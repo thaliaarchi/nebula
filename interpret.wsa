@@ -1,8 +1,9 @@
-define IP 2       # Instruction pointer, points to current instruction
-define IMIN 2     # Instruction stack bottom, unchanging
-define SP 101     # Stack pointer, points to top of stack
-define SMINP 101  # Stack bottom pointer, points to bottom of stack
-define TEMP 1     # Temporary storage for reading
+define IP 2      # Instruction pointer, points to current instruction
+define IMIN 10   # Instruction stack location, unchanging
+define SP 3      # Stack pointer, points to top of stack
+define SMINP 4   # Stack bottom pointer, points to bottom of stack
+define SMIN 100  # stack bottom location, unchanging
+define TEMP 1    # Temporary storage for reading
 
 define INSTR_PUSH     1
 define INSTR_DUP      2
@@ -29,6 +30,13 @@ define INSTR_PRINTI   22
 define INSTR_READC    23
 define INSTR_READI    24
 
+
+    push IP;    push IMIN; store
+    push SP;    push SMIN; store
+    push SMINP; push SMIN; store
+
+    # dropped by read_char
+    push 0
 
 parse:
     call read_char
@@ -151,14 +159,14 @@ parse:
 # returns result on top of stack
 parse_signed:
     call read_char
-    dup; push ' ';  sub; jz .parse_unsigned
+    dup; push ' ';  sub; jz parse_unsigned
     dup; push '\t'; sub; jz .parse_signed_negative
     dup; push '\n'; sub; jz .parse_signed_zero
     jz .error_unterminated_number
-    jmp .parse_signed
+    jmp parse_signed
 .parse_signed_negative:
+    call parse_unsigned
     push -1
-    call .parse_unsigned
     mul
     ret
 .parse_signed_zero:
@@ -168,82 +176,98 @@ parse_signed:
 # returns result on top of stack
 parse_unsigned:
     push 0
+.parse_unsigned_loop:
+    swap
     call read_char
     dup; push ' ';  sub; jz .parse_unsigned_zero
     dup; push '\t'; sub; jz .parse_unsigned_one
     dup; push '\n'; sub; jz .parse_unsigned_end
     jz .error_unterminated_number
-    jmp .parse_unsigned
+    jmp .parse_unsigned_loop
 .parse_unsigned_zero:
+    swap
     push 2
     mul
-    jmp .parse_unsigned
+    jmp .parse_unsigned_loop
 .parse_unsigned_one:
+    swap
     push 2
     mul
     push 1
     add
-    jmp .parse_unsigned
+    jmp .parse_unsigned_loop
 .parse_unsigned_end:
+    swap
     ret
 
 read_char:
+    drop
     push TEMP
     dup
-    retrieve
     readc
     retrieve
     ret
 
 
-# drop chars from reading instruction and store instruction and potential argument in instruction stack
-.parsed_push:     drop; drop;             push INSTR_PUSH;     call parse_signed;   jmp .parsed_instr_arg
-.parsed_dup:      drop; drop; drop;       push INSTR_DUP;                           jmp .parsed_instr
-.parsed_copy:     drop; drop; drop;       push INSTR_COPY;     call parse_signed;   jmp .parsed_instr_arg
-.parsed_swap:     drop; drop; drop;       push INSTR_SWAP;                          jmp .parsed_instr
-.parsed_drop:     drop; drop; drop;       push INSTR_DROP;                          jmp .parsed_instr
-.parsed_slide:    drop; drop; drop;       push INSTR_SLIDE;    call parse_signed;   jmp .parsed_instr_arg
-.parsed_add:      drop; drop; drop; drop; push INSTR_ADD;                           jmp .parsed_instr
-.parsed_sub:      drop; drop; drop; drop; push INSTR_SUB;                           jmp .parsed_instr
-.parsed_mul:      drop; drop; drop; drop; push INSTR_MUL;                           jmp .parsed_instr
-.parsed_div:      drop; drop; drop; drop; push INSTR_DIV;                           jmp .parsed_instr
-.parsed_mod:      drop; drop; drop; drop; push INSTR_MOD;                           jmp .parsed_instr
-.parsed_store:    drop; drop; drop;       push INSTR_STORE;                         jmp .parsed_instr
-.parsed_retrieve: drop; drop; drop;       push INSTR_RETRIEVE;                      jmp .parsed_instr
-.parsed_label:    drop; drop; drop;       push INSTR_LABEL;    call parse_unsigned; jmp .parsed_instr_arg
-.parsed_call:     drop; drop; drop;       push INSTR_CALL;     call parse_unsigned; jmp .parsed_instr_arg
-.parsed_jmp:      drop; drop; drop;       push INSTR_JMP;      call parse_unsigned; jmp .parsed_instr_arg
-.parsed_jz:       drop; drop; drop;       push INSTR_JZ;       call parse_unsigned; jmp .parsed_instr_arg
-.parsed_jn:       drop; drop; drop;       push INSTR_JN;       call parse_unsigned; jmp .parsed_instr_arg
-.parsed_ret:      drop; drop; drop;       push INSTR_RET;                           jmp .parsed_instr
-.parsed_end       drop; drop; drop;       push INSTR_END;                           jmp .parsed_instr
-.parsed_printc:   drop; drop; drop; drop; push INSTR_PRINTC;                        jmp .parsed_instr
-.parsed_printi:   drop; drop; drop; drop; push INSTR_PRINTI;                        jmp .parsed_instr
-.parsed_readc:    drop; drop; drop; drop; push INSTR_READC;                         jmp .parsed_instr
-.parsed_readi:    drop; drop; drop; drop; push INSTR_READI;                         jmp .parsed_instr
+# push instruction ID and number argument with reading temp char on top
+.parsed_push:     call parse_signed;   push INSTR_PUSH;     jmp .parsed_instr_arg
+.parsed_dup:                           push INSTR_DUP;      jmp .parsed_instr
+.parsed_copy:     call parse_signed;   push INSTR_COPY;     jmp .parsed_instr_arg
+.parsed_swap:                          push INSTR_SWAP;     jmp .parsed_instr
+.parsed_drop:                          push INSTR_DROP;     jmp .parsed_instr
+.parsed_slide:    call parse_signed;   push INSTR_SLIDE;    jmp .parsed_instr_arg
+.parsed_add:                           push INSTR_ADD;      jmp .parsed_instr
+.parsed_sub:                           push INSTR_SUB;      jmp .parsed_instr
+.parsed_mul:                           push INSTR_MUL;      jmp .parsed_instr
+.parsed_div:                           push INSTR_DIV;      jmp .parsed_instr
+.parsed_mod:                           push INSTR_MOD;      jmp .parsed_instr
+.parsed_store:                         push INSTR_STORE;    jmp .parsed_instr
+.parsed_retrieve:                      push INSTR_RETRIEVE; jmp .parsed_instr
+.parsed_label:    call parse_unsigned; push INSTR_LABEL;    jmp .parsed_instr_arg
+.parsed_call:     call parse_unsigned; push INSTR_CALL;     jmp .parsed_instr_arg
+.parsed_jmp:      call parse_unsigned; push INSTR_JMP;      jmp .parsed_instr_arg
+.parsed_jz:       call parse_unsigned; push INSTR_JZ;       jmp .parsed_instr_arg
+.parsed_jn:       call parse_unsigned; push INSTR_JN;       jmp .parsed_instr_arg
+.parsed_ret:                           push INSTR_RET;      jmp .parsed_instr
+.parsed_end:                           push INSTR_END;      jmp .parsed_instr
+.parsed_printc:                        push INSTR_PRINTC;   jmp .parsed_instr
+.parsed_printi:                        push INSTR_PRINTI;   jmp .parsed_instr
+.parsed_readc:                         push INSTR_READC;    jmp .parsed_instr
+.parsed_readi:                         push INSTR_READI;    jmp .parsed_instr
 
-# instruction id must be on top of stack
-.parsed_instr:
-    push IP
-    retrieve
-    swap
-    store
-    jmp parse
-
-# argument must be on top of stack, then instruction id
 .parsed_instr_arg:
+    # store argument at IP+1
+    swap
+    push IP
+    retrieve
+    push 1
+    add
+    swap
+    store
+    # fallthrough
+
+.parsed_instr:
+    # store instruction id at IP
     push IP
     retrieve
     swap
-    copy 1
-    swap
     store
-    swap
+
+    # increment IP
+    push IP
+    dup
+    retrieve
+    push 2
+    add
     store
+
     jmp parse
 
 
 interpret:
+    # drop reading temp char
+    drop
+
     # reset IP to IMIN
     push IP
     push IMIN
@@ -287,7 +311,7 @@ interpret:
     dup; push INSTR_PRINTI;   sub; jz .do_printi
     dup; push INSTR_READC;    sub; jz .do_readc
     dup; push INSTR_READI;    sub; jz .do_readi
-    jz do_end  # unclean exit
+    jz .do_end  # unclean exit
     jmp .error_unexpected_instr
 
 .do_push:
@@ -310,7 +334,7 @@ interpret:
     # increment SP
     store
 
-    jmp do_next_instr
+    jmp .do_next_instr
 
 .do_dup:
     # push SP and address for one above top of VM stack
@@ -330,7 +354,7 @@ interpret:
     # increment SP
     store
 
-    jmp do_next_instr
+    jmp .do_next_instr
 
 .do_copy: jmp .error_unimplemented_instr
 .do_swap: jmp .error_unimplemented_instr
@@ -344,8 +368,8 @@ interpret:
     sub
     store
 
-    call check_stack_underflow
-    jmp do_next_instr
+    # call check_stack_underflow
+    jmp .do_next_instr
 
 .do_slide:    jmp .error_unimplemented_instr
 .do_add:      jmp .error_unimplemented_instr
@@ -361,9 +385,48 @@ interpret:
 .do_jz:       jmp .error_unimplemented_instr
 .do_jn:       jmp .error_unimplemented_instr
 .do_ret:      jmp .error_unimplemented_instr
-.do_end:      jmp .error_unimplemented_instr
-.do_printc:   jmp .error_unimplemented_instr
-.do_printi:   jmp .error_unimplemented_instr
+
+.do_end:
+    end
+
+.do_printc:
+    # push SP and top value of stack
+    push SP
+    dup
+    retrieve
+
+    # print top value of stack
+    dup
+    retrieve
+    printc
+
+    # decrement SP
+    push 1
+    sub
+    store
+
+    # call check_stack_underflow
+    jmp .do_next_instr
+
+.do_printi:
+    # push SP and top value of stack
+    push SP
+    dup
+    retrieve
+
+    # print top value of stack
+    dup
+    retrieve
+    printi
+
+    # decrement SP
+    push 1
+    sub
+    store
+
+    # call check_stack_underflow
+    jmp .do_next_instr
+
 .do_readc:    jmp .error_unimplemented_instr
 .do_readi:    jmp .error_unimplemented_instr
 
