@@ -1,0 +1,524 @@
+define IP 2       # Instruction pointer, points to current instruction
+define IMIN 2     # Instruction stack bottom, unchanging
+define SP 101     # Stack pointer, points to top of stack
+define SMINP 101  # Stack bottom pointer, points to bottom of stack
+define TEMP 1     # Temporary storage for reading
+
+define INSTR_PUSH     1
+define INSTR_DUP      2
+define INSTR_COPY     3
+define INSTR_SWAP     4
+define INSTR_DROP     5
+define INSTR_SLIDE    6
+define INSTR_ADD      7
+define INSTR_SUB      8
+define INSTR_MUL      9
+define INSTR_DIV      10
+define INSTR_MOD      11
+define INSTR_STORE    12
+define INSTR_RETRIEVE 13
+define INSTR_LABEL    14  # TODO remove after creating label map
+define INSTR_CALL     15
+define INSTR_JMP      16
+define INSTR_JZ       17
+define INSTR_JN       18
+define INSTR_RET      19
+define INSTR_END      20
+define INSTR_PRINTC   21
+define INSTR_PRINTI   22
+define INSTR_READC    23
+define INSTR_READI    24
+
+
+parse:
+    call read_char
+    dup; push ' ';  sub; jz .parse_stack
+    dup; push '\t'; sub; jz .parse_imp_tab
+    dup; push '\n'; sub; jz .parse_flow
+    jz interpret
+    jmp parse
+.parse_imp_tab:
+    call read_char
+    dup; push ' ';  sub; jz .parse_arith
+    dup; push '\t'; sub; jz .parse_heap
+    dup; push '\n'; sub; jz .parse_io
+    jz .error_incomplete_instr
+    jmp .parse_imp_tab
+
+.parse_stack:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_push
+    dup; push '\t'; sub; jz .parse_stack_tab
+    dup; push '\n'; sub; jz .parse_stack_lf
+    jz .error_incomplete_instr
+    jmp .parse_stack
+.parse_stack_tab:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_copy
+    dup; push '\t'; sub; jz .error_invalid_instr
+    dup; push '\n'; sub; jz .parsed_slide
+    jz .error_incomplete_instr
+    jmp .parse_stack_tab
+.parse_stack_lf:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_dup
+    dup; push '\t'; sub; jz .parsed_swap
+    dup; push '\n'; sub; jz .parsed_drop
+    jz .error_incomplete_instr
+    jmp .parse_stack_lf
+
+.parse_arith:
+    call read_char
+    dup; push ' ';  sub; jz .parse_arith_space
+    dup; push '\t'; sub; jz .parse_arith_tab
+    dup; push '\n'; sub; jz .error_invalid_instr
+    jz .error_incomplete_instr
+    jmp .parse_arith
+.parse_arith_space:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_add
+    dup; push '\t'; sub; jz .parsed_sub
+    dup; push '\n'; sub; jz .parsed_mul
+    jz .error_incomplete_instr
+    jmp .parse_arith_space
+.parse_arith_tab:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_div
+    dup; push '\t'; sub; jz .parsed_mod
+    dup; push '\n'; sub; jz .error_invalid_instr
+    jz .error_incomplete_instr
+    jmp .parse_arith_tab
+
+.parse_heap:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_store
+    dup; push '\t'; sub; jz .parsed_retrieve
+    dup; push '\n'; sub; jz .error_invalid_instr
+    jz .error_incomplete_instr
+    jmp .parse_heap
+
+.parse_flow:
+    call read_char
+    dup; push ' ';  sub; jz .parse_flow_space
+    dup; push '\t'; sub; jz .parse_flow_tab
+    dup; push '\n'; sub; jz .parse_flow_lf
+    jz .error_incomplete_instr
+    jmp .parse_arith_tab
+.parse_flow_space:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_label
+    dup; push '\t'; sub; jz .parsed_call
+    dup; push '\n'; sub; jz .parsed_jmp
+    jz .error_incomplete_instr
+    jmp .parse_flow_space
+.parse_flow_tab:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_jz
+    dup; push '\t'; sub; jz .parsed_jn
+    dup; push '\n'; sub; jz .parsed_ret
+    jz .error_incomplete_instr
+    jmp .parse_flow_tab
+.parse_flow_lf:
+    call read_char
+    dup; push ' ';  sub; jz .error_invalid_instr
+    dup; push '\t'; sub; jz .error_invalid_instr
+    dup; push '\n'; sub; jz .parsed_end
+    jz .error_incomplete_instr
+    jmp .parse_flow_lf
+
+.parse_io:
+    call read_char
+    dup; push ' ';  sub; jz .parse_io_space
+    dup; push '\t'; sub; jz .parse_io_tab
+    dup; push '\n'; sub; jz .error_invalid_instr
+    jz .error_incomplete_instr
+    jmp .parse_io
+.parse_io_space:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_printc
+    dup; push '\t'; sub; jz .parsed_printi
+    dup; push '\n'; sub; jz .error_invalid_instr
+    jz .error_incomplete_instr
+    jmp .parse_flow_space
+.parse_io_tab:
+    call read_char
+    dup; push ' ';  sub; jz .parsed_readc
+    dup; push '\t'; sub; jz .parsed_readi
+    dup; push '\n'; sub; jz .error_invalid_instr
+    jz .error_incomplete_instr
+    jmp .parse_flow_tab
+
+# returns result on top of stack
+parse_signed:
+    call read_char
+    dup; push ' ';  sub; jz .parse_unsigned
+    dup; push '\t'; sub; jz .parse_signed_negative
+    dup; push '\n'; sub; jz .parse_signed_zero
+    jz .error_unterminated_number
+    jmp .parse_signed
+.parse_signed_negative:
+    push -1
+    call .parse_unsigned
+    mul
+    ret
+.parse_signed_zero:
+    push 0
+    ret
+
+# returns result on top of stack
+parse_unsigned:
+    push 0
+    call read_char
+    dup; push ' ';  sub; jz .parse_unsigned_zero
+    dup; push '\t'; sub; jz .parse_unsigned_one
+    dup; push '\n'; sub; jz .parse_unsigned_end
+    jz .error_unterminated_number
+    jmp .parse_unsigned
+.parse_unsigned_zero:
+    push 2
+    mul
+    jmp .parse_unsigned
+.parse_unsigned_one:
+    push 2
+    mul
+    push 1
+    add
+    jmp .parse_unsigned
+.parse_unsigned_end:
+    ret
+
+read_char:
+    push TEMP
+    dup
+    retrieve
+    readc
+    retrieve
+    ret
+
+
+# drop chars from reading instruction and store instruction and potential argument in instruction stack
+.parsed_push:     drop; drop;             push INSTR_PUSH;     call parse_signed;   jmp .parsed_instr_arg
+.parsed_dup:      drop; drop; drop;       push INSTR_DUP;                           jmp .parsed_instr
+.parsed_copy:     drop; drop; drop;       push INSTR_COPY;     call parse_signed;   jmp .parsed_instr_arg
+.parsed_swap:     drop; drop; drop;       push INSTR_SWAP;                          jmp .parsed_instr
+.parsed_drop:     drop; drop; drop;       push INSTR_DROP;                          jmp .parsed_instr
+.parsed_slide:    drop; drop; drop;       push INSTR_SLIDE;    call parse_signed;   jmp .parsed_instr_arg
+.parsed_add:      drop; drop; drop; drop; push INSTR_ADD;                           jmp .parsed_instr
+.parsed_sub:      drop; drop; drop; drop; push INSTR_SUB;                           jmp .parsed_instr
+.parsed_mul:      drop; drop; drop; drop; push INSTR_MUL;                           jmp .parsed_instr
+.parsed_div:      drop; drop; drop; drop; push INSTR_DIV;                           jmp .parsed_instr
+.parsed_mod:      drop; drop; drop; drop; push INSTR_MOD;                           jmp .parsed_instr
+.parsed_store:    drop; drop; drop;       push INSTR_STORE;                         jmp .parsed_instr
+.parsed_retrieve: drop; drop; drop;       push INSTR_RETRIEVE;                      jmp .parsed_instr
+.parsed_label:    drop; drop; drop;       push INSTR_LABEL;    call parse_unsigned; jmp .parsed_instr_arg
+.parsed_call:     drop; drop; drop;       push INSTR_CALL;     call parse_unsigned; jmp .parsed_instr_arg
+.parsed_jmp:      drop; drop; drop;       push INSTR_JMP;      call parse_unsigned; jmp .parsed_instr_arg
+.parsed_jz:       drop; drop; drop;       push INSTR_JZ;       call parse_unsigned; jmp .parsed_instr_arg
+.parsed_jn:       drop; drop; drop;       push INSTR_JN;       call parse_unsigned; jmp .parsed_instr_arg
+.parsed_ret:      drop; drop; drop;       push INSTR_RET;                           jmp .parsed_instr
+.parsed_end       drop; drop; drop;       push INSTR_END;                           jmp .parsed_instr
+.parsed_printc:   drop; drop; drop; drop; push INSTR_PRINTC;                        jmp .parsed_instr
+.parsed_printi:   drop; drop; drop; drop; push INSTR_PRINTI;                        jmp .parsed_instr
+.parsed_readc:    drop; drop; drop; drop; push INSTR_READC;                         jmp .parsed_instr
+.parsed_readi:    drop; drop; drop; drop; push INSTR_READI;                         jmp .parsed_instr
+
+# instruction id must be on top of stack
+.parsed_instr:
+    push IP
+    retrieve
+    swap
+    store
+    jmp parse
+
+# argument must be on top of stack, then instruction id
+.parsed_instr_arg:
+    push IP
+    retrieve
+    swap
+    copy 1
+    swap
+    store
+    swap
+    store
+    jmp parse
+
+
+interpret:
+    # reset IP to IMIN
+    push IP
+    push IMIN
+    store
+    jmp .do_instr
+
+.do_next_instr:
+    # increment IP
+    push IP
+    dup
+    retrieve
+    push 2
+    add
+    store
+    # fallthrough
+
+.do_instr:
+    push IP
+    retrieve
+    dup; push INSTR_PUSH;     sub; jz .do_push
+    dup; push INSTR_DUP;      sub; jz .do_dup
+    dup; push INSTR_COPY;     sub; jz .do_copy
+    dup; push INSTR_SWAP;     sub; jz .do_swap
+    dup; push INSTR_DROP;     sub; jz .do_drop
+    dup; push INSTR_SLIDE;    sub; jz .do_slide
+    dup; push INSTR_ADD;      sub; jz .do_add
+    dup; push INSTR_SUB;      sub; jz .do_sub
+    dup; push INSTR_MUL;      sub; jz .do_mul
+    dup; push INSTR_DIV;      sub; jz .do_div
+    dup; push INSTR_MOD;      sub; jz .do_mod
+    dup; push INSTR_STORE;    sub; jz .do_store
+    dup; push INSTR_RETRIEVE; sub; jz .do_retrieve
+    dup; push INSTR_LABEL;    sub; jz .do_label
+    dup; push INSTR_CALL;     sub; jz .do_call
+    dup; push INSTR_JMP;      sub; jz .do_jmp
+    dup; push INSTR_JZ;       sub; jz .do_jz
+    dup; push INSTR_JN;       sub; jz .do_jn
+    dup; push INSTR_RET;      sub; jz .do_ret
+    dup; push INSTR_END;      sub; jz .do_end
+    dup; push INSTR_PRINTC;   sub; jz .do_printc
+    dup; push INSTR_PRINTI;   sub; jz .do_printi
+    dup; push INSTR_READC;    sub; jz .do_readc
+    dup; push INSTR_READI;    sub; jz .do_readi
+    jz do_end  # unclean exit
+    jmp .error_unexpected_instr
+
+.do_push:
+    # push SP and address for one above top of VM stack
+    push SP
+    dup
+    retrieve
+    push 1
+    add
+
+    # push argument to VM stack
+    dup
+    push IP
+    retrieve
+    push 1
+    add
+    retrieve
+    store
+
+    # increment SP
+    store
+
+    jmp do_next_instr
+
+.do_dup:
+    # push SP and address for one above top of VM stack
+    push SP
+    dup
+    retrieve
+    push 1
+    add
+
+    # duplicate top of stack
+    dup
+    copy 2
+    retrieve
+    retrieve
+    store
+
+    # increment SP
+    store
+
+    jmp do_next_instr
+
+.do_copy: jmp .error_unimplemented_instr
+.do_swap: jmp .error_unimplemented_instr
+
+.do_drop:
+    # decrement SP
+    push SP
+    dup
+    retrieve
+    push 1
+    sub
+    store
+
+    call check_stack_underflow
+    jmp do_next_instr
+
+.do_slide:    jmp .error_unimplemented_instr
+.do_add:      jmp .error_unimplemented_instr
+.do_sub:      jmp .error_unimplemented_instr
+.do_mul:      jmp .error_unimplemented_instr
+.do_div:      jmp .error_unimplemented_instr
+.do_mod:      jmp .error_unimplemented_instr
+.do_store:    jmp .error_unimplemented_instr
+.do_retrieve: jmp .error_unimplemented_instr
+.do_label:    jmp .error_unimplemented_instr
+.do_call:     jmp .error_unimplemented_instr
+.do_jmp:      jmp .error_unimplemented_instr
+.do_jz:       jmp .error_unimplemented_instr
+.do_jn:       jmp .error_unimplemented_instr
+.do_ret:      jmp .error_unimplemented_instr
+.do_end:      jmp .error_unimplemented_instr
+.do_printc:   jmp .error_unimplemented_instr
+.do_printi:   jmp .error_unimplemented_instr
+.do_readc:    jmp .error_unimplemented_instr
+.do_readi:    jmp .error_unimplemented_instr
+
+check_stack_underflow:
+    push SP
+    retrieve
+    push SMINP
+    sub
+    jn .error_stack_underflow
+    ret
+
+
+# errors print char by char rather than in a loop to use stack less
+
+.error_incomplete_instr:
+    push 'I'; printc
+    push 'n'; printc
+    push 'c'; printc
+    push 'o'; printc
+    push 'm'; printc
+    push 'p'; printc
+    push 'l'; printc
+    push 'e'; printc
+    push 't'; printc
+    push 'e'; printc
+    push ' '; printc
+    push 'i'; printc
+    push 'n'; printc
+    push 's'; printc
+    push 't'; printc
+    push 'r'; printc
+    push 'u'; printc
+    push 'c'; printc
+    push 't'; printc
+    push 'i'; printc
+    push 'o'; printc
+    push 'n'; printc
+    push '\n'; printc
+    end
+
+.error_invalid_instr:
+    push 'I'; printc
+    push 'n'; printc
+    push 'v'; printc
+    push 'a'; printc
+    push 'l'; printc
+    push 'i'; printc
+    push 'd'; printc
+    push ' '; printc
+    push 'i'; printc
+    push 'n'; printc
+    push 's'; printc
+    push 't'; printc
+    push 'r'; printc
+    push 'u'; printc
+    push 'c'; printc
+    push 't'; printc
+    push 'i'; printc
+    push 'o'; printc
+    push 'n'; printc
+    push '\n'; printc
+    end
+
+.error_unterminated_number:
+    push 'U'; printc
+    push 'n'; printc
+    push 't'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push 'm'; printc
+    push 'i'; printc
+    push 'n'; printc
+    push 'a'; printc
+    push 't'; printc
+    push 'e'; printc
+    push 'd'; printc
+    push ' '; printc
+    push 'n'; printc
+    push 'u'; printc
+    push 'm'; printc
+    push 'b'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push '\n'; printc
+    end
+
+.error_unexpected_instr:
+    push 'U'; printc
+    push 'n'; printc
+    push 'e'; printc
+    push 'x'; printc
+    push 'p'; printc
+    push 'e'; printc
+    push 'c'; printc
+    push 't'; printc
+    push 'e'; printc
+    push 'd'; printc
+    push ' '; printc
+    push 'i'; printc
+    push 'n'; printc
+    push 's'; printc
+    push 't'; printc
+    push 'r'; printc
+    push 'u'; printc
+    push 'c'; printc
+    push 't'; printc
+    push 'i'; printc
+    push 'o'; printc
+    push 'n'; printc
+    push '\n'; printc
+    end
+
+.error_unimplemented_instr:
+    push 'U'; printc
+    push 'n'; printc
+    push 'i'; printc
+    push 'm'; printc
+    push 'p'; printc
+    push 'l'; printc
+    push 'e'; printc
+    push 'm'; printc
+    push 'e'; printc
+    push 'n'; printc
+    push 't'; printc
+    push 'e'; printc
+    push 'd'; printc
+    push ' '; printc
+    push 'i'; printc
+    push 'n'; printc
+    push 's'; printc
+    push 't'; printc
+    push 'r'; printc
+    push 'u'; printc
+    push 'c'; printc
+    push 't'; printc
+    push 'i'; printc
+    push 'o'; printc
+    push 'n'; printc
+    end
+
+.error_stack_underflow:
+    push 'S'; printc
+    push 't'; printc
+    push 'a'; printc
+    push 'c'; printc
+    push 'k'; printc
+    push ' '; printc
+    push 'u'; printc
+    push 'n'; printc
+    push 'd'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push 'f'; printc
+    push 'l'; printc
+    push 'o'; printc
+    push 'w'; printc
+    push '\n'; printc
+    end
