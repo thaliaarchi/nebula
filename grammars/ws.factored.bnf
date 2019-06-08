@@ -1,0 +1,34 @@
+<program> ::= <instruction> <program> | epsilon
+
+<instruction> ::= <space> <stack>
+                | <tab> <arith-heap-io>
+                | <lf> <flow>
+
+<arith-heap-io> ::= <space> <arith>
+                  | <tab> <space-tab>
+                  | <lf> <io>
+
+<stack> ::= <space> <number>
+          | <tab> <space-lf-number>
+          | <lf> <space-tab-lf>
+<arith> ::= <space> <space-tab-lf>
+          | <tab> <space-tab>
+<flow>  ::= <space> <space-tab-lf>
+          | <tab> <space-tab-lf>
+          | <lf> <lf>
+<io>    ::= <space> <space-tab>
+          | <tab> <space-tab>
+
+<number> ::= <space> <number>
+           | <tab> <number>
+           | "\n"
+
+<space-lf-number> ::= <space> <number>
+                    | <lf> <number>
+
+<space-tab-lf> ::= ' ' | '\t' | '\n'
+<space-tab>    ::= ' ' | '\t'
+
+<space> ::= ' '
+<tab>   ::= '\t'
+<lf>    ::= '\n'

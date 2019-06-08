@@ -1,0 +1,70 @@
+<program> ::= <instruction> <program> | epsilon
+
+<instruction> ::= <push> <signed>
+                | <dup>
+                | <copy> <signed>
+                | <swap>
+                | <drop>
+                | <slide> <signed>
+                | <add>
+                | <sub>
+                | <mul>
+                | <div>
+                | <mod>
+                | <store>
+                | <retrieve>
+                | <label> <unsigned>
+                | <call> <unsigned>
+                | <jmp> <unsigned>
+                | <jz> <unsigned>
+                | <jn> <unsigned>
+                | <ret>
+                | <end>
+                | <printc>
+                | <printi>
+                | <readc>
+                | <readi>
+
+<stack> ::= <space>
+<arith> ::= <tab> <space>
+<heap>  ::= <tab> <tab>
+<flow>  ::= <lf>
+<io>    ::= <tab> <lf>
+
+<push>  ::= <stack> <space>
+<dup>   ::= <stack> <lf> <space>
+<copy>  ::= <stack> <tab> <space>
+<swap>  ::= <stack> <lf> <tab>
+<drop>  ::= <stack> <lf> <lf>
+<slide> ::= <stack> <tab> <lf>
+
+<add> ::= <arith> <space> <space>
+<sub> ::= <arith> <space> <tab>
+<mul> ::= <arith> <space> <lf>
+<div> ::= <arith> <tab> <space>
+<mod> ::= <arith> <tab> <tab>
+
+<store>    ::= <heap> <space>
+<retrieve> ::= <heap> <tab>
+
+<label> ::= <flow> <space> <space>
+<call>  ::= <flow> <space> <tab>
+<jmp>   ::= <flow> <space> <lf>
+<jz>    ::= <flow> <tab> <space>
+<jn>    ::= <flow> <tab> <tab>
+<ret>   ::= <flow> <tab> <lf>
+<end>   ::= <flow> <lf> <lf>
+
+<printc> ::= <io> <space> <space>
+<printi> ::= <io> <space> <tab>
+<readc>  ::= <io> <tab> <space>
+<readi>  ::= <io> <tab> <tab>
+
+<signed>   ::= <sign> <unsigned> | <lf>
+<unsigned> ::= <digit> <unsigned> | <lf>
+<sign>     ::= <space> | <tab>
+<digit>    ::= <space> | <tab>
+
+<space> ::= ' '
+<tab>   ::= '\t'
+<lf>    ::= '\n'
