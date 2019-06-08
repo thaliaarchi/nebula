@@ -1,0 +1,46 @@
+<program> ::= <instruction> <program> | epsilon
+
+<instruction> ::= "push" <push-arg>
+                | "dup"
+                | "copy" <number>
+                | "swap"
+                | "drop"
+                | "slide" <number>
+                | "add"
+                | "sub"
+                | "mul"
+                | "div"
+                | "mod"
+                | "store"
+                | "retrieve"
+                | <label> ':'
+                | "call" <label>
+                | "jmp" <label>
+                | "jz" <label>
+                | "jn" <label>
+                | "ret"
+                | "end"
+                | "printc"
+                | "printi"
+                | "readc"
+                | "readi"
+
+<push-arg> ::= <number> | "'" <char> "'"
+<char> ::= <alpha> | <digit> | <symbol> | '\\' <escape>
+
+<number> ::= <sign> <unsigned> | <unsigned>
+<unsigned> ::= <digit> <unsigned> | <digit>
+
+<label> ::= <label-char> <label> | <label-char>
+<label-char> ::= <alpha> | <digit> | '.' | '_'
+
+<digit> ::= '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+<alpha> ::= 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M'
+          | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+          | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
+          | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+<symbol> ::= ' ' | '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '*'
+           | '+' | ',' | '-' | '.' | '/' | ':' | ';' | '<' | '=' | '>' | '?'
+           | '@' | '[' | '\\' | ']' | '^' | '_' | '`' | '{' | '|' | '}' | '~'
+<escape> ::= 'a' | 'b' | 'e' | 'f' | 'n' | 'r' | 't' | 'v'
+           | '0' | '\\' | '\'' | 'x' <digit> <digit>
