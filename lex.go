@@ -1,4 +1,4 @@
-package gospace
+package wspace
 
 import (
 	"bufio"
@@ -17,7 +17,7 @@ const (
 )
 
 type SpaceLexer interface {
-	Read() (Token, error)
+	Next() (Token, error)
 	Pos() (int, int)
 }
 

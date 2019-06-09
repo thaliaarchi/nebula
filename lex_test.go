@@ -1,4 +1,4 @@
-package gospace
+package wspace
 
 import (
 	"bytes"
