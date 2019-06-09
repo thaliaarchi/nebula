@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/andrewarchi/wspace"
+	"github.com/andrewarchi/wspace/ws"
 )
 
 func main() {
@@ -17,8 +17,8 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	l := wspace.NewLexer(f)
-	instrs := wspace.Parse(l)
+	l := ws.NewLexer(f)
+	instrs := ws.Parse(l)
 	for instr := range instrs {
 		fmt.Printf("%s %d\n", &instr.Type, instr.Arg)
 	}

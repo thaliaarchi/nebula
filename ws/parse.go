@@ -1,6 +1,7 @@
-package wspace
+package ws
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -34,14 +35,14 @@ func (p *Parser) run() error {
 
 type stateFn func(*Parser) (stateFn, error)
 
-type tree struct {
+type states struct {
 	Space stateFn
 	Tab   stateFn
 	LF    stateFn
 	Root  bool
 }
 
-func treeFn(state tree) stateFn {
+func transition(s states) stateFn {
 	return func(p *Parser) (stateFn, error) {
 		t, err := p.l.Next()
 		if err != nil {
@@ -49,13 +50,13 @@ func treeFn(state tree) stateFn {
 		}
 		switch t {
 		case Space:
-			return state.Space, nil
+			return s.Space, nil
 		case Tab:
-			return state.Tab, nil
+			return s.Tab, nil
 		case LF:
-			return state.LF, nil
+			return s.LF, nil
 		case EOF:
-			if !state.Root {
+			if !s.Root {
 				return nil, io.ErrUnexpectedEOF
 			}
 			return nil, nil
@@ -64,16 +65,16 @@ func treeFn(state tree) stateFn {
 	}
 }
 
-func instrFn(typ InstrType) stateFn {
+func emitInstr(typ InstrType) stateFn {
 	return func(p *Parser) (stateFn, error) {
 		p.instrs <- Instr{typ, nil}
 		return parseInstr, nil
 	}
 }
 
-func instrNumberFn(typ InstrType) stateFn {
+func parseInstrNumber(typ InstrType) stateFn {
 	return func(p *Parser) (stateFn, error) {
-		arg, err := p.parseSigned()
+		arg, err := parseSigned(p)
 		if err != nil {
 			return nil, err
 		}
@@ -82,9 +83,9 @@ func instrNumberFn(typ InstrType) stateFn {
 	}
 }
 
-func instrLabelFn(typ InstrType) stateFn {
+func parseInstrLabel(typ InstrType) stateFn {
 	return func(p *Parser) (stateFn, error) {
-		arg, err := p.parseUnsigned()
+		arg, err := parseUnsigned(p)
 		if err != nil {
 			return nil, err
 		}
@@ -93,30 +94,32 @@ func instrLabelFn(typ InstrType) stateFn {
 	}
 }
 
-func (p *Parser) parseSigned() (*big.Int, error) {
+func parseSigned(p *Parser) (*big.Int, error) {
 	t, err := p.l.Next()
 	if err != nil {
 		return nil, err
 	}
 	switch t {
 	case Space:
-		return p.parseUnsigned()
+		return parseUnsigned(p)
 	case Tab:
-		num, err := p.parseUnsigned()
+		num, err := parseUnsigned(p)
 		if err != nil {
 			return nil, err
 		}
 		num.Neg(num)
 		return num, nil
-	case LF, EOF:
+	case LF:
 		return nil, nil // zero
+	case EOF:
+		return nil, errors.New("unterminated number")
 	}
 	panic(invalidToken(t))
 }
 
 var bigOne = new(big.Int).SetInt64(1)
 
-func (p *Parser) parseUnsigned() (*big.Int, error) {
+func parseUnsigned(p *Parser) (*big.Int, error) {
 	num := new(big.Int)
 	for {
 		t, err := p.l.Next()
@@ -143,9 +146,9 @@ func invalidToken(t Token) string {
 }
 
 func init() {
-	parseInstr = treeFn(tree{
+	parseInstr = transition(states{
 		Space: parseStack,
-		Tab: treeFn(tree{
+		Tab: transition(states{
 			Space: parseArith,
 			Tab:   parseHeap,
 			LF:    parseIO,
@@ -157,59 +160,59 @@ func init() {
 
 var parseInstr stateFn
 
-var parseStack = treeFn(tree{
-	Space: instrNumberFn(Push),
-	Tab: treeFn(tree{
-		Space: instrNumberFn(Copy),
-		LF:    instrNumberFn(Slide),
+var parseStack = transition(states{
+	Space: parseInstrNumber(Push),
+	Tab: transition(states{
+		Space: parseInstrNumber(Copy),
+		LF:    parseInstrNumber(Slide),
 	}),
-	LF: treeFn(tree{
-		Space: instrFn(Dup),
-		Tab:   instrFn(Swap),
-		LF:    instrFn(Drop),
-	}),
-})
-
-var parseArith = treeFn(tree{
-	Space: treeFn(tree{
-		Space: instrFn(Add),
-		Tab:   instrFn(Sub),
-		LF:    instrFn(Mul),
-	}),
-	Tab: treeFn(tree{
-		Space: instrFn(Div),
-		Tab:   instrFn(Mod),
+	LF: transition(states{
+		Space: emitInstr(Dup),
+		Tab:   emitInstr(Swap),
+		LF:    emitInstr(Drop),
 	}),
 })
 
-var parseHeap = treeFn(tree{
-	Space: instrFn(Store),
-	Tab:   instrFn(Retrieve),
-})
-
-var parseIO = treeFn(tree{
-	Space: treeFn(tree{
-		Space: instrFn(Printc),
-		Tab:   instrFn(Printi),
+var parseArith = transition(states{
+	Space: transition(states{
+		Space: emitInstr(Add),
+		Tab:   emitInstr(Sub),
+		LF:    emitInstr(Mul),
 	}),
-	Tab: treeFn(tree{
-		Space: instrFn(Readc),
-		Tab:   instrFn(Readi),
+	Tab: transition(states{
+		Space: emitInstr(Div),
+		Tab:   emitInstr(Mod),
 	}),
 })
 
-var parseFlow = treeFn(tree{
-	Space: treeFn(tree{
-		Space: instrLabelFn(Label),
-		Tab:   instrLabelFn(Call),
-		LF:    instrLabelFn(Jmp),
+var parseHeap = transition(states{
+	Space: emitInstr(Store),
+	Tab:   emitInstr(Retrieve),
+})
+
+var parseIO = transition(states{
+	Space: transition(states{
+		Space: emitInstr(Printc),
+		Tab:   emitInstr(Printi),
 	}),
-	Tab: treeFn(tree{
-		Space: instrLabelFn(Jz),
-		Tab:   instrLabelFn(Jn),
-		LF:    instrFn(Ret),
+	Tab: transition(states{
+		Space: emitInstr(Readc),
+		Tab:   emitInstr(Readi),
 	}),
-	LF: treeFn(tree{
-		LF: instrFn(End),
+})
+
+var parseFlow = transition(states{
+	Space: transition(states{
+		Space: parseInstrLabel(Label),
+		Tab:   parseInstrLabel(Call),
+		LF:    parseInstrLabel(Jmp),
+	}),
+	Tab: transition(states{
+		Space: parseInstrLabel(Jz),
+		Tab:   parseInstrLabel(Jn),
+		LF:    emitInstr(Ret),
+	}),
+	LF: transition(states{
+		LF: emitInstr(End),
 	}),
 })

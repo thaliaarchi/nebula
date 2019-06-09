@@ -1,4 +1,4 @@
-package wspace
+package ws
 
 import (
 	"bufio"
