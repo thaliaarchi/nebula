@@ -2,6 +2,7 @@ package wspace
 
 import (
 	"fmt"
+	"io"
 	"math/big"
 )
 
@@ -33,7 +34,14 @@ func (p *Parser) run() error {
 
 type stateFn func(*Parser) (stateFn, error)
 
-func treeFn(spaceFn, tabFn, lfFn stateFn) stateFn {
+type tree struct {
+	Space stateFn
+	Tab   stateFn
+	LF    stateFn
+	Root  bool
+}
+
+func treeFn(state tree) stateFn {
 	return func(p *Parser) (stateFn, error) {
 		t, err := p.l.Next()
 		if err != nil {
@@ -41,13 +49,16 @@ func treeFn(spaceFn, tabFn, lfFn stateFn) stateFn {
 		}
 		switch t {
 		case Space:
-			return spaceFn, nil
+			return state.Space, nil
 		case Tab:
-			return tabFn, nil
+			return state.Tab, nil
 		case LF:
-			return lfFn, nil
+			return state.LF, nil
 		case EOF:
-			return nil, nil // TODO
+			if !state.Root {
+				return nil, io.ErrUnexpectedEOF
+			}
+			return nil, nil
 		}
 		panic(invalidToken(t))
 	}
@@ -116,8 +127,7 @@ func (p *Parser) parseUnsigned() (*big.Int, error) {
 		case Space:
 			num.Lsh(num, 1)
 		case Tab:
-			num.Lsh(num, 1)
-			num.Add(num, bigOne)
+			num.Lsh(num, 1).Or(num, bigOne)
 		case LF:
 			return num, nil
 		case EOF:
@@ -133,41 +143,73 @@ func invalidToken(t Token) string {
 }
 
 func init() {
-	parseInstr = treeFn(
-		parseStack,
-		treeFn(parseArith, parseHeap, parseIO),
-		parseFlow,
-	)
+	parseInstr = treeFn(tree{
+		Space: parseStack,
+		Tab: treeFn(tree{
+			Space: parseArith,
+			Tab:   parseHeap,
+			LF:    parseIO,
+		}),
+		LF:   parseFlow,
+		Root: true,
+	})
 }
 
 var parseInstr stateFn
 
-var parseStack = treeFn(
-	instrNumberFn(Push),
-	treeFn(instrNumberFn(Copy), nil, instrNumberFn(Slide)),
-	treeFn(instrFn(Dup), instrFn(Swap), instrFn(Drop)),
-)
+var parseStack = treeFn(tree{
+	Space: instrNumberFn(Push),
+	Tab: treeFn(tree{
+		Space: instrNumberFn(Copy),
+		LF:    instrNumberFn(Slide),
+	}),
+	LF: treeFn(tree{
+		Space: instrFn(Dup),
+		Tab:   instrFn(Swap),
+		LF:    instrFn(Drop),
+	}),
+})
 
-var parseArith = treeFn(
-	treeFn(instrFn(Add), instrFn(Sub), instrFn(Mul)),
-	treeFn(instrFn(Div), instrFn(Mod), nil),
-	nil,
-)
+var parseArith = treeFn(tree{
+	Space: treeFn(tree{
+		Space: instrFn(Add),
+		Tab:   instrFn(Sub),
+		LF:    instrFn(Mul),
+	}),
+	Tab: treeFn(tree{
+		Space: instrFn(Div),
+		Tab:   instrFn(Mod),
+	}),
+})
 
-var parseHeap = treeFn(
-	instrFn(Store),
-	instrFn(Retrieve),
-	nil,
-)
+var parseHeap = treeFn(tree{
+	Space: instrFn(Store),
+	Tab:   instrFn(Retrieve),
+})
 
-var parseIO = treeFn(
-	treeFn(instrFn(Printc), instrFn(Printi), nil),
-	treeFn(instrFn(Readc), instrFn(Readi), nil),
-	nil,
-)
+var parseIO = treeFn(tree{
+	Space: treeFn(tree{
+		Space: instrFn(Printc),
+		Tab:   instrFn(Printi),
+	}),
+	Tab: treeFn(tree{
+		Space: instrFn(Readc),
+		Tab:   instrFn(Readi),
+	}),
+})
 
-var parseFlow = treeFn(
-	treeFn(instrLabelFn(Label), instrLabelFn(Call), instrLabelFn(Jmp)),
-	treeFn(instrLabelFn(Jz), instrLabelFn(Jn), instrFn(Ret)),
-	treeFn(nil, nil, instrFn(End)),
-)
+var parseFlow = treeFn(tree{
+	Space: treeFn(tree{
+		Space: instrLabelFn(Label),
+		Tab:   instrLabelFn(Call),
+		LF:    instrLabelFn(Jmp),
+	}),
+	Tab: treeFn(tree{
+		Space: instrLabelFn(Jz),
+		Tab:   instrLabelFn(Jn),
+		LF:    instrFn(Ret),
+	}),
+	LF: treeFn(tree{
+		LF: instrFn(End),
+	}),
+})
