@@ -115,17 +115,16 @@ func (p *Parser) parseUnsigned() (*big.Int, error) {
 		switch t {
 		case Space:
 			num.Lsh(num, 1)
-			return num, nil
 		case Tab:
 			num.Lsh(num, 1)
 			num.Add(num, bigOne)
-			return num, nil
 		case LF:
 			return num, nil
 		case EOF:
 			return nil, fmt.Errorf("unterminated number: %d", num)
+		default:
+			panic(invalidToken(t))
 		}
-		panic(invalidToken(t))
 	}
 }
 
