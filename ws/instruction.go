@@ -40,55 +40,55 @@ const (
 func (typ *InstrType) String() string {
 	switch *typ {
 	case Invalid:
-		return "Invalid"
+		return "invalid"
 	case Push:
-		return "Push"
+		return "push"
 	case Dup:
-		return "Dup"
+		return "dup"
 	case Copy:
-		return "Copy"
+		return "copy"
 	case Swap:
-		return "Swap"
+		return "swap"
 	case Drop:
-		return "Drop"
+		return "drop"
 	case Slide:
-		return "Slide"
+		return "slide"
 	case Add:
-		return "Add"
+		return "add"
 	case Sub:
-		return "Sub"
+		return "sub"
 	case Mul:
-		return "Mul"
+		return "mul"
 	case Div:
-		return "Div"
+		return "div"
 	case Mod:
-		return "Mod"
+		return "mod"
 	case Store:
-		return "Store"
+		return "store"
 	case Retrieve:
-		return "Retrieve"
+		return "retrieve"
 	case Label:
-		return "Label"
+		return "label"
 	case Call:
-		return "Call"
+		return "call"
 	case Jmp:
-		return "Jmp"
+		return "jmp"
 	case Jz:
-		return "Jz"
+		return "jz"
 	case Jn:
-		return "Jn"
+		return "jn"
 	case Ret:
-		return "Ret"
+		return "ret"
 	case End:
-		return "End"
+		return "end"
 	case Printc:
-		return "Printc"
+		return "printc"
 	case Printi:
-		return "Printi"
+		return "printi"
 	case Readc:
-		return "Readc"
+		return "readc"
 	case Readi:
-		return "Readi"
+		return "readi"
 	}
-	return "Unknown"
+	return "unknown"
 }

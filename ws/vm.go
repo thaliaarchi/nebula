@@ -321,6 +321,8 @@ func instrExecs(instrs []Instr) ([]InstrExec, error) {
 			instrExec = &StoreInstr{}
 		case Retrieve:
 			instrExec = &RetrieveInstr{}
+		case Label:
+			continue
 		case Call:
 			label, err := getLabel(instr.Arg, labels, "call")
 			if err != nil {
@@ -378,6 +380,8 @@ func getLabels(instrs []Instr) (map[int64]int, error) {
 	return labels, nil
 }
 
+const maxInt int = int(^uint(0) >> 1)
+
 func getArg(arg *big.Int, name string) (int, error) {
 	if !arg.IsInt64() {
 		return 0, fmt.Errorf("argument overflow: %s %s", name, arg)
@@ -399,5 +403,3 @@ func getLabel(label *big.Int, labels map[int64]int, name string) (int, error) {
 	}
 	return l, nil
 }
-
-const maxInt int = int(^uint(0) >> 1)

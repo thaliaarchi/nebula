@@ -22,7 +22,13 @@ func main() {
 	var instrs []ws.Instr
 	fmt.Println("Parsing:")
 	for instr := range instrChan {
-		fmt.Printf("  %s %d\n", &instr.Type, instr.Arg)
+		if instr.Type == ws.Label {
+			fmt.Printf("label_%s:\n", instr.Arg)
+		} else if instr.Arg == nil {
+			fmt.Printf("    %s\n", &instr.Type)
+		} else {
+			fmt.Printf("    %s %d\n", &instr.Type, instr.Arg)
+		}
 		instrs = append(instrs, instr)
 	}
 	fmt.Println("Running:")
