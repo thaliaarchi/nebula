@@ -43,14 +43,14 @@ parse:
     dup; push ' ';  sub; jz .parse_stack
     dup; push '\t'; sub; jz .parse_imp_tab
     dup; push '\n'; sub; jz .parse_flow
-    jz interpret
+    dup; jz interpret
     jmp parse
 .parse_imp_tab:
     call read_char
     dup; push ' ';  sub; jz .parse_arith
     dup; push '\t'; sub; jz .parse_heap
     dup; push '\n'; sub; jz .parse_io
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_imp_tab
 
 .parse_stack:
@@ -58,21 +58,21 @@ parse:
     dup; push ' ';  sub; jz .parsed_push
     dup; push '\t'; sub; jz .parse_stack_tab
     dup; push '\n'; sub; jz .parse_stack_lf
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_stack
 .parse_stack_tab:
     call read_char
     dup; push ' ';  sub; jz .parsed_copy
     dup; push '\t'; sub; jz .error_invalid_instr
     dup; push '\n'; sub; jz .parsed_slide
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_stack_tab
 .parse_stack_lf:
     call read_char
     dup; push ' ';  sub; jz .parsed_dup
     dup; push '\t'; sub; jz .parsed_swap
     dup; push '\n'; sub; jz .parsed_drop
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_stack_lf
 
 .parse_arith:
@@ -80,21 +80,21 @@ parse:
     dup; push ' ';  sub; jz .parse_arith_space
     dup; push '\t'; sub; jz .parse_arith_tab
     dup; push '\n'; sub; jz .error_invalid_instr
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_arith
 .parse_arith_space:
     call read_char
     dup; push ' ';  sub; jz .parsed_add
     dup; push '\t'; sub; jz .parsed_sub
     dup; push '\n'; sub; jz .parsed_mul
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_arith_space
 .parse_arith_tab:
     call read_char
     dup; push ' ';  sub; jz .parsed_div
     dup; push '\t'; sub; jz .parsed_mod
     dup; push '\n'; sub; jz .error_invalid_instr
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_arith_tab
 
 .parse_heap:
@@ -102,7 +102,7 @@ parse:
     dup; push ' ';  sub; jz .parsed_store
     dup; push '\t'; sub; jz .parsed_retrieve
     dup; push '\n'; sub; jz .error_invalid_instr
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_heap
 
 .parse_flow:
@@ -110,28 +110,28 @@ parse:
     dup; push ' ';  sub; jz .parse_flow_space
     dup; push '\t'; sub; jz .parse_flow_tab
     dup; push '\n'; sub; jz .parse_flow_lf
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_arith_tab
 .parse_flow_space:
     call read_char
     dup; push ' ';  sub; jz .parsed_label
     dup; push '\t'; sub; jz .parsed_call
     dup; push '\n'; sub; jz .parsed_jmp
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_flow_space
 .parse_flow_tab:
     call read_char
     dup; push ' ';  sub; jz .parsed_jz
     dup; push '\t'; sub; jz .parsed_jn
     dup; push '\n'; sub; jz .parsed_ret
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_flow_tab
 .parse_flow_lf:
     call read_char
     dup; push ' ';  sub; jz .error_invalid_instr
     dup; push '\t'; sub; jz .error_invalid_instr
     dup; push '\n'; sub; jz .parsed_end
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_flow_lf
 
 .parse_io:
@@ -139,21 +139,21 @@ parse:
     dup; push ' ';  sub; jz .parse_io_space
     dup; push '\t'; sub; jz .parse_io_tab
     dup; push '\n'; sub; jz .error_invalid_instr
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_io
 .parse_io_space:
     call read_char
     dup; push ' ';  sub; jz .parsed_printc
     dup; push '\t'; sub; jz .parsed_printi
     dup; push '\n'; sub; jz .error_invalid_instr
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_flow_space
 .parse_io_tab:
     call read_char
     dup; push ' ';  sub; jz .parsed_readc
     dup; push '\t'; sub; jz .parsed_readi
     dup; push '\n'; sub; jz .error_invalid_instr
-    jz .error_incomplete_instr
+    dup; jz .error_incomplete_instr
     jmp .parse_flow_tab
 
 # returns result on top of stack
@@ -162,7 +162,7 @@ parse_signed:
     dup; push ' ';  sub; jz parse_unsigned
     dup; push '\t'; sub; jz .parse_signed_negative
     dup; push '\n'; sub; jz .parse_signed_zero
-    jz .error_unterminated_number
+    dup; jz .error_unterminated_number
     jmp parse_signed
 .parse_signed_negative:
     call parse_unsigned
@@ -182,7 +182,7 @@ parse_unsigned:
     dup; push ' ';  sub; jz .parse_unsigned_zero
     dup; push '\t'; sub; jz .parse_unsigned_one
     dup; push '\n'; sub; jz .parse_unsigned_end
-    jz .error_unterminated_number
+    dup; jz .error_unterminated_number
     jmp .parse_unsigned_loop
 .parse_unsigned_zero:
     swap

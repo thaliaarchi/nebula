@@ -181,7 +181,7 @@ func (ret *RetInstr) Exec(vm *VM) {
 	if len(vm.callers) == 0 {
 		panic("call stack underflow: ret")
 	}
-	vm.pc = vm.callers[len(vm.callers)-1]
+	vm.pc = vm.callers[len(vm.callers)-1] + 1
 	vm.callers = vm.callers[:len(vm.callers)-1]
 }
 
@@ -195,6 +195,8 @@ func (vm *VM) execJmpSign(sign int, label int, name string) {
 	vm.stack = vm.stack[:len(vm.stack)-1]
 	if val.Sign() == sign {
 		vm.pc = label
+	} else {
+		vm.pc++
 	}
 }
 
@@ -236,8 +238,8 @@ func (vm *VM) execRead(read func() *big.Int, name string) {
 
 func (vm *VM) readRune() *big.Int {
 	r, _, err := vm.in.ReadRune()
-	if err != nil {
-		panic(err)
+	if err != nil && err != io.EOF {
+		panic("readc: " + err.Error())
 	}
 	return new(big.Int).SetInt64(int64(r))
 }
@@ -245,7 +247,7 @@ func (vm *VM) readRune() *big.Int {
 func (vm *VM) readInt() *big.Int {
 	line, err := vm.in.ReadString('\n')
 	if err != nil && err != io.EOF {
-		panic(err)
+		panic("readi: " + err.Error())
 	}
 	x, ok := new(big.Int).SetString(line, 10)
 	if !ok {
@@ -367,15 +369,18 @@ func instrExecs(instrs []Instr) ([]InstrExec, error) {
 	return execs, nil
 }
 
-func getLabels(instrs []Instr) (map[int64]int, error) {
-	labels := make(map[int64]int)
-	for i, instr := range instrs {
+func getLabels(instrs []Instr) (*intMap, error) {
+	labels := newIntMap()
+	var i int
+	for _, instr := range instrs {
 		if instr.Type == Label {
-			if !instr.Arg.IsInt64() {
-				return nil, fmt.Errorf("label overflow: %s", instr.Arg)
+			replace := labels.Put(instr.Arg, i)
+			if replace {
+				return nil, fmt.Errorf("duplicate label: %s", instr.Arg)
 			}
-			labels[instr.Arg.Int64()] = i
+			continue
 		}
+		i++
 	}
 	return labels, nil
 }
@@ -393,13 +398,10 @@ func getArg(arg *big.Int, name string) (int, error) {
 	return int(a), nil
 }
 
-func getLabel(label *big.Int, labels map[int64]int, name string) (int, error) {
-	if !label.IsInt64() {
-		return 0, fmt.Errorf("label overflow: %s %s", name, label)
-	}
-	l, ok := labels[label.Int64()]
+func getLabel(label *big.Int, labels *intMap, name string) (int, error) {
+	l, ok := labels.Get(label)
 	if !ok {
 		return 0, fmt.Errorf("label does not exist: %s %s", name, label)
 	}
-	return l, nil
+	return l.(int), nil
 }
