@@ -7,7 +7,6 @@ import (
 	"math"
 	"math/big"
 	"os"
-	"sort"
 	"unicode/utf8"
 )
 
@@ -16,7 +15,7 @@ type VM struct {
 	pc      int
 	callers []int
 	stack   Stack
-	heap    map[int64]*big.Int
+	heap    Map
 	in      *bufio.Reader
 }
 
@@ -30,33 +29,17 @@ func NewVM(instrs []Instr) (*VM, error) {
 		pc:      0,
 		callers: nil,
 		stack:   *NewStack(),
-		heap:    make(map[int64]*big.Int),
+		heap:    *NewMap(func() interface{} { return new(big.Int) }),
 		in:      bufio.NewReader(os.Stdin),
 	}, nil
 }
 
 func (vm *VM) Run() {
 	for vm.pc < len(vm.instrs) {
-		// fmt.Print(instrString(vm.instrs[vm.pc], vm.pc), " ")
 		vm.instrs[vm.pc].Exec(vm)
-		// fmt.Println()
 	}
-	var keys []int64
-	for k := range vm.heap {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
-	fmt.Print("\nHeap: {")
-	for i, k := range keys {
-		if i != 0 {
-			fmt.Print(",")
-		}
-		fmt.Printf(" %d: %s", k, vm.heap[k])
-	}
-	fmt.Println(" }")
-	fmt.Printf("Stack: %s\n", &vm.stack)
+	fmt.Printf("\nStack: %s\n", &vm.stack)
+	fmt.Printf("Heap: %s\n", &vm.heap)
 }
 
 type InstrExec interface {
@@ -161,14 +144,14 @@ func (mod *ModInstr) Exec(vm *VM) {
 // Exec executes a store instruction.
 func (store *StoreInstr) Exec(vm *VM) {
 	val, addr := vm.stack.Pop(), vm.stack.Pop()
-	vm.retrieve(addr).Set(val)
+	vm.heap.Retrieve(addr).(*big.Int).Set(val)
 	vm.pc++
 }
 
 // Exec executes a retrieve instruction.
 func (retrieve *RetrieveInstr) Exec(vm *VM) {
 	top := vm.stack.Top()
-	top.Set(vm.retrieve(top))
+	top.Set(vm.heap.Retrieve(top).(*big.Int))
 	vm.pc++
 }
 
@@ -221,25 +204,14 @@ func (printi *PrintiInstr) Exec(vm *VM) {
 
 // Exec executes a readc instruction.
 func (readc *ReadcInstr) Exec(vm *VM) {
-	vm.readRune(vm.retrieve(vm.stack.Pop()))
+	vm.readRune(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
 	vm.pc++
 }
 
 // Exec executes a readi instruction.
 func (readi *ReadiInstr) Exec(vm *VM) {
-	vm.readInt(vm.retrieve(vm.stack.Pop()))
+	vm.readInt(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
 	vm.pc++
-}
-
-func (vm *VM) retrieve(addr *big.Int) *big.Int {
-	vm.checkAddr(addr)
-	key := addr.Int64()
-	if val, ok := vm.heap[key]; ok {
-		return val
-	}
-	val := new(big.Int)
-	vm.heap[key] = val
-	return val
 }
 
 func (vm *VM) jmpCond(sign int, label int) {
@@ -280,12 +252,6 @@ func bigIntRune(x *big.Int) rune {
 		return invalid
 	}
 	return rune(v)
-}
-
-func (vm *VM) checkAddr(addr *big.Int) {
-	if !addr.IsInt64() {
-		panic("address overflow: " + vm.getInstrName())
-	}
 }
 
 func instrExecs(instrs []Instr) ([]InstrExec, error) {
@@ -377,8 +343,8 @@ func instrExecs(instrs []Instr) ([]InstrExec, error) {
 	return execs, nil
 }
 
-func getLabels(instrs []Instr) (*intMap, error) {
-	labels := newIntMap()
+func getLabels(instrs []Instr) (*Map, error) {
+	labels := NewMap(func() interface{} { return 0 })
 	var i int
 	for _, instr := range instrs {
 		if instr.Type == Label {
@@ -406,7 +372,7 @@ func getArg(arg *big.Int, name string) (int, error) {
 	return int(a), nil
 }
 
-func getLabel(label *big.Int, labels *intMap, name string) (int, error) {
+func getLabel(label *big.Int, labels *Map, name string) (int, error) {
 	l, ok := labels.Get(label)
 	if !ok {
 		return 0, fmt.Errorf("label does not exist: %s %s", name, label)
