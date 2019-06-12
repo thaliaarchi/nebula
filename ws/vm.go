@@ -7,17 +7,17 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"sort"
 	"unicode/utf8"
 )
 
 type VM struct {
-	instrs    []InstrExec
-	pc        int
-	callers   []int
-	stack     []*big.Int
-	stackSize int
-	heap      map[int64]*big.Int
-	in        *bufio.Reader
+	instrs  []InstrExec
+	pc      int
+	callers []int
+	stack   Stack
+	heap    map[int64]*big.Int
+	in      *bufio.Reader
 }
 
 func NewVM(instrs []Instr) (*VM, error) {
@@ -25,15 +25,11 @@ func NewVM(instrs []Instr) (*VM, error) {
 	if err != nil {
 		return nil, err
 	}
-	stack := make([]*big.Int, 1024)
-	for i := range stack {
-		stack[i] = new(big.Int)
-	}
 	return &VM{
 		instrs:  execs,
 		pc:      0,
 		callers: nil,
-		stack:   stack,
+		stack:   *NewStack(),
 		heap:    make(map[int64]*big.Int),
 		in:      bufio.NewReader(os.Stdin),
 	}, nil
@@ -41,8 +37,26 @@ func NewVM(instrs []Instr) (*VM, error) {
 
 func (vm *VM) Run() {
 	for vm.pc < len(vm.instrs) {
+		// fmt.Print(instrString(vm.instrs[vm.pc], vm.pc), " ")
 		vm.instrs[vm.pc].Exec(vm)
+		// fmt.Println()
 	}
+	var keys []int64
+	for k := range vm.heap {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	fmt.Print("\nHeap: {")
+	for i, k := range keys {
+		if i != 0 {
+			fmt.Print(",")
+		}
+		fmt.Printf(" %d: %s", k, vm.heap[k])
+	}
+	fmt.Println(" }")
+	fmt.Printf("Stack: %s\n", &vm.stack)
 }
 
 type InstrExec interface {
@@ -75,95 +89,85 @@ type ReadiInstr struct{}
 
 // Exec executes a push instruction.
 func (push *PushInstr) Exec(vm *VM) {
-	vm.push(push.arg)
+	vm.stack.Push(push.arg)
 	vm.pc++
 }
 
 // Exec executes a dup instruction.
 func (dup *DupInstr) Exec(vm *VM) {
-	vm.push(vm.top())
+	vm.stack.Push(vm.stack.Top())
 	vm.pc++
 }
 
 // Exec executes a copy instruction.
 func (copy *CopyInstr) Exec(vm *VM) {
-	vm.checkUnderflow(copy.arg + 1)
-	vm.push(vm.stack[vm.stackSize-copy.arg-1])
+	vm.stack.Push(vm.stack.Get(copy.arg))
 	vm.pc++
 }
 
 // Exec executes a swap instruction.
 func (swap *SwapInstr) Exec(vm *VM) {
-	vm.checkUnderflow(2)
-	s := vm.stackSize
-	vm.stack[s-1], vm.stack[s-2] = vm.stack[s-2], vm.stack[s-1]
+	vm.stack.Swap()
 	vm.pc++
 }
 
 // Exec executes a drop instruction.
 func (drop *DropInstr) Exec(vm *VM) {
-	vm.pop()
+	vm.stack.Pop()
 	vm.pc++
 }
 
 // Exec executes a slide instruction.
 func (slide *SlideInstr) Exec(vm *VM) {
-	vm.checkUnderflow(slide.arg + 1)
-	i := vm.stackSize - 1
-	j := vm.stackSize - 1 - slide.arg
-	vm.stack[i], vm.stack[j] = vm.stack[j], vm.stack[i]
-	vm.stackSize -= slide.arg
+	vm.stack.Slide(slide.arg)
 	vm.pc++
 }
 
 // Exec executes an add instruction.
 func (add *AddInstr) Exec(vm *VM) {
-	left, right := vm.arith()
-	left.Add(left, right)
+	y, x := vm.stack.Pop(), vm.stack.Top()
+	x.Add(x, y)
 	vm.pc++
 }
 
 // Exec executes a sub instruction.
 func (sub *SubInstr) Exec(vm *VM) {
-	left, right := vm.arith()
-	left.Sub(left, right)
+	y, x := vm.stack.Pop(), vm.stack.Top()
+	x.Sub(x, y)
 	vm.pc++
 }
 
 // Exec executes a mul instruction.
 func (mul *MulInstr) Exec(vm *VM) {
-	left, right := vm.arith()
-	left.Mul(left, right)
+	y, x := vm.stack.Pop(), vm.stack.Top()
+	x.Mul(x, y)
 	vm.pc++
 }
 
 // Exec executes a div instruction.
 func (div *DivInstr) Exec(vm *VM) {
-	left, right := vm.arith()
-	left.Div(left, right)
+	y, x := vm.stack.Pop(), vm.stack.Top()
+	x.Div(x, y)
 	vm.pc++
 }
 
 // Exec executes a mod instruction.
 func (mod *ModInstr) Exec(vm *VM) {
-	left, right := vm.arith()
-	left.Mod(left, right)
+	y, x := vm.stack.Pop(), vm.stack.Top()
+	x.Mod(x, y)
 	vm.pc++
 }
 
 // Exec executes a store instruction.
 func (store *StoreInstr) Exec(vm *VM) {
-	vm.checkUnderflow(2)
-	addr, val := vm.stack[vm.stackSize-2], vm.stack[vm.stackSize-1]
+	val, addr := vm.stack.Pop(), vm.stack.Pop()
 	vm.retrieve(addr).Set(val)
-	vm.stackSize -= 2
 	vm.pc++
 }
 
 // Exec executes a retrieve instruction.
 func (retrieve *RetrieveInstr) Exec(vm *VM) {
-	vm.checkUnderflow(1)
-	top := vm.stack[vm.stackSize-1]
+	top := vm.stack.Top()
 	top.Set(vm.retrieve(top))
 	vm.pc++
 }
@@ -205,43 +209,26 @@ func (end *EndInstr) Exec(vm *VM) {
 
 // Exec executes a printc instruction.
 func (printc *PrintcInstr) Exec(vm *VM) {
-	fmt.Printf("%c", bigIntRune(vm.pop()))
+	fmt.Printf("%c", bigIntRune(vm.stack.Pop()))
 	vm.pc++
 }
 
 // Exec executes a printi instruction.
 func (printi *PrintiInstr) Exec(vm *VM) {
-	fmt.Print(vm.pop().String())
+	fmt.Print(vm.stack.Pop().String())
 	vm.pc++
 }
 
 // Exec executes a readc instruction.
 func (readc *ReadcInstr) Exec(vm *VM) {
-	vm.readRune(vm.retrieve(vm.pop()))
+	vm.readRune(vm.retrieve(vm.stack.Pop()))
 	vm.pc++
 }
 
 // Exec executes a readi instruction.
 func (readi *ReadiInstr) Exec(vm *VM) {
-	vm.readInt(vm.retrieve(vm.pop()))
+	vm.readInt(vm.retrieve(vm.stack.Pop()))
 	vm.pc++
-}
-
-func (vm *VM) push(val *big.Int) {
-	vm.checkOverflow()
-	vm.stack[vm.stackSize].Set(val)
-	vm.stackSize++
-}
-
-func (vm *VM) pop() *big.Int {
-	vm.checkUnderflow(1)
-	vm.stackSize--
-	return vm.stack[vm.stackSize]
-}
-
-func (vm *VM) top() *big.Int {
-	vm.checkUnderflow(1)
-	return vm.stack[vm.stackSize-1]
 }
 
 func (vm *VM) retrieve(addr *big.Int) *big.Int {
@@ -255,16 +242,8 @@ func (vm *VM) retrieve(addr *big.Int) *big.Int {
 	return val
 }
 
-func (vm *VM) arith() (*big.Int, *big.Int) {
-	vm.checkUnderflow(2)
-	left := vm.stack[vm.stackSize-2]
-	right := vm.stack[vm.stackSize-1]
-	vm.stackSize--
-	return left, right
-}
-
 func (vm *VM) jmpCond(sign int, label int) {
-	if vm.pop().Sign() == sign {
+	if vm.stack.Pop().Sign() == sign {
 		vm.pc = label
 	} else {
 		vm.pc++
@@ -301,18 +280,6 @@ func bigIntRune(x *big.Int) rune {
 		return invalid
 	}
 	return rune(v)
-}
-
-func (vm *VM) checkUnderflow(n int) {
-	if vm.stackSize < n {
-		panic("stack underflow: " + vm.getInstrName())
-	}
-}
-
-func (vm *VM) checkOverflow() {
-	if vm.stackSize >= cap(vm.stack) {
-		panic("stack overflow: " + vm.getInstrName())
-	}
 }
 
 func (vm *VM) checkAddr(addr *big.Int) {
