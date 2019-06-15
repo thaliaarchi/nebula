@@ -1,10 +1,11 @@
-    define IP 2      # Instruction pointer, points to current instruction
-    define IMIN 10   # Instruction stack location, unchanging
-    define SP 3      # Stack pointer, points to top of stack
-    define SMINP 4   # Stack bottom pointer, points to bottom of stack
-    define SMIN 100  # Stack bottom location, unchanging
-    define TEMP 1    # Temporary storage for reading
+    define IP 2      # instruction pointer, points to current instruction
+    define IMIN 10   # instruction stack location, unchanging
+    define SP 3      # stack pointer, points to top of stack
+    define SMINP 4   # stack bottom pointer, points to bottom of stack
+    define SMIN 100  # stack bottom location, unchanging
+    define TEMP 1    # temporary storage for reading
 
+    # instruction ids in order of time to find in .select_instr
     define INSTR_1    0
     define INSTR_2    6
     define INSTR_3   -6
@@ -29,6 +30,7 @@
     define INSTR_22  -7
     define INSTR_23 -11
 
+    # instructions in order of most common
     define DO_INSTR_1  .do_push;     define INSTR_PUSH     INSTR_1
     define DO_INSTR_2  .do_dup;      define INSTR_DUP      INSTR_2
     define DO_INSTR_3  .do_store;    define INSTR_STORE    INSTR_3
@@ -53,6 +55,7 @@
     define DO_INSTR_22 .do_div;      define INSTR_DIV      INSTR_22
     define DO_INSTR_23 .do_mod;      define INSTR_MOD      INSTR_23
 
+    # assigning initial values
     push IP;    push IMIN; store
     push SP;    push SMIN; store
     push SMINP; push SMIN; store
@@ -291,9 +294,6 @@ read_char:
 
 
 interpret:
-    # drop reading temp char
-    drop
-
     # append end instruction
     push IP
     dup
@@ -318,6 +318,10 @@ interpret:
 
 # find instruction with binary search
 .select_instr:
+    # drop temp value
+    drop
+
+    # push current instruction ID
     push IP
     retrieve
     retrieve
@@ -513,9 +517,11 @@ interpret:
     # push 'r'; printc; push 'e'; printc; push 't'; printc; push '\n'; printc # debug
     jmp .error_unimplemented_instr
 
-
 .do_end:
     # push 'e'; printc; push 'n'; printc; push 'd'; printc; push '\n'; printc # debug
+
+    # drop temp value and end
+    drop
     end
 
 .do_printc:
