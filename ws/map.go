@@ -38,11 +38,11 @@ func (m *Map) Retrieve(k *big.Int) interface{} {
 	hash := k.Int64()
 	for _, e := range m.m[hash] {
 		if e.k.Cmp(k) == 0 {
-			return e.v.(*big.Int)
+			return e.v
 		}
 	}
 	v := m.new()
-	m.m[hash] = append(m.m[hash], mapEntry{k, v})
+	m.m[hash] = append(m.m[hash], mapEntry{new(big.Int).Set(k), v})
 	return v
 }
 
@@ -56,7 +56,7 @@ func (m *Map) Put(k *big.Int, v interface{}) bool {
 			return true
 		}
 	}
-	m.m[hash] = append(entries, mapEntry{k, v})
+	m.m[hash] = append(entries, mapEntry{new(big.Int).Set(k), v})
 	return false
 }
 
@@ -76,7 +76,7 @@ func (m Map) String() string {
 		if i != 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(fmt.Sprintf("%d: %s", e.k, e.v))
+		b.WriteString(fmt.Sprintf("%s: %s", e.k, e.v))
 	}
 	b.WriteRune('}')
 	return b.String()

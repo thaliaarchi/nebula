@@ -11,7 +11,7 @@ import (
 )
 
 type VM struct {
-	instrs  []InstrExec
+	instrs  []InstrExecer
 	pc      int
 	callers []int
 	stack   Stack
@@ -42,7 +42,7 @@ func (vm *VM) Run() {
 	fmt.Printf("Heap: %s\n", &vm.heap)
 }
 
-type InstrExec interface {
+type InstrExecer interface {
 	Exec(vm *VM)
 }
 
@@ -254,14 +254,14 @@ func bigIntRune(x *big.Int) rune {
 	return rune(v)
 }
 
-func instrExecs(instrs []Instr) ([]InstrExec, error) {
+func instrExecs(instrs []Instr) ([]InstrExecer, error) {
 	labels, err := getLabels(instrs)
 	if err != nil {
 		return nil, err
 	}
-	execs := make([]InstrExec, 0, len(instrs))
+	execs := make([]InstrExecer, 0, len(instrs))
 	for _, instr := range instrs {
-		var instrExec InstrExec
+		var instrExec InstrExecer
 		switch instr.Type {
 		case Push:
 			instrExec = &PushInstr{instr.Arg}
