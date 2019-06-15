@@ -1,43 +1,65 @@
-define IP 2      # Instruction pointer, points to current instruction
-define IMIN 10   # Instruction stack location, unchanging
-define SP 3      # Stack pointer, points to top of stack
-define SMINP 4   # Stack bottom pointer, points to bottom of stack
-define SMIN 100  # stack bottom location, unchanging
-define TEMP 1    # Temporary storage for reading
+    define IP 2      # Instruction pointer, points to current instruction
+    define IMIN 10   # Instruction stack location, unchanging
+    define SP 3      # Stack pointer, points to top of stack
+    define SMINP 4   # Stack bottom pointer, points to bottom of stack
+    define SMIN 100  # Stack bottom location, unchanging
+    define TEMP 1    # Temporary storage for reading
 
-define INSTR_PUSH     1
-define INSTR_DUP      2
-define INSTR_COPY     3
-define INSTR_SWAP     4
-define INSTR_DROP     5
-define INSTR_SLIDE    6
-define INSTR_ADD      7
-define INSTR_SUB      8
-define INSTR_MUL      9
-define INSTR_DIV      10
-define INSTR_MOD      11
-define INSTR_STORE    12
-define INSTR_RETRIEVE 13
-define INSTR_LABEL    14  # TODO remove after creating label map
-define INSTR_CALL     15
-define INSTR_JMP      16
-define INSTR_JZ       17
-define INSTR_JN       18
-define INSTR_RET      19
-define INSTR_END      20
-define INSTR_PRINTC   21
-define INSTR_PRINTI   22
-define INSTR_READC    23
-define INSTR_READI    24
+    define INSTR_1    0
+    define INSTR_2    6
+    define INSTR_3   -6
+    define INSTR_4    9
+    define INSTR_5    3
+    define INSTR_6   -3
+    define INSTR_7   -9
+    define INSTR_8   10
+    define INSTR_9    8
+    define INSTR_10   4
+    define INSTR_11   2
+    define INSTR_12  -2
+    define INSTR_13  -4
+    define INSTR_14  -8
+    define INSTR_15 -10
+    define INSTR_16  11
+    define INSTR_17   7
+    define INSTR_18   5
+    define INSTR_19   1
+    define INSTR_20  -1
+    define INSTR_21  -5
+    define INSTR_22  -7
+    define INSTR_23 -11
 
+    define DO_INSTR_1  .do_push;     define INSTR_PUSH     INSTR_1
+    define DO_INSTR_2  .do_dup;      define INSTR_DUP      INSTR_2
+    define DO_INSTR_3  .do_store;    define INSTR_STORE    INSTR_3
+    define DO_INSTR_4  .do_sub;      define INSTR_SUB      INSTR_4
+    define DO_INSTR_5  .do_jz;       define INSTR_JZ       INSTR_5
+    define DO_INSTR_6  .do_retrieve; define INSTR_RETRIEVE INSTR_6
+    define DO_INSTR_7  .do_jmp;      define INSTR_JMP      INSTR_7
+    define DO_INSTR_8  .do_call;     define INSTR_CALL     INSTR_8
+    define DO_INSTR_9  .do_drop;     define INSTR_DROP     INSTR_9
+    define DO_INSTR_10 .do_printc;   define INSTR_PRINTC   INSTR_10
+    define DO_INSTR_11 .do_ret;      define INSTR_RET      INSTR_11
+    define DO_INSTR_12 .do_add;      define INSTR_ADD      INSTR_12
+    define DO_INSTR_13 .do_swap;     define INSTR_SWAP     INSTR_13
+    define DO_INSTR_14 .do_printi;   define INSTR_PRINTI   INSTR_14
+    define DO_INSTR_15 .do_jn;       define INSTR_JN       INSTR_15
+    define DO_INSTR_16 .do_end;      define INSTR_END      INSTR_16
+    define DO_INSTR_17 .do_mul;      define INSTR_MUL      INSTR_17
+    define DO_INSTR_18 .do_readc;    define INSTR_READC    INSTR_18
+    define DO_INSTR_19 .do_readi;    define INSTR_READI    INSTR_19
+    define DO_INSTR_20 .do_copy;     define INSTR_COPY     INSTR_20
+    define DO_INSTR_21 .do_slide;    define INSTR_SLIDE    INSTR_21
+    define DO_INSTR_22 .do_div;      define INSTR_DIV      INSTR_22
+    define DO_INSTR_23 .do_mod;      define INSTR_MOD      INSTR_23
 
     push IP;    push IMIN; store
     push SP;    push SMIN; store
     push SMINP; push SMIN; store
 
+
     # dropped by read_char
     push 0
-
 parse:
     call read_char
     dup; push ' ';  sub; jz .parse_stack
@@ -223,7 +245,6 @@ read_char:
 .parsed_mod:                           push INSTR_MOD;      jmp .parsed_instr
 .parsed_store:                         push INSTR_STORE;    jmp .parsed_instr
 .parsed_retrieve:                      push INSTR_RETRIEVE; jmp .parsed_instr
-.parsed_label:    call parse_unsigned; push INSTR_LABEL;    jmp .parsed_instr_arg
 .parsed_call:     call parse_unsigned; push INSTR_CALL;     jmp .parsed_instr_arg
 .parsed_jmp:      call parse_unsigned; push INSTR_JMP;      jmp .parsed_instr_arg
 .parsed_jz:       call parse_unsigned; push INSTR_JZ;       jmp .parsed_instr_arg
@@ -234,6 +255,11 @@ read_char:
 .parsed_printi:                        push INSTR_PRINTI;   jmp .parsed_instr
 .parsed_readc:                         push INSTR_READC;    jmp .parsed_instr
 .parsed_readi:                         push INSTR_READI;    jmp .parsed_instr
+
+.parsed_label:
+    call parse_unsigned
+    # TODO
+    jmp parse
 
 .parsed_instr_arg:
     # store argument at IP+1
@@ -268,11 +294,17 @@ interpret:
     # drop reading temp char
     drop
 
-    # reset IP to IMIN
+    # append end instruction
     push IP
+    dup
+    retrieve
+    push INSTR_END
+    store
+
+    # reset IP to IMIN
     push IMIN
     store
-    jmp .do_instr
+    jmp .select_instr
 
 .do_next_instr:
     # increment IP
@@ -284,38 +316,82 @@ interpret:
     store
     # fallthrough
 
-.do_instr:
+# find instruction with binary search
+.select_instr:
     push IP
     retrieve
     retrieve
-    dup; push INSTR_PUSH;     sub; jz .do_push
-    dup; push INSTR_DUP;      sub; jz .do_dup
-    dup; push INSTR_COPY;     sub; jz .do_copy
-    dup; push INSTR_SWAP;     sub; jz .do_swap
-    dup; push INSTR_DROP;     sub; jz .do_drop
-    dup; push INSTR_SLIDE;    sub; jz .do_slide
-    dup; push INSTR_ADD;      sub; jz .do_add
-    dup; push INSTR_SUB;      sub; jz .do_sub
-    dup; push INSTR_MUL;      sub; jz .do_mul
-    dup; push INSTR_DIV;      sub; jz .do_div
-    dup; push INSTR_MOD;      sub; jz .do_mod
-    dup; push INSTR_STORE;    sub; jz .do_store
-    dup; push INSTR_RETRIEVE; sub; jz .do_retrieve
-    dup; push INSTR_LABEL;    sub; jz .do_label
-    dup; push INSTR_CALL;     sub; jz .do_call
-    dup; push INSTR_JMP;      sub; jz .do_jmp
-    dup; push INSTR_JZ;       sub; jz .do_jz
-    dup; push INSTR_JN;       sub; jz .do_jn
-    dup; push INSTR_RET;      sub; jz .do_ret
-    dup; push INSTR_END;      sub; jz .do_end
-    dup; push INSTR_PRINTC;   sub; jz .do_printc
-    dup; push INSTR_PRINTI;   sub; jz .do_printi
-    dup; push INSTR_READC;    sub; jz .do_readc
-    dup; push INSTR_READI;    sub; jz .do_readi
-    jz .do_end  # unclean exit
-    jmp .error_unexpected_instr
+
+    dup; jz DO_INSTR_1
+    dup; jn .select_instr_L
+    # fallthrough
+# .select_instr_R:
+    push 6; sub
+    dup; jz DO_INSTR_2
+    dup; jn .select_instr_RL
+    # fallthrough
+# .select_instr_RR:
+    push 3; sub
+    dup; jz DO_INSTR_4
+    dup; jn .select_instr_RRL
+    # fallthrough
+# .select_instr_RRR:
+    push 1; sub
+    dup; jz DO_INSTR_8
+    jmp DO_INSTR_16
+.select_instr_RRL:
+    push 1; add
+    dup; jz DO_INSTR_9
+    jmp DO_INSTR_17
+.select_instr_RL:
+    push 3; add
+    dup; jz DO_INSTR_5
+    dup; jn .select_instr_RLL
+    # fallthrough
+# .select_instr_RLR:
+    push 1; sub
+    dup; jz DO_INSTR_10
+    jmp DO_INSTR_18
+.select_instr_RLL:
+    push 1; add
+    dup; jz DO_INSTR_11
+    jmp DO_INSTR_19
+.select_instr_L:
+    push 6; add
+    dup; jz DO_INSTR_3
+    dup; jn .select_instr_LL
+    # fallthrough
+# .select_instr_LR:
+    push 3; sub
+    dup; jz DO_INSTR_6
+    dup; jn .select_instr_LRL
+    # fallthrough
+# .select_instr_LRR:
+    push 1; sub
+    dup; jz DO_INSTR_12
+    jmp DO_INSTR_20
+.select_instr_LRL:
+    push 1; add
+    dup; jz DO_INSTR_13
+    jmp DO_INSTR_21
+.select_instr_LL:
+    push 3; add
+    dup; jz DO_INSTR_7
+    dup; jn .select_instr_LLL
+    # fallthrough
+# .select_instr_LLR:
+    push 1; sub
+    dup; jz DO_INSTR_14
+    jmp DO_INSTR_22
+.select_instr_LLL:
+    push 1; add
+    dup; jz DO_INSTR_15
+    jmp DO_INSTR_23
+
 
 .do_push:
+    # push 'p'; printc; push 'u'; printc; push 's'; printc; push 'h'; printc; push '\n'; printc; # debug
+
     # push SP and address for one above top of VM stack
     push SP
     dup
@@ -338,6 +414,8 @@ interpret:
     jmp .do_next_instr
 
 .do_dup:
+    # push 'd'; printc; push 'u'; printc; push 'p'; printc; push '\n'; printc # debug
+
     # push SP and address for one above top of VM stack
     push SP
     dup
@@ -357,10 +435,17 @@ interpret:
 
     jmp .do_next_instr
 
-.do_copy: jmp .error_unimplemented_instr
-.do_swap: jmp .error_unimplemented_instr
+.do_copy:
+    # push 'c'; printc; push 'o'; printc; push 'p'; printc; push 'y'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_swap:
+    # push 's'; printc; push 'w'; printc; push 'a'; printc; push 'p'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
 
 .do_drop:
+    # push 'd'; printc; push 'r'; printc; push 'o'; printc; push 'p'; printc; push '\n'; printc # debug
+
     # decrement SP
     push SP
     dup
@@ -372,25 +457,70 @@ interpret:
     # call check_stack_underflow
     jmp .do_next_instr
 
-.do_slide:    jmp .error_unimplemented_instr
-.do_add:      jmp .error_unimplemented_instr
-.do_sub:      jmp .error_unimplemented_instr
-.do_mul:      jmp .error_unimplemented_instr
-.do_div:      jmp .error_unimplemented_instr
-.do_mod:      jmp .error_unimplemented_instr
-.do_store:    jmp .error_unimplemented_instr
-.do_retrieve: jmp .error_unimplemented_instr
-.do_label:    jmp .error_unimplemented_instr
-.do_call:     jmp .error_unimplemented_instr
-.do_jmp:      jmp .error_unimplemented_instr
-.do_jz:       jmp .error_unimplemented_instr
-.do_jn:       jmp .error_unimplemented_instr
-.do_ret:      jmp .error_unimplemented_instr
+.do_slide:
+    # push 's'; printc; push 'l'; printc; push 'i'; printc; push 'd'; printc; push 'e'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_add:
+    # push 'a'; printc; push 'd'; printc; push 'd'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_sub:
+    # push 's'; printc; push 'u'; printc; push 'b'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_mul:
+    # push 'm'; printc; push 'u'; printc; push 'l'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_div:
+    # push 'd'; printc; push 'i'; printc; push 'v'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_mod:
+    # push 'm'; printc; push 'o'; printc; push 'd'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_store:
+    # push 's'; printc; push 't'; printc; push 'o'; printc; push 'r'; printc; push 'e'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_retrieve:
+    # push 'r'; printc; push 'e'; printc; push 't'; printc; push 'r'; printc; push 'i'; printc; push 'e'; printc; push 'v'; printc; push 'e'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_label:
+    # push 'l'; printc; push 'a'; printc; push 'b'; printc; push 'e'; printc; push 'l'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_call:
+    # push 'c'; printc; push 'a'; printc; push 'l'; printc; push 'l'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_jmp:
+    # push 'j'; printc; push 'm'; printc; push 'p'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_jz:
+    # push 'j'; printc; push 'z'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_jn:
+    # push 'j'; printc; push 'n'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_ret:
+    # push 'r'; printc; push 'e'; printc; push 't'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
 
 .do_end:
+    # push 'e'; printc; push 'n'; printc; push 'd'; printc; push '\n'; printc # debug
     end
 
 .do_printc:
+    # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'c'; printc; push '\n'; printc # debug
+
     # push SP and top value of stack
     push SP
     dup
@@ -410,6 +540,8 @@ interpret:
     jmp .do_next_instr
 
 .do_printi:
+    # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'i'; printc; push '\n'; printc # debug
+
     # push SP and top value of stack
     push SP
     dup
@@ -428,8 +560,14 @@ interpret:
     # call check_stack_underflow
     jmp .do_next_instr
 
-.do_readc:    jmp .error_unimplemented_instr
-.do_readi:    jmp .error_unimplemented_instr
+.do_readc:
+    # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'c'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
+.do_readi:
+    # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'i'; printc; push '\n'; printc # debug
+    jmp .error_unimplemented_instr
+
 
 check_stack_underflow:
     push SP
@@ -511,32 +649,6 @@ check_stack_underflow:
     push 'b'; printc
     push 'e'; printc
     push 'r'; printc
-    push '\n'; printc
-    end
-
-.error_unexpected_instr:
-    push 'U'; printc
-    push 'n'; printc
-    push 'e'; printc
-    push 'x'; printc
-    push 'p'; printc
-    push 'e'; printc
-    push 'c'; printc
-    push 't'; printc
-    push 'e'; printc
-    push 'd'; printc
-    push ' '; printc
-    push 'i'; printc
-    push 'n'; printc
-    push 's'; printc
-    push 't'; printc
-    push 'r'; printc
-    push 'u'; printc
-    push 'c'; printc
-    push 't'; printc
-    push 'i'; printc
-    push 'o'; printc
-    push 'n'; printc
     push '\n'; printc
     end
 

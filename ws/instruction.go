@@ -1,10 +1,24 @@
 package ws
 
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+)
 
 type Instr struct {
 	Type InstrType
 	Arg  *big.Int
+}
+
+func (instr *Instr) String() string {
+	switch {
+	case instr.Type == Label:
+		return fmt.Sprintf("label_%s:", instr.Arg)
+	case instr.Arg == nil:
+		return fmt.Sprintf("    %s", &instr.Type)
+	default:
+		return fmt.Sprintf("    %s %d", &instr.Type, instr.Arg)
+	}
 }
 
 type InstrType uint8
