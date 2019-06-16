@@ -1,19 +1,49 @@
-    define IP 2      # instruction pointer, points to current instruction
-    define IMIN 10   # instruction stack location, unchanging
-    define SP 3      # stack pointer, points to top of stack
-    define SMINP 4   # stack bottom pointer, points to bottom of stack
-    define SMIN 100  # stack bottom location, unchanging
-    define TEMP 1    # temporary storage for reading
+    # variable addresses
+    define IP 0    # current instruction pointer
+    define SP 1    # stack top pointer
+    define CP 2    # call stack top pointer
+    define LP 3    # label list pointer
+    define JP 4    # jump list pointer
+    define TEMP 5  # temporary pointer
+
+    # allocation sizes
+    # 199990:    instruction list size - <id, argument> pairs
+    # 1000:      stack size
+    # 1000:      call stack size
+    # 1000:      label list size - <label, line> pairs
+    # 1000:      jump list size
+    # unbounded: heap size
+
+    # boundaries for allocation blocks
+    # label list and jump list blocks are reused by stack and call stack
+    define IMIN 10      # instruction list start
+    define IMAX 200000  # instruction list end
+    define SMIN 200000  # stack start
+    define SMAX 201000  # stack end
+    define CMIN 201000  # call stack start
+    define CMAX 202000  # call stack end
+    define LMIN 200000  # label list start
+    define LMAX 201000  # label list end
+    define JMIN 201000  # jump list start
+    define JMAX 202000  # jump list end
+    define HMIN 202000  # heap start
+
+    # assigning initial values
+    push IP; push IMIN; store
+    push SP; push SMIN; store
+    push CP; push CMIN; store
+    push LP; push LMIN; store
+    push JP; push JMIN; store
 
     # instruction ids in order of time to find in .select_instr
-    define INSTR_1    0
-    define INSTR_2    6
+    define INSTR_1    0  # selects in 2 instructions
+    define INSTR_2    6  # selects in 8 instructions
     define INSTR_3   -6
-    define INSTR_4    9
+    define INSTR_4    9  # selects in 14 instructions
     define INSTR_5    3
     define INSTR_6   -3
     define INSTR_7   -9
-    define INSTR_8   10
+    define INSTR_8   10  # selects in 20 instructions
     define INSTR_9    8
     define INSTR_10   4
     define INSTR_11   2
@@ -21,7 +51,7 @@
     define INSTR_13  -4
     define INSTR_14  -8
     define INSTR_15 -10
-    define INSTR_16  11
+    define INSTR_16  11  # selects in 21 instructions
     define INSTR_17   7
     define INSTR_18   5
     define INSTR_19   1
@@ -54,11 +84,6 @@
     define DO_INSTR_21 .do_slide;    define INSTR_SLIDE    INSTR_21
     define DO_INSTR_22 .do_div;      define INSTR_DIV      INSTR_22
     define DO_INSTR_23 .do_mod;      define INSTR_MOD      INSTR_23
-
-    # assigning initial values
-    push IP;    push IMIN; store
-    push SP;    push SMIN; store
-    push SMINP; push SMIN; store
 
 
     # dropped by read_char
@@ -578,7 +603,7 @@ interpret:
 check_stack_underflow:
     push SP
     retrieve
-    push SMINP
+    push SMIN
     sub
     jn .error_stack_underflow
     ret
