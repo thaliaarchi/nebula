@@ -451,7 +451,7 @@ interpret:
     store
     jmp .select_instr
 
-.do_next_instr:
+.select_next_instr:
     # increment IP
     push IP
     dup
@@ -541,12 +541,10 @@ interpret:
 .do_push:
     # push 'p'; printc; push 'u'; printc; push 's'; printc; push 'h'; printc; push '\n'; printc; # debug
 
-    # push SP and address for one above top of VM stack
+    # push SP and address for top of VM stack
     push SP
     dup
     retrieve
-    push 1
-    add
 
     # push argument to VM stack
     dup
@@ -558,31 +556,36 @@ interpret:
     store
 
     # increment SP
+    push 1
+    add
     store
 
-    jmp .do_next_instr
+    jmp .select_next_instr
 
 .do_dup:
     # push 'd'; printc; push 'u'; printc; push 'p'; printc; push '\n'; printc # debug
 
-    # push SP and address for one above top of VM stack
+    push 1; call check_stack_underflow
+
+    # push SP and address for top of VM stack
     push SP
     dup
     retrieve
-    push 1
-    add
 
     # duplicate top of stack
     dup
-    copy 2
-    retrieve
+    dup
+    push 1
+    sub
     retrieve
     store
 
     # increment SP
+    push 1
+    add
     store
 
-    jmp .do_next_instr
+    jmp .select_next_instr
 
 .do_copy:
     # push 'c'; printc; push 'o'; printc; push 'p'; printc; push 'y'; printc; push '\n'; printc # debug
@@ -605,7 +608,7 @@ interpret:
     sub
     store
 
-    jmp .do_next_instr
+    jmp .select_next_instr
 
 .do_slide:
     # push 's'; printc; push 'l'; printc; push 'i'; printc; push 'd'; printc; push 'e'; printc; push '\n'; printc # debug
@@ -657,7 +660,7 @@ interpret:
     # jump to label
     store
 
-    jmp .do_next_instr
+    jmp .select_instr
 
 .do_jz:
     # push 'j'; printc; push 'z'; printc; push '\n'; printc # debug
@@ -687,6 +690,8 @@ interpret:
     push SP
     dup
     retrieve
+    push 1
+    sub
 
     # print top value of stack
     dup
@@ -694,11 +699,9 @@ interpret:
     printc
 
     # decrement SP
-    push 1
-    sub
     store
 
-    jmp .do_next_instr
+    jmp .select_next_instr
 
 .do_printi:
     # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'i'; printc; push '\n'; printc # debug
@@ -709,6 +712,8 @@ interpret:
     push SP
     dup
     retrieve
+    push 1
+    sub
 
     # print top value of stack
     dup
@@ -716,11 +721,9 @@ interpret:
     printi
 
     # decrement SP
-    push 1
-    sub
     store
 
-    jmp .do_next_instr
+    jmp .select_next_instr
 
 .do_readc:
     # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'c'; printc; push '\n'; printc # debug
@@ -748,7 +751,8 @@ check_stack_underflow:
 # errors print char by char to reduce stack usage
 
 .error_incomplete_instr:
-    push 'I'; printc
+    call print_error_prefix
+    push 'i'; printc
     push 'n'; printc
     push 'c'; printc
     push 'o'; printc
@@ -774,7 +778,8 @@ check_stack_underflow:
     end
 
 .error_invalid_instr:
-    push 'I'; printc
+    call print_error_prefix
+    push 'i'; printc
     push 'n'; printc
     push 'v'; printc
     push 'a'; printc
@@ -797,7 +802,8 @@ check_stack_underflow:
     end
 
 .error_unterminated_number:
-    push 'U'; printc
+    call print_error_prefix
+    push 'u'; printc
     push 'n'; printc
     push 't'; printc
     push 'e'; printc
@@ -820,7 +826,8 @@ check_stack_underflow:
     end
 
 .error_unimplemented_instr:
-    push 'U'; printc
+    call print_error_prefix
+    push 'u'; printc
     push 'n'; printc
     push 'i'; printc
     push 'm'; printc
@@ -849,7 +856,8 @@ check_stack_underflow:
     end
 
 .error_label_not_found:
-    push 'L'; printc
+    call print_error_prefix
+    push 'l'; printc
     push 'a'; printc
     push 'b'; printc
     push 'e'; printc
@@ -868,7 +876,8 @@ check_stack_underflow:
     end
 
 .error_stack_underflow:
-    push 'S'; printc
+    call print_error_prefix
+    push 's'; printc
     push 't'; printc
     push 'a'; printc
     push 'c'; printc
@@ -883,5 +892,26 @@ check_stack_underflow:
     push 'l'; printc
     push 'o'; printc
     push 'w'; printc
+    jmp .print_trace
+
+print_error_prefix:
+    push 'E'; printc
+    push 'r'; printc
+    push 'r'; printc
+    push 'o'; printc
+    push 'r'; printc
+    push ':'; printc
+    push ' '; printc
+    ret
+
+.print_trace:
+    push ','; printc
+    push ' '; printc
+    push 'I'; printc
+    push 'P'; printc
+    push '='; printc
+    push IP
+    retrieve
+    printi
     push '\n'; printc
     end
