@@ -5,7 +5,8 @@
     push 4; push 't'; store
     push 5; push 'l'; store
     push 6; push 'e'; store
-    push 7; push 's'; store
+    push 7; push 0; store
+
     push 8; push ' '; store
     push 9; push 'o'; store
     push 10; push 'f'; store
@@ -112,13 +113,10 @@
 
     push 99
 .loop:
-    dup;       printi
-    push 0;    call print_string
-    push 27;   call print_string
+    dup;       call print_bottles_on_wall
     push ',';  printc
     push ' ';  printc
-    dup;       printi
-    push 0;    call print_string
+    dup;       call print_bottles
     push '.';  printc
     push '\n'; printc
 
@@ -127,22 +125,34 @@
     dup; jz .loop_break
 
     push 40;   call print_string
-    dup;       printi
-    push 0;    call print_string
-    push 27;   call print_string
+    dup;       call print_bottles_on_wall
     push '.';  printc
     push '\n'; printc
     jmp .loop
 
 .loop_break:
     push 72;   call print_string
-    push 99;   printi
-    push 0;    call print_string
-    push 27;   call print_string
+    push 99;   call print_bottles_on_wall
     push '.';  printc
     push '\n'; printc
     drop
     end
+
+print_bottles:
+    printi
+    push 0; call print_string
+
+    dup; push 1; sub; jz .print_bottles_one
+
+    push 's'; printc
+.print_bottles_one:
+    push 8; call print_string
+    ret
+
+print_bottles_on_wall:
+    call print_bottles
+    push 27; call print_string
+    ret
 
 print_string:
     dup
