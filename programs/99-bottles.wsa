@@ -1,0 +1,158 @@
+    push 0; push ' '; store
+    push 1; push 'b'; store
+    push 2; push 'o'; store
+    push 3; push 't'; store
+    push 4; push 't'; store
+    push 5; push 'l'; store
+    push 6; push 'e'; store
+    push 7; push 's'; store
+    push 8; push ' '; store
+    push 9; push 'o'; store
+    push 10; push 'f'; store
+    push 11; push ' '; store
+    push 12; push 'c'; store
+    push 13; push 'h'; store
+    push 14; push 'o'; store
+    push 15; push 'c'; store
+    push 16; push 'o'; store
+    push 17; push 'l'; store
+    push 18; push 'a'; store
+    push 19; push 't'; store
+    push 20; push 'e'; store
+    push 21; push ' '; store
+    push 22; push 'm'; store
+    push 23; push 'i'; store
+    push 24; push 'l'; store
+    push 25; push 'k'; store
+    push 26; push 0; store
+
+    push 27; push ' '; store
+    push 28; push 'o'; store
+    push 29; push 'n'; store
+    push 30; push ' '; store
+    push 31; push 't'; store
+    push 32; push 'h'; store
+    push 33; push 'e'; store
+    push 34; push ' '; store
+    push 35; push 'w'; store
+    push 36; push 'a'; store
+    push 37; push 'l'; store
+    push 38; push 'l'; store
+    push 39; push 0; store
+
+    push 40; push 'T'; store
+    push 41; push 'a'; store
+    push 42; push 'k'; store
+    push 43; push 'e'; store
+    push 44; push ' '; store
+    push 45; push 'o'; store
+    push 46; push 'n'; store
+    push 47; push 'e'; store
+    push 48; push ' '; store
+    push 49; push 'd'; store
+    push 50; push 'o'; store
+    push 51; push 'w'; store
+    push 52; push 'n'; store
+    push 53; push ','; store
+    push 54; push ' '; store
+    push 55; push 'p'; store
+    push 56; push 'a'; store
+    push 57; push 's'; store
+    push 58; push 's'; store
+    push 59; push ' '; store
+    push 60; push 'i'; store
+    push 61; push 't'; store
+    push 62; push ' '; store
+    push 63; push 'a'; store
+    push 64; push 'r'; store
+    push 65; push 'o'; store
+    push 66; push 'u'; store
+    push 67; push 'n'; store
+    push 68; push 'd'; store
+    push 69; push ','; store
+    push 70; push ' '; store
+    push 71; push 0; store
+
+    push 72; push 'G'; store
+    push 73; push 'o'; store
+    push 74; push ' '; store
+    push 75; push 't'; store
+    push 76; push 'o'; store
+    push 77; push ' '; store
+    push 78; push 't'; store
+    push 79; push 'h'; store
+    push 80; push 'e'; store
+    push 81; push ' '; store
+    push 82; push 's'; store
+    push 83; push 't'; store
+    push 84; push 'o'; store
+    push 85; push 'r'; store
+    push 86; push 'e'; store
+    push 87; push ' '; store
+    push 88; push 'a'; store
+    push 89; push 'n'; store
+    push 90; push 'd'; store
+    push 91; push ' '; store
+    push 92; push 'b'; store
+    push 93; push 'u'; store
+    push 94; push 'y'; store
+    push 95; push ' '; store
+    push 96; push 's'; store
+    push 97; push 'o'; store
+    push 98; push 'm'; store
+    push 99; push 'e'; store
+    push 100; push ' '; store
+    push 101; push 'm'; store
+    push 102; push 'o'; store
+    push 103; push 'r'; store
+    push 104; push 'e'; store
+    push 105; push ','; store
+    push 106; push ' '; store
+    push 107; push 0; store
+
+    push 99
+.loop:
+    dup;       printi
+    push 0;    call print_string
+    push 27;   call print_string
+    push ',';  printc
+    push ' ';  printc
+    dup;       printi
+    push 0;    call print_string
+    push '.';  printc
+    push '\n'; printc
+
+    push 1
+    sub
+    dup; jz .loop_break
+
+    push 40;   call print_string
+    dup;       printi
+    push 0;    call print_string
+    push 27;   call print_string
+    push '.';  printc
+    push '\n'; printc
+    jmp .loop
+
+.loop_break:
+    push 72;   call print_string
+    push 99;   printi
+    push 0;    call print_string
+    push 27;   call print_string
+    push '.';  printc
+    push '\n'; printc
+    drop
+    end
+
+print_string:
+    dup
+    retrieve
+    dup; jz .print_string_break
+    printc
+    push 1
+    add
+    jmp print_string
+.print_string_break:
+    drop
+    drop
+    ret
