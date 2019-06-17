@@ -93,7 +93,7 @@ parse:
     dup; push ' ';  sub; jz .parse_stack
     dup; push '\t'; sub; jz .parse_imp_tab
     dup; push '\n'; sub; jz .parse_flow
-    dup; jz interpret
+    dup; jz setup_labels
     jmp parse
 .parse_imp_tab:
     call read_char
@@ -323,9 +323,12 @@ read_char:
     dup
     retrieve
 
-    # store label at address at LP
+    # store IP+1 at address at LP
     dup
-    copy 3
+    push IP
+    retrieve
+    push 1
+    add
     store
 
     # increment LP
@@ -372,7 +375,70 @@ read_char:
     jmp parse
 
 
+# replace labels with instruction indices
+setup_labels:
+    # init jump loop
+    push JP
+    retrieve
+    push JMIN
+.jump_loop:
+    # check jump loop bounds
+    dup
+    copy 2
+    sub; jz interpret
+
+    # init label loop
+    push LP
+    retrieve
+    push LMIN
+.label_loop:
+    # check label loop bounds
+    dup
+    copy 2
+    sub; jz .error_label_not_found
+
+    # push current label and label of current jump
+    dup
+    retrieve
+    copy 3
+    retrieve
+    retrieve
+    # check if labels match
+    sub; jz .replace_label
+
+.label_loop_continue:
+    # increment label loop
+    push 1
+    add
+    jmp .label_loop
+
+.jump_loop_continue:
+    # drop label loop bounds
+    drop
+    drop
+    # increment jump loop
+    push 1
+    add
+    jmp .jump_loop
+
+.replace_label:
+    # push address of jump and instruction index of label
+    copy 2
+    retrieve
+    copy 1
+    push 1
+    add
+    retrieve
+    # replace jump label with index
+    store
+    jmp .jump_loop_continue
+
+
 interpret:
+    # drop label setup loop bounds
+    drop
+    drop
+
     # append end instruction
     push IP
     dup
@@ -529,6 +595,8 @@ interpret:
 .do_drop:
     # push 'd'; printc; push 'r'; printc; push 'o'; printc; push 'p'; printc; push '\n'; printc # debug
 
+    push 1; call check_stack_underflow
+
     # decrement SP
     push SP
     dup
@@ -537,7 +605,6 @@ interpret:
     sub
     store
 
-    # call check_stack_underflow
     jmp .do_next_instr
 
 .do_slide:
@@ -572,17 +639,25 @@ interpret:
     # push 'r'; printc; push 'e'; printc; push 't'; printc; push 'r'; printc; push 'i'; printc; push 'e'; printc; push 'v'; printc; push 'e'; printc; push '\n'; printc # debug
     jmp .error_unimplemented_instr
 
-.do_label:
-    # push 'l'; printc; push 'a'; printc; push 'b'; printc; push 'e'; printc; push 'l'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
-
 .do_call:
     # push 'c'; printc; push 'a'; printc; push 'l'; printc; push 'l'; printc; push '\n'; printc # debug
     jmp .error_unimplemented_instr
 
 .do_jmp:
     # push 'j'; printc; push 'm'; printc; push 'p'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    # push IP and address of jmp label
+    push IP
+    dup
+    retrieve
+    push 1
+    add
+    retrieve
+
+    # jump to label
+    store
+
+    jmp .do_next_instr
 
 .do_jz:
     # push 'j'; printc; push 'z'; printc; push '\n'; printc # debug
@@ -606,6 +681,8 @@ interpret:
 .do_printc:
     # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'c'; printc; push '\n'; printc # debug
 
+    push 1; call check_stack_underflow
+
     # push SP and top value of stack
     push SP
     dup
@@ -621,11 +698,12 @@ interpret:
     sub
     store
 
-    # call check_stack_underflow
     jmp .do_next_instr
 
 .do_printi:
     # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'i'; printc; push '\n'; printc # debug
+
+    push 1; call check_stack_underflow
 
     # push SP and top value of stack
     push SP
@@ -642,7 +720,6 @@ interpret:
     sub
     store
 
-    # call check_stack_underflow
     jmp .do_next_instr
 
 .do_readc:
@@ -654,12 +731,17 @@ interpret:
     jmp .error_unimplemented_instr
 
 
+# requires a parameter of count
 check_stack_underflow:
+    # push SP-count and SMIN
     push SP
     retrieve
-    push SMIN
+    swap
     sub
-    jn .error_stack_underflow
+    push SMIN
+
+    # underflow if SP-count < SMIN
+    sub; jn .error_stack_underflow
     ret
 
 
@@ -763,6 +845,25 @@ check_stack_underflow:
     push 'i'; printc
     push 'o'; printc
     push 'n'; printc
+    push '\n'; printc
+    end
+
+.error_label_not_found:
+    push 'L'; printc
+    push 'a'; printc
+    push 'b'; printc
+    push 'e'; printc
+    push 'l'; printc
+    push ' '; printc
+    push 'n'; printc
+    push 'o'; printc
+    push 't'; printc
+    push ' '; printc
+    push 'f'; printc
+    push 'o'; printc
+    push 'u'; printc
+    push 'n'; printc
+    push 'd'; printc
     push '\n'; printc
     end
 
