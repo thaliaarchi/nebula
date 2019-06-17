@@ -541,12 +541,12 @@ interpret:
 .do_push:
     # push 'p'; printc; push 'u'; printc; push 's'; printc; push 'h'; printc; push '\n'; printc; # debug
 
-    # push SP and address for top of VM stack
+    # push SP and address for top+1 of stack
     push SP
     dup
     retrieve
 
-    # push argument to VM stack
+    # push argument to stack
     dup
     push IP
     retrieve
@@ -567,7 +567,7 @@ interpret:
 
     push 1; call check_stack_underflow
 
-    # push SP and address for top of VM stack
+    # push SP and address for top+1 of stack
     push SP
     dup
     retrieve
@@ -614,25 +614,71 @@ interpret:
     # push 's'; printc; push 'l'; printc; push 'i'; printc; push 'd'; printc; push 'e'; printc; push '\n'; printc # debug
     jmp .error_unimplemented_instr
 
+# returns address of top of stack, value at top-1 of stack, and value at top of stack
+do_arith:
+    push 2; call check_stack_underflow
+
+    # push SP and address for top of stack
+    push SP
+    dup
+    retrieve
+    push 1
+    sub
+
+    # decrement SP
+    swap
+    copy 1
+    store
+
+    # push address for top-1 of stack
+    dup
+    push 1
+    sub
+
+    # retrieve values at top-1 and top of stack
+    swap
+    retrieve
+    copy 1
+    retrieve
+    swap
+
+    ret
+
 .do_add:
     # push 'a'; printc; push 'd'; printc; push 'd'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+    call do_arith
+    add
+    store
+    jmp .select_next_instr
 
 .do_sub:
     # push 's'; printc; push 'u'; printc; push 'b'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+    call do_arith
+    sub
+    store
+    jmp .select_next_instr
 
 .do_mul:
     # push 'm'; printc; push 'u'; printc; push 'l'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+    call do_arith
+    mul
+    store
+    jmp .select_next_instr
 
 .do_div:
     # push 'd'; printc; push 'i'; printc; push 'v'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+    call do_arith
+    dup; jz .error_division_by_zero
+    div
+    store
+    jmp .select_next_instr
 
 .do_mod:
     # push 'm'; printc; push 'o'; printc; push 'd'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+    call do_arith
+    mod
+    store
+    jmp .select_next_instr
 
 .do_store:
     # push 's'; printc; push 't'; printc; push 'o'; printc; push 'r'; printc; push 'e'; printc; push '\n'; printc # debug
@@ -894,7 +940,31 @@ check_stack_underflow:
     push 'w'; printc
     jmp .print_trace
 
+.error_division_by_zero:
+    drop
+    drop
+    drop
+    call print_error_prefix
+    push 'd'; printc
+    push 'i'; printc
+    push 'v'; printc
+    push 'i'; printc
+    push 's'; printc
+    push 'i'; printc
+    push 'o'; printc
+    push 'n'; printc
+    push ' '; printc
+    push 'b'; printc
+    push 'y'; printc
+    push ' '; printc
+    push 'z'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push 'o'; printc
+    jmp .print_trace
+
 print_error_prefix:
+    drop
     push 'E'; printc
     push 'r'; printc
     push 'r'; printc
