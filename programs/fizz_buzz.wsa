@@ -1,0 +1,28 @@
+    push 1
+loop:
+    dup; push 3; mod; jz .fizz
+    dup; push 5; mod; jz .buzz
+    dup; printi
+.loop_check:
+    push '\n'; printc
+    dup; push 100; sub; jz .loop_break
+    push 1
+    add
+    jmp loop
+.loop_break:
+    drop
+    end
+
+.fizz:
+    push 'F'; printc
+    push 'i'; printc
+    push 'z'; printc
+    push 'z'; printc
+    dup; push 5; mod; jz .buzz
+    jmp .loop_check
+.buzz:
+    push 'B'; printc
+    push 'u'; printc
+    push 'z'; printc
+    push 'z'; printc
+    jmp .loop_check
