@@ -206,7 +206,7 @@ parse:
     dup; jz .error_incomplete_instr
     jmp .parse_flow_tab
 
-# returns result on top of stack
+# returns parsed signed integer on top of stack
 parse_signed:
     call read_char
     dup; push ' ';  sub; jz parse_unsigned
@@ -223,7 +223,7 @@ parse_signed:
     push 0
     ret
 
-# returns result on top of stack
+# returns parsed unsigned integer on top of stack
 parse_unsigned:
     push 0
 .parse_unsigned_loop:
@@ -259,60 +259,114 @@ read_char:
     ret
 
 
-# push instruction ID and number argument with reading temp char on top
-.parsed_push:     call parse_signed;   push INSTR_PUSH;     jmp .parsed_instr_arg
-.parsed_dup:                           push INSTR_DUP;      jmp .parsed_instr
-.parsed_copy:     call parse_signed;   push INSTR_COPY;     jmp .parsed_instr_arg
-.parsed_swap:                          push INSTR_SWAP;     jmp .parsed_instr
-.parsed_drop:                          push INSTR_DROP;     jmp .parsed_instr
-.parsed_slide:    call parse_signed;   push INSTR_SLIDE;    jmp .parsed_instr_arg
-.parsed_add:                           push INSTR_ADD;      jmp .parsed_instr
-.parsed_sub:                           push INSTR_SUB;      jmp .parsed_instr
-.parsed_mul:                           push INSTR_MUL;      jmp .parsed_instr
-.parsed_div:                           push INSTR_DIV;      jmp .parsed_instr
-.parsed_mod:                           push INSTR_MOD;      jmp .parsed_instr
-.parsed_store:                         push INSTR_STORE;    jmp .parsed_instr
-.parsed_retrieve:                      push INSTR_RETRIEVE; jmp .parsed_instr
-.parsed_call:     call parse_unsigned; push INSTR_CALL;     jmp .parsed_instr_arg
-.parsed_jmp:      call parse_unsigned; push INSTR_JMP;      jmp .parsed_instr_arg
-.parsed_jz:       call parse_unsigned; push INSTR_JZ;       jmp .parsed_instr_arg
-.parsed_jn:       call parse_unsigned; push INSTR_JN;       jmp .parsed_instr_arg
-.parsed_ret:                           push INSTR_RET;      jmp .parsed_instr
-.parsed_end:                           push INSTR_END;      jmp .parsed_instr
-.parsed_printc:                        push INSTR_PRINTC;   jmp .parsed_instr
-.parsed_printi:                        push INSTR_PRINTI;   jmp .parsed_instr
-.parsed_readc:                         push INSTR_READC;    jmp .parsed_instr
-.parsed_readi:                         push INSTR_READI;    jmp .parsed_instr
+# pushes instruction ID and stores instruction in instruction list
+.parsed_push:     push INSTR_PUSH;     jmp .parsed_instr_number_arg
+.parsed_dup:      push INSTR_DUP;      jmp .parsed_instr
+.parsed_copy:     push INSTR_COPY;     jmp .parsed_instr_number_arg
+.parsed_swap:     push INSTR_SWAP;     jmp .parsed_instr
+.parsed_drop:     push INSTR_DROP;     jmp .parsed_instr
+.parsed_slide:    push INSTR_SLIDE;    jmp .parsed_instr_number_arg
+.parsed_add:      push INSTR_ADD;      jmp .parsed_instr
+.parsed_sub:      push INSTR_SUB;      jmp .parsed_instr
+.parsed_mul:      push INSTR_MUL;      jmp .parsed_instr
+.parsed_div:      push INSTR_DIV;      jmp .parsed_instr
+.parsed_mod:      push INSTR_MOD;      jmp .parsed_instr
+.parsed_store:    push INSTR_STORE;    jmp .parsed_instr
+.parsed_retrieve: push INSTR_RETRIEVE; jmp .parsed_instr
+.parsed_call:     push INSTR_CALL;     jmp .parsed_instr_label_arg
+.parsed_jmp:      push INSTR_JMP;      jmp .parsed_instr_label_arg
+.parsed_jz:       push INSTR_JZ;       jmp .parsed_instr_label_arg
+.parsed_jn:       push INSTR_JN;       jmp .parsed_instr_label_arg
+.parsed_ret:      push INSTR_RET;      jmp .parsed_instr
+.parsed_end:      push INSTR_END;      jmp .parsed_instr
+.parsed_printc:   push INSTR_PRINTC;   jmp .parsed_instr
+.parsed_printi:   push INSTR_PRINTI;   jmp .parsed_instr
+.parsed_readc:    push INSTR_READC;    jmp .parsed_instr
+.parsed_readi:    push INSTR_READI;    jmp .parsed_instr
 
+# adds label to label stack
 .parsed_label:
     call parse_unsigned
-    # TODO
+
+    # push LP and address at LP
+    push LP
+    dup
+    retrieve
+
+    # store IP at address at LP+1
+    dup
+    push 1
+    add
+    push IP
+    retrieve
+    store
+
+    # increment LP
+    swap
+    copy 1
+    push 2
+    add
+    store
+
+    # store label at address at LP
+    swap
+    store
+
     jmp parse
 
-.parsed_instr_arg:
-    # store argument at IP+1
+.parsed_instr_label_arg:
     swap
+    call parse_unsigned
+
+    # push JP and address at JP
+    push JP
+    dup
+    retrieve
+
+    # store label at address at LP
+    dup
+    copy 3
+    store
+
+    # increment LP
+    push 1
+    add
+    store
+
+    jmp .store_instr_arg
+
+.parsed_instr_number_arg:
+    swap
+    call parse_signed
+    # fallthrough
+
+.store_instr_arg:
+    # store argument at IP+1
     push IP
     retrieve
     push 1
     add
     swap
     store
+
+    swap
     # fallthrough
 
 .parsed_instr:
-    # store instruction id at IP
-    push IP
-    retrieve
-    swap
-    store
-
-    # increment IP
+    # push IP and address at IP
     push IP
     dup
     retrieve
+
+    # increment IP
+    swap
+    copy 1
     push 2
     add
+    store
+
+    # store instruction id at IP
+    swap
     store
 
     jmp parse
@@ -609,7 +663,7 @@ check_stack_underflow:
     ret
 
 
-# errors print char by char rather than in a loop to use stack less
+# errors print char by char to reduce stack usage
 
 .error_incomplete_instr:
     push 'I'; printc
