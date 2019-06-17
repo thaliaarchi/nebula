@@ -614,71 +614,36 @@ interpret:
     # push 's'; printc; push 'l'; printc; push 'i'; printc; push 'd'; printc; push 'e'; printc; push '\n'; printc # debug
     jmp .error_unimplemented_instr
 
-# returns address of top of stack, value at top-1 of stack, and value at top of stack
-do_arith:
-    push 2; call check_stack_underflow
-
-    # push SP and address for top of stack
-    push SP
-    dup
-    retrieve
-    push 1
-    sub
-
-    # decrement SP
-    swap
-    copy 1
-    store
-
-    # push address for top-1 of stack
-    dup
-    push 1
-    sub
-
-    # retrieve values at top-1 and top of stack
-    swap
-    retrieve
-    copy 1
-    retrieve
-    swap
-
-    ret
-
 .do_add:
     # push 'a'; printc; push 'd'; printc; push 'd'; printc; push '\n'; printc # debug
-    call do_arith
+    call arith_retrieve
     add
-    store
-    jmp .select_next_instr
+    jmp .arith_store
 
 .do_sub:
     # push 's'; printc; push 'u'; printc; push 'b'; printc; push '\n'; printc # debug
-    call do_arith
+    call arith_retrieve
     sub
-    store
-    jmp .select_next_instr
+    jmp .arith_store
 
 .do_mul:
     # push 'm'; printc; push 'u'; printc; push 'l'; printc; push '\n'; printc # debug
-    call do_arith
+    call arith_retrieve
     mul
-    store
-    jmp .select_next_instr
+    jmp .arith_store
 
 .do_div:
     # push 'd'; printc; push 'i'; printc; push 'v'; printc; push '\n'; printc # debug
-    call do_arith
+    call arith_retrieve
     dup; jz .error_division_by_zero
     div
-    store
-    jmp .select_next_instr
+    jmp .arith_store
 
 .do_mod:
     # push 'm'; printc; push 'o'; printc; push 'd'; printc; push '\n'; printc # debug
-    call do_arith
+    call arith_retrieve
     mod
-    store
-    jmp .select_next_instr
+    jmp .arith_store
 
 .do_store:
     # push 's'; printc; push 't'; printc; push 'o'; printc; push 'r'; printc; push 'e'; printc; push '\n'; printc # debug
@@ -778,6 +743,37 @@ do_arith:
 .do_readi:
     # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'i'; printc; push '\n'; printc # debug
     jmp .error_unimplemented_instr
+
+# returns SP, address for top of stack, address of top-1 of stack, value at top-1 of stack, and value at top of stack
+arith_retrieve:
+    # push SP and address for top of stack
+    push SP
+    dup
+    retrieve
+    push 1
+    sub
+
+    # push address for top-1 of stack
+    dup
+    push 1
+    sub
+
+    # push value at top-1 of stack
+    dup
+    retrieve
+
+    # push value at top of stack
+    copy 2
+    retrieve
+
+    ret
+
+.arith_store:
+    # store modified value
+    store
+    # decrement SP
+    store
+    jmp .select_next_instr
 
 
 # requires a parameter of count
