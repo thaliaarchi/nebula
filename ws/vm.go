@@ -235,7 +235,7 @@ func (vm *VM) readInt(x *big.Int) *big.Int {
 	if err != nil && err != io.EOF {
 		panic("readi: " + err.Error())
 	}
-	x, ok := x.SetString(line, 10)
+	x, ok := x.SetString(line[:len(line)-1], 10)
 	if !ok {
 		panic("invalid number")
 	}

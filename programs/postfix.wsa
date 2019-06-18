@@ -1,0 +1,222 @@
+# postfix.wsa evaluates postfix expressions
+
+    define TEMP 0
+    define SP 1
+    define SMIN 2
+
+eval_expr:
+    # initialize variable
+    push SP; push SMIN; store
+
+    push '('; printc
+    push 'e'; printc
+    push 'x'; printc
+    push 'p'; printc
+    push 'r'; printc
+    push ')'; printc
+    push ' '; printc
+
+.read_token:
+    call read_char
+    dup; push '0'; sub; jn .read_operator
+    push '9'; copy 1; sub; jn .error_illegal_char
+
+    # operand
+    push '0'
+    sub
+
+.read_operand_loop:
+    call read_char
+    dup; push '0'; sub; jn .read_operand_break
+    push '9'; copy 1; sub; jn .error_illegal_char
+
+    push '0'
+    sub
+    swap
+    push 10
+    mul
+    add
+
+    jmp .read_operand_loop
+
+.read_operand_break:
+    swap
+
+    # store operand at SP
+    push SP; retrieve
+    swap
+    store
+
+    # increment SP
+    push SP
+    dup; retrieve; push 1; add
+    store
+
+    # fallthrough
+
+.read_operator:
+    dup; push '+'; sub; jz .eval_add
+    dup; push '-'; sub; jz .eval_sub
+    dup; push '*'; sub; jz .eval_mul
+    dup; push '/'; sub; jz .eval_div
+    dup; push '%'; sub; jz .eval_mod
+    dup; push '\n'; sub; jz .print_result
+    dup; push ' '; sub; jz .read_space
+    jmp .error_illegal_char
+
+.read_space:
+    drop
+    jmp .read_token
+
+read_char:
+    push TEMP
+    dup; readc
+    retrieve
+    dup; jz .read_char_eof
+    ret
+
+.read_char_eof:
+    drop
+    end
+
+.eval_add:
+    call eval_operator
+    add
+    jmp .eval_operator_done
+
+.eval_sub:
+    call eval_operator
+    sub
+    jmp .eval_operator_done
+
+.eval_mul:
+    call eval_operator
+    mul
+    jmp .eval_operator_done
+
+.eval_div:
+    call eval_operator
+    div
+    jmp .eval_operator_done
+
+.eval_mod:
+    call eval_operator
+    mod
+    jmp .eval_operator_done
+
+eval_operator:
+    drop
+
+    # check underflow
+    push SP; retrieve; push 2; sub
+    push SMIN
+    sub
+    jn .error_missing_operand
+
+    # push SP, (*SP)-1, (*SP)-2, *((*SP)-2), and *((*SP)-1)
+    push SP
+    dup; retrieve; push 1; sub
+    dup; push 1; sub
+    dup; retrieve
+    copy 2; retrieve
+
+    ret
+
+.eval_operator_done:
+    store
+    store
+    jmp .read_token
+
+.print_result:
+    drop
+
+    # check overflow
+    push SMIN
+    push SP; retrieve
+    sub
+    dup; jz eval_expr
+    push 1; add; jn .error_missing_operator
+
+    push ' '; printc
+    push '='; printc
+    push '>'; printc
+    push ' '; printc
+
+    push SP; retrieve; push 1; sub; retrieve
+    printi
+    push '\n'; printc
+
+    jmp eval_expr
+
+.consume_line:
+    # consume remainder of line
+    call read_char
+    push '\n'; sub; jz eval_expr
+    jmp .consume_line
+
+.error_illegal_char:
+    call print_error_prefix
+    push 'i'; printc
+    push 'l'; printc
+    push 'l'; printc
+    push 'e'; printc
+    push 'g'; printc
+    push 'a'; printc
+    push 'l'; printc
+    push ' '; printc
+    push 'c'; printc
+    push 'h'; printc
+    push 'a'; printc
+    push 'r'; printc
+    push 'a'; printc
+    push 'c'; printc
+    push 't'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push ':'; printc
+    push ' '; printc
+    printc
+    push '\n'; printc
+    jmp .consume_line
+
+.error_missing_operand:
+    call print_missing_opera
+    push 'n'; printc
+    push 'd'; printc
+    push '\n'; printc
+    jmp .consume_line
+
+.error_missing_operator:
+    call print_missing_opera
+    push 't'; printc
+    push 'o'; printc
+    push 'r'; printc
+    push '\n'; printc
+    jmp eval_expr
+
+print_missing_opera:
+    call print_error_prefix
+    push 'm'; printc
+    push 'i'; printc
+    push 's'; printc
+    push 's'; printc
+    push 'i'; printc
+    push 'n'; printc
+    push 'g'; printc
+    push ' '; printc
+    push 'o'; printc
+    push 'p'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push 'a'; printc
+    ret
+
+print_error_prefix:
+    push 'E'; printc
+    push 'r'; printc
+    push 'r'; printc
+    push 'o'; printc
+    push 'r'; printc
+    push ':'; printc
+    push ' '; printc
+    ret
