@@ -1,4 +1,5 @@
 start:
+    # print prompt "Enter the number of terms to calculate: "
     push 'E'; printc
     push 'n'; printc
     push 't'; printc
@@ -40,31 +41,41 @@ start:
     push ':'; printc
     push ' '; printc
 
+    # read integer n
     push 0
     dup
     readi
     retrieve
 
+    # reject n < 0
     dup; jn start
 
+    # store the first two terms: f(0) = 0, f(1) = 1
     push 0; dup; store
     push 1; dup; store
 loop:
+    # break if n == 0
     dup; jz .loop_break
 
+    # push 0, f(i+1), 1, and f(i)
     push 0
     push 1; retrieve
     push 1
     push 0; retrieve
 
+    # print f(i)
     dup; printi
     push '\n'; printc
 
+    # f(i+1) = f(i) + f(i+1)
     copy 2
     add
     store
+
+    # f(i) = f(i+1)
     store
 
+    # n--
     push 1
     sub
 

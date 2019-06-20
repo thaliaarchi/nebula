@@ -1,3 +1,4 @@
+    # store string " bottle" in the heap starting at 0
     push 0; push ' '; store
     push 1; push 'b'; store
     push 2; push 'o'; store
@@ -7,6 +8,7 @@
     push 6; push 'e'; store
     push 7; push 0; store
 
+    # store string " of chocolate milk" in the heap starting at 8
     push 8; push ' '; store
     push 9; push 'o'; store
     push 10; push 'f'; store
@@ -27,6 +29,7 @@
     push 25; push 'k'; store
     push 26; push 0; store
 
+    # store string " on the wall" in the heap starting at 27
     push 27; push ' '; store
     push 28; push 'o'; store
     push 29; push 'n'; store
@@ -41,6 +44,7 @@
     push 38; push 'l'; store
     push 39; push 0; store
 
+    # store string "Take one down, pass it around, " in the heap starting at 40
     push 40; push 'T'; store
     push 41; push 'a'; store
     push 42; push 'k'; store
@@ -74,6 +78,7 @@
     push 70; push ' '; store
     push 71; push 0; store
 
+    # store string "Go to the store and buy some more, " in the heap starting at 72
     push 72; push 'G'; store
     push 73; push 'o'; store
     push 74; push ' '; store
@@ -113,6 +118,7 @@
 
     push 99
 .loop:
+    # print "n bottle(s) of chocolate milk on the wall, n bottle(s) of chocolate milk.\n"
     dup;       call print_bottles_on_wall
     push ',';  printc
     push ' ';  printc
@@ -120,10 +126,12 @@
     push '.';  printc
     push '\n'; printc
 
+    # decrement n, break if zero
     push 1
     sub
     dup; jz .loop_break
 
+    # Take one down, pass it around, n bottle(s) of chocolate milk on the wall.\n"
     push 40;   call print_string
     dup;       call print_bottles_on_wall
     push '.';  printc
@@ -131,6 +139,7 @@
     jmp .loop
 
 .loop_break:
+    # print "Go to the store and buy some more, 99 bottles of chocolate milk on the wall.\n"
     push 72;   call print_string
     push 99;   call print_bottles_on_wall
     push '.';  printc
@@ -138,22 +147,26 @@
     drop
     end
 
+# print string "n bottles of chocolate milk" or "1 bottle of chocolate milk"
+# param: n
 print_bottles:
     printi
     push 0; call print_string
-
     dup; push 1; sub; jz .print_bottles_one
-
     push 's'; printc
 .print_bottles_one:
     push 8; call print_string
     ret
 
+# print string "n bottles of chocolate milk on the wall" or "1 bottle of chocolate milk on the wall"
+# param: n
 print_bottles_on_wall:
     call print_bottles
     push 27; call print_string
     ret
 
+# print string stored in the heap starting at address and terminated with 0
+# param: string address
 print_string:
     dup
     retrieve
