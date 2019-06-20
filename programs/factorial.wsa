@@ -1,0 +1,55 @@
+start:
+    # print prompt "Enter a number: "
+    push 'E'; printc
+    push 'n'; printc
+    push 't'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push ' '; printc
+    push 'a'; printc
+    push ' '; printc
+    push 'n'; printc
+    push 'u'; printc
+    push 'm'; printc
+    push 'b'; printc
+    push 'e'; printc
+    push 'r'; printc
+    push ':'; printc
+    push ' '; printc
+
+    # read integer n
+    push 0
+    dup
+    readi
+    retrieve
+
+    # reject n < 0
+    dup; jn start
+
+    # print "n! = "
+    dup; printi
+    push '!'; printc
+    push ' '; printc
+    push '='; printc
+    push ' '; printc
+
+    # print factorial of n
+    call factorial; printi
+
+    end
+
+# recursively compute factorial of n
+# param: n
+factorial:
+    # n == 0
+    dup; jz .factorial_zero
+    # n * (n-1)!
+    dup; push 1; sub
+    call factorial
+    mul
+    ret
+.factorial_zero:
+    drop
+    push 1
+    ret
+
