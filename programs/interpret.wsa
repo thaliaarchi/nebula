@@ -207,15 +207,15 @@ parse:
     jmp .parse_flow_tab
 
 # returns parsed signed integer on top of stack
-parse_signed:
+.parse_signed:
     call read_char
-    dup; push ' ';  sub; jz parse_unsigned
+    dup; push ' ';  sub; jz .parse_unsigned
     dup; push '\t'; sub; jz .parse_signed_negative
     dup; push '\n'; sub; jz .parse_signed_zero
     dup; jz .error_unterminated_number
-    jmp parse_signed
+    jmp .parse_signed
 .parse_signed_negative:
-    call parse_unsigned
+    call .parse_unsigned
     push -1
     mul
     ret
@@ -224,7 +224,7 @@ parse_signed:
     ret
 
 # returns parsed unsigned integer on top of stack
-parse_unsigned:
+.parse_unsigned:
     push 0
 .parse_unsigned_loop:
     swap
@@ -286,7 +286,7 @@ read_char:
 
 # adds label to label stack
 .parsed_label:
-    call parse_unsigned
+    call .parse_unsigned
 
     # push LP and address at LP
     push LP
@@ -316,7 +316,7 @@ read_char:
 
 .parsed_instr_label_arg:
     swap
-    call parse_unsigned
+    call .parse_unsigned
 
     # push JP and address at JP
     push JP
@@ -340,7 +340,7 @@ read_char:
 
 .parsed_instr_number_arg:
     swap
-    call parse_signed
+    call .parse_signed
     # fallthrough
 
 .store_instr_arg:
@@ -616,32 +616,32 @@ interpret:
 
 .do_add:
     # push 'a'; printc; push 'd'; printc; push 'd'; printc; push '\n'; printc # debug
-    call arith_retrieve
+    call .arith_retrieve
     add
     jmp .arith_store
 
 .do_sub:
     # push 's'; printc; push 'u'; printc; push 'b'; printc; push '\n'; printc # debug
-    call arith_retrieve
+    call .arith_retrieve
     sub
     jmp .arith_store
 
 .do_mul:
     # push 'm'; printc; push 'u'; printc; push 'l'; printc; push '\n'; printc # debug
-    call arith_retrieve
+    call .arith_retrieve
     mul
     jmp .arith_store
 
 .do_div:
     # push 'd'; printc; push 'i'; printc; push 'v'; printc; push '\n'; printc # debug
-    call arith_retrieve
+    call .arith_retrieve
     dup; jz .error_division_by_zero
     div
     jmp .arith_store
 
 .do_mod:
     # push 'm'; printc; push 'o'; printc; push 'd'; printc; push '\n'; printc # debug
-    call arith_retrieve
+    call .arith_retrieve
     mod
     jmp .arith_store
 
@@ -675,11 +675,17 @@ interpret:
 
 .do_jz:
     # push 'j'; printc; push 'z'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    call .pop_stack
+    jz .do_jmp
+    jmp .select_next_instr
 
 .do_jn:
     # push 'j'; printc; push 'n'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    call .pop_stack
+    jn .do_jmp
+    jmp .select_next_instr
 
 .do_ret:
     # push 'r'; printc; push 'e'; printc; push 't'; printc; push '\n'; printc # debug
@@ -745,7 +751,7 @@ interpret:
     jmp .error_unimplemented_instr
 
 # returns SP, address for top of stack, address of top-1 of stack, value at top-1 of stack, and value at top of stack
-arith_retrieve:
+.arith_retrieve:
     # push SP and address for top of stack
     push SP
     dup
@@ -775,8 +781,28 @@ arith_retrieve:
     store
     jmp .select_next_instr
 
+.pop_stack:
+    push 1; call check_stack_underflow
 
-# requires a parameter of count
+    # push SP and address for top of stack
+    push SP
+    dup
+    retrieve
+    push 1
+    sub
+
+    # decrement SP
+    swap
+    copy 1
+    store
+
+    # push value at top of stack
+    retrieve
+
+    ret
+
+
+# params: count
 check_stack_underflow:
     # push SP-count and SMIN
     push SP
@@ -793,7 +819,7 @@ check_stack_underflow:
 # errors print char by char to reduce stack usage
 
 .error_incomplete_instr:
-    call print_error_prefix
+    call .print_error_prefix
     push 'i'; printc
     push 'n'; printc
     push 'c'; printc
@@ -820,7 +846,7 @@ check_stack_underflow:
     end
 
 .error_invalid_instr:
-    call print_error_prefix
+    call .print_error_prefix
     push 'i'; printc
     push 'n'; printc
     push 'v'; printc
@@ -844,7 +870,7 @@ check_stack_underflow:
     end
 
 .error_unterminated_number:
-    call print_error_prefix
+    call .print_error_prefix
     push 'u'; printc
     push 'n'; printc
     push 't'; printc
@@ -868,7 +894,7 @@ check_stack_underflow:
     end
 
 .error_unimplemented_instr:
-    call print_error_prefix
+    call .print_error_prefix
     push 'u'; printc
     push 'n'; printc
     push 'i'; printc
@@ -898,7 +924,7 @@ check_stack_underflow:
     end
 
 .error_label_not_found:
-    call print_error_prefix
+    call .print_error_prefix
     push 'l'; printc
     push 'a'; printc
     push 'b'; printc
@@ -918,7 +944,7 @@ check_stack_underflow:
     end
 
 .error_stack_underflow:
-    call print_error_prefix
+    call .print_error_prefix
     push 's'; printc
     push 't'; printc
     push 'a'; printc
@@ -940,7 +966,7 @@ check_stack_underflow:
     drop
     drop
     drop
-    call print_error_prefix
+    call .print_error_prefix
     push 'd'; printc
     push 'i'; printc
     push 'v'; printc
@@ -959,7 +985,7 @@ check_stack_underflow:
     push 'o'; printc
     jmp .print_trace
 
-print_error_prefix:
+.print_error_prefix:
     drop
     push 'E'; printc
     push 'r'; printc
