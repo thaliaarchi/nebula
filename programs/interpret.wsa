@@ -647,15 +647,72 @@ interpret:
 
 .do_store:
     # push 's'; printc; push 't'; printc; push 'o'; printc; push 'r'; printc; push 'e'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    push 2; call check_stack_underflow
+
+    # push SP and addresses for top-1 of stack and top-2 of stack
+    push SP
+    dup
+    retrieve
+    push 2
+    sub
+    dup
+    push 1
+    add
+
+    # store in heap
+    copy 1
+    call .to_heap_addr
+    swap
+    store
+
+    # decrement SP by 2
+    store
+
+    jmp .select_next_instr
 
 .do_retrieve:
     # push 'r'; printc; push 'e'; printc; push 't'; printc; push 'r'; printc; push 'i'; printc; push 'e'; printc; push 'v'; printc; push 'e'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    push 1; call check_stack_underflow
+
+    # push SP and address for top-1 of stack
+    push SP
+    retrieve
+    push 1
+    sub
+
+    # retrieve heap value and push to stack
+    dup
+    call .to_heap_addr
+    retrieve
+    store
+
+    jmp .select_next_instr
 
 .do_call:
     # push 'c'; printc; push 'a'; printc; push 'l'; printc; push 'l'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    # push CP and *CP
+    push CP
+    dup
+    retrieve
+
+    # push *IP+2
+    push IP
+    retrieve
+    push 2
+    add
+
+    # store *IP+2 at *CP
+    store
+
+    # increment CP
+    push 1
+    add
+    store
+
+    # fallthrough
 
 .do_jmp:
     # push 'j'; printc; push 'm'; printc; push 'p'; printc; push '\n'; printc # debug
@@ -701,54 +758,32 @@ interpret:
 .do_printc:
     # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'c'; printc; push '\n'; printc # debug
 
-    push 1; call check_stack_underflow
-
-    # push SP and top value of stack
-    push SP
-    dup
-    retrieve
-    push 1
-    sub
-
-    # print top value of stack
-    dup
-    retrieve
+    call .pop_stack
     printc
-
-    # decrement SP
-    store
-
     jmp .select_next_instr
 
 .do_printi:
     # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'i'; printc; push '\n'; printc # debug
 
-    push 1; call check_stack_underflow
-
-    # push SP and top value of stack
-    push SP
-    dup
-    retrieve
-    push 1
-    sub
-
-    # print top value of stack
-    dup
-    retrieve
+    call .pop_stack
     printi
-
-    # decrement SP
-    store
-
     jmp .select_next_instr
 
 .do_readc:
     # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'c'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    call .pop_stack
+    call .to_heap_addr
+    readc
+    jmp .select_next_instr
 
 .do_readi:
     # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'i'; printc; push '\n'; printc # debug
-    jmp .error_unimplemented_instr
+
+    call .pop_stack
+    call .to_heap_addr
+    readi
+    jmp .select_next_instr
 
 # returns SP, address for top of stack, address of top-1 of stack, value at top-1 of stack, and value at top of stack
 .arith_retrieve:
@@ -801,6 +836,17 @@ interpret:
 
     ret
 
+# params: addr
+.to_heap_addr:
+    push 2; mul
+    dup; jn .to_heap_addr_neg
+.to_heap_addr_done:
+    push HMIN; add
+    ret
+.to_heap_addr_neg:
+    push -1; mul
+    push 1; add
+    jmp .to_heap_addr_done
 
 # params: count
 check_stack_underflow:
