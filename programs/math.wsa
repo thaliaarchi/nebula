@@ -1,0 +1,299 @@
+    end
+
+# func pow(x, n int) int {
+#   if n <= 0 || x == 1 {
+#     return 1
+#   }
+#   return powHelper(x, n)
+# }
+# func powHelper(x, n int) int {
+#   if n == 1   { return x }
+#   if n%2 == 0 { return pow(x*x, n/2) }
+#   return x * pow(x*x, (n-1)/2)
+# }
+
+# pow computes x to the nth power (x ** n) using exponentiation by squaring
+# params: x, n
+pow:
+    dup; push 1; sub; jn .pow_one
+    copy 1; push 1; sub; jz .pow_one
+.pow:
+    dup; push 1; sub; jz .pow_x
+    dup; push 2; mod; jz .pow_even
+    # odd
+    copy 1
+    dup; mul
+    swap
+    push 1; sub
+    push 2; div
+    call .pow
+    mul
+    ret
+.pow_even:
+    swap
+    dup; mul
+    swap
+    push 2; div
+    jmp .pow
+.pow_one:
+    push 1
+    slide 2
+    ret
+.pow_x:
+    drop
+    ret
+
+# pow2 computes 2 to the nth power (2 ** n) using exponentiation by squaring
+# params: n
+pow2:
+    push 2
+    swap
+    jmp pow
+
+# func not(x int) int {
+#   result := 0
+#   exp := 1
+#   for x != 0 {
+#     if x%2 != 1 {
+#       result += exp
+#     }
+#     x /= 2
+#     exp *= 2
+#   }
+#   return result
+# }
+
+# not computes the bitwise NOT of x (~x)
+# params: x
+# side effects: *0, *1
+not:
+    push 0; push 0; store
+    push 1; push 1; store
+.not_loop:
+    dup; jz .not_done
+    dup; push 2; mod
+    push 1; sub; jz .not_zero
+    push 0
+    dup; retrieve
+    push 1; retrieve
+    add
+    store
+.not_zero:
+    push 2; div
+    push 1
+    dup; retrieve
+    push 2; mul
+    store
+    jmp .not_loop
+.not_done:
+    drop
+    push 0; retrieve
+    ret
+
+# func and(x, y int) int {
+#   result := 0
+#   exp := 1
+#   for x != 0 && y != 0 {
+#     if x%2 != 0 && y%2 != 0 {
+#       result += exp
+#     }
+#     x /= 2
+#     y /= 2
+#     exp *= 2
+#   }
+#   return result
+# }
+
+# and computes the bitwise AND of x and y (x & y)
+# params: x, y
+# side effects: *0, *1
+and:
+    push 0; push 0; store
+    push 1; push 1; store
+.and_loop:
+    copy 1; jz .bit_done
+    dup; jz .bit_done
+    copy 1; push 2; mod; jz .and_zero
+    dup; push 2; mod; jz .and_zero
+    push 0
+    dup; retrieve
+    push 1; retrieve
+    add
+    store
+.and_zero:
+    swap
+    push 2; div
+    swap
+    push 2; div
+    push 1
+    dup; retrieve
+    push 2; mul
+    store
+    jmp .and_loop
+
+# func or(x, y int) int {
+#   result := 0
+#   exp := 1
+#   for (x+y) != 0 {
+#     if (x+y)%2 != 0 {
+#       result += exp
+#     }
+#     x /= 2
+#     y /= 2
+#     exp *= 2
+#   }
+#   return result
+# }
+
+# or computes the bitwise OR of x and y (x | y)
+# params: x, y
+# side effects: *0, *1
+or:
+    push 0; push 0; store
+    push 1; push 1; store
+.or_loop:
+    copy 1; copy 1; add; jz .bit_done
+    copy 1; push 2; mod
+    copy 1; push 2; mod
+    add; jz .or_zero
+    push 0
+    dup; retrieve
+    push 1; retrieve
+    add
+    store
+.or_zero:
+    swap
+    push 2; div
+    swap
+    push 2; div
+    push 1
+    dup; retrieve
+    push 2; mul
+    store
+    jmp .or_loop
+
+# func xor(x, y int) int {
+#   result := 0
+#   exp := 1
+#   for (x+y) != 0 {
+#     if (x+y)%2 == 1 {
+#       result += exp
+#     }
+#     x /= 2
+#     y /= 2
+#     exp *= 2
+#   }
+#   return result
+# }
+
+# xor computes the bitwise XOR of x and y (x ^ y)
+# params: x, y
+# side effects: *0, *1
+xor:
+    push 0; push 0; store
+    push 1; push 1; store
+.xor_loop:
+    copy 1; copy 1; add; jz .bit_done
+    copy 1; push 2; mod
+    copy 1; push 2; mod
+    add; push 1; sub; jz .xor_one
+    jmp .xor_zero
+.xor_one:
+    push 0
+    dup; retrieve
+    push 1; retrieve
+    add
+    store
+.xor_zero:
+    swap
+    push 2; div
+    swap
+    push 2; div
+    push 1
+    dup; retrieve
+    push 2; mul
+    store
+    jmp .xor_loop
+
+.bit_done:
+    push 0; retrieve
+    slide 2
+    ret
+
+# shl computes arithmetic left shift (x << n)
+# params: x, n
+shl:
+    call pow2
+    mul
+    ret
+
+# shr computes arithmetic right shift (x >> n)
+# params: x, n
+shr:
+    call pow2
+    div
+    ret
+
+
+# abs computes the absolute value of x
+# params: x
+abs:
+    dup; jn .abs_neg
+    ret
+.abs_neg:
+    push -1
+    mul
+    ret
+
+# sign computes the sign of x
+# params: x
+sign:
+    dup; jz .sign_zero
+    jn .sign_neg
+    push 1
+    ret
+.sign_neg:
+    push -1
+    ret
+.sign_zero:
+    ret
+
+# print_bin prints a binary integer with a leading sign when negative
+# params: x
+print_bin:
+    dup; jz .print_bin_zero
+    push 0
+    swap
+    dup; jn .print_bin_neg
+.print_bin_loop:
+    dup; jz .print_bin_done
+    dup; push 2; mod; jz .print_bin_push_zero
+    push '1'
+.print_bin_shift:
+    swap
+    push 2; div
+    jmp .print_bin_loop
+.print_bin_push_zero:
+    push '0'
+    jmp .print_bin_shift
+.print_bin_neg:
+    push -1; mul
+    push '-'; printc
+    jmp .print_bin_loop
+.print_bin_zero:
+    drop
+    push '0'; printc
+    ret
+.print_bin_done:
+    drop
+    jmp print_string_stack
+
+# print_string_stack prints a string on the stack terminated with 0
+# params: char..., 0
+print_string_stack:
+    dup; jz .print_string_stack_done
+    printc
+    jmp print_string_stack
+.print_string_stack_done:
+    drop
+    ret
