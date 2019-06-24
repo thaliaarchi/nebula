@@ -86,17 +86,17 @@
     define DO_INSTR_23 .do_mod;      define INSTR_MOD      INSTR_23
 
 
-    # dropped by read_char
+    # dropped by .read_char
     push 0
 parse:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_stack
     dup; push '\t'; sub; jz .parse_imp_tab
     dup; push '\n'; sub; jz .parse_flow
     dup; jz setup_labels
     jmp parse
 .parse_imp_tab:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_arith
     dup; push '\t'; sub; jz .parse_heap
     dup; push '\n'; sub; jz .parse_io
@@ -104,21 +104,21 @@ parse:
     jmp .parse_imp_tab
 
 .parse_stack:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_push
     dup; push '\t'; sub; jz .parse_stack_tab
     dup; push '\n'; sub; jz .parse_stack_lf
     dup; jz .error_incomplete_instr_space
     jmp .parse_stack
 .parse_stack_tab:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_copy
     dup; push '\t'; sub; jz .error_invalid_instr_space_tab_tab
     dup; push '\n'; sub; jz .parsed_slide
     dup; jz .error_incomplete_instr_space_tab
     jmp .parse_stack_tab
 .parse_stack_lf:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_dup
     dup; push '\t'; sub; jz .parsed_swap
     dup; push '\n'; sub; jz .parsed_drop
@@ -126,21 +126,21 @@ parse:
     jmp .parse_stack_lf
 
 .parse_arith:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_arith_space
     dup; push '\t'; sub; jz .parse_arith_tab
     dup; push '\n'; sub; jz .error_invalid_instr_tab_space_lf
     dup; jz .error_incomplete_instr_tab_space
     jmp .parse_arith
 .parse_arith_space:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_add
     dup; push '\t'; sub; jz .parsed_sub
     dup; push '\n'; sub; jz .parsed_mul
     dup; jz .error_incomplete_instr_tab_space_space
     jmp .parse_arith_space
 .parse_arith_tab:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_div
     dup; push '\t'; sub; jz .parsed_mod
     dup; push '\n'; sub; jz .error_invalid_instr_tab_space_tab_lf
@@ -148,7 +148,7 @@ parse:
     jmp .parse_arith_tab
 
 .parse_heap:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_store
     dup; push '\t'; sub; jz .parsed_retrieve
     dup; push '\n'; sub; jz .error_invalid_instr_tab_tab_lf
@@ -156,28 +156,28 @@ parse:
     jmp .parse_heap
 
 .parse_flow:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_flow_space
     dup; push '\t'; sub; jz .parse_flow_tab
     dup; push '\n'; sub; jz .parse_flow_lf
     dup; jz .error_incomplete_instr_lf
     jmp .parse_arith_tab
 .parse_flow_space:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_label
     dup; push '\t'; sub; jz .parsed_call
     dup; push '\n'; sub; jz .parsed_jmp
     dup; jz .error_incomplete_instr_lf_space
     jmp .parse_flow_space
 .parse_flow_tab:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_jz
     dup; push '\t'; sub; jz .parsed_jn
     dup; push '\n'; sub; jz .parsed_ret
     dup; jz .error_incomplete_instr_lf_tab
     jmp .parse_flow_tab
 .parse_flow_lf:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .error_invalid_instr_lf_lf_space
     dup; push '\t'; sub; jz .error_invalid_instr_lf_lf_tab
     dup; push '\n'; sub; jz .parsed_end
@@ -185,21 +185,21 @@ parse:
     jmp .parse_flow_lf
 
 .parse_io:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_io_space
     dup; push '\t'; sub; jz .parse_io_tab
     dup; push '\n'; sub; jz .error_invalid_instr_tab_lf_lf
     dup; jz .error_incomplete_instr_tab_lf
     jmp .parse_io
 .parse_io_space:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_printc
     dup; push '\t'; sub; jz .parsed_printi
     dup; push '\n'; sub; jz .error_invalid_instr_tab_lf_space_lf
     dup; jz .error_incomplete_instr_tab_lf_space
     jmp .parse_flow_space
 .parse_io_tab:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parsed_readc
     dup; push '\t'; sub; jz .parsed_readi
     dup; push '\n'; sub; jz .error_invalid_instr_tab_lf_tab_lf
@@ -208,7 +208,7 @@ parse:
 
 # returns parsed signed integer on top of stack
 .parse_signed:
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_unsigned
     dup; push '\t'; sub; jz .parse_signed_negative
     dup; push '\n'; sub; jz .parse_signed_zero
@@ -228,7 +228,7 @@ parse:
     push 0
 .parse_unsigned_loop:
     swap
-    call read_char
+    call .read_char
     dup; push ' ';  sub; jz .parse_unsigned_zero
     dup; push '\t'; sub; jz .parse_unsigned_one
     dup; push '\n'; sub; jz .parse_unsigned_end
@@ -250,7 +250,7 @@ parse:
     swap
     ret
 
-read_char:
+.read_char:
     drop
     push TEMP
     dup
@@ -565,7 +565,7 @@ interpret:
 .do_dup:
     # push 0; push 'p'; push 'u'; push 'd'; call .debug_instr
 
-    push 1; call check_stack_underflow
+    push 1; call .check_stack_underflow
 
     # push SP and address for top+1 of stack
     push SP
@@ -598,7 +598,7 @@ interpret:
 .do_drop:
     # push 0; push 'p'; push 'o'; push 'r'; push 'd'; call .debug_instr
 
-    push 1; call check_stack_underflow
+    push 1; call .check_stack_underflow
 
     # decrement SP
     push SP
@@ -648,7 +648,7 @@ interpret:
 .do_store:
     # push 0; push 'e'; push 'r'; push 'o'; push 't'; push 's'; call .debug_instr
 
-    push 2; call check_stack_underflow
+    push 2; call .check_stack_underflow
 
     # push SP and address for top-2 of stack
     push SP
@@ -676,7 +676,7 @@ interpret:
 .do_retrieve:
     # push 0; push 'e'; push 'v'; push 'e'; push 'i'; push 'r'; push 't'; push 'e'; push 'r'; call .debug_instr
 
-    push 1; call check_stack_underflow
+    push 1; call .check_stack_underflow
 
     # push SP and address for top-1 of stack
     push SP
@@ -750,6 +750,8 @@ interpret:
 
 .do_ret:
     # push 0; push 't'; push 'e'; push 'r'; call .debug_instr
+
+    call .check_call_stack_underflow
 
     # push CP and *CP-1
     push CP
@@ -838,7 +840,7 @@ interpret:
     jmp .select_next_instr
 
 .pop_stack:
-    push 1; call check_stack_underflow
+    push 1; call .check_stack_underflow
 
     # push SP and address for top of stack
     push SP
@@ -870,16 +872,28 @@ interpret:
     jmp .to_heap_addr_done
 
 # params: count
-check_stack_underflow:
-    # push SP-count and SMIN
+.check_stack_underflow:
+    # push *SP-count and SMIN
     push SP
     retrieve
     swap
     sub
     push SMIN
 
-    # underflow if SP-count < SMIN
+    # underflow if *SP-count < SMIN
     sub; jn .error_stack_underflow
+    ret
+
+.check_call_stack_underflow:
+    # push *CP-1 and CMIN
+    push CP
+    retrieve
+    push 1
+    sub
+    push CMIN
+
+    # underflow if *CP-1 < CMIN
+    sub; jn .error_call_stack_underflow
     ret
 
 
@@ -1027,21 +1041,20 @@ check_stack_underflow:
 # expects temp value on stack
 .error_stack_underflow:
     push 0
-    push 'w'
-    push 'o'
-    push 'l'
-    push 'f'
-    push 'r'
-    push 'e'
-    push 'd'
-    push 'n'
-    push 'u'
+    call .string_stack_underflow
+    call .println_error
+    drop
+    end
+
+# expects temp value on stack
+.error_call_stack_underflow:
+    push 0
+    call .string_stack_underflow
     push ' '
-    push 'k'
-    push 'c'
+    push 'l'
+    push 'l'
     push 'a'
-    push 't'
-    push 's'
+    push 'c'
     call .println_error
     drop
     end
@@ -1122,6 +1135,23 @@ check_stack_underflow:
     push 's'
     push 'n'
     push 'i'
+    ret
+.string_stack_underflow:
+    push 'w'
+    push 'o'
+    push 'l'
+    push 'f'
+    push 'r'
+    push 'e'
+    push 'd'
+    push 'n'
+    push 'u'
+    push ' '
+    push 'k'
+    push 'c'
+    push 'a'
+    push 't'
+    push 's'
     ret
 
 .println_error:
