@@ -7,8 +7,11 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"strings"
 	"unicode/utf8"
 )
+
+const eofValue = 0
 
 type VM struct {
 	instrs  []InstrExecer
@@ -224,7 +227,10 @@ func (vm *VM) jmpCond(sign int, label int) {
 
 func (vm *VM) readRune(x *big.Int) *big.Int {
 	r, _, err := vm.in.ReadRune()
-	if err != nil && err != io.EOF {
+	if err == io.EOF {
+		return x.SetInt64(eofValue)
+	}
+	if err != nil {
 		panic("readc: " + err.Error())
 	}
 	return x.SetInt64(int64(r))
@@ -232,12 +238,16 @@ func (vm *VM) readRune(x *big.Int) *big.Int {
 
 func (vm *VM) readInt(x *big.Int) *big.Int {
 	line, err := vm.in.ReadString('\n')
-	if err != nil && err != io.EOF {
+	if err == io.EOF {
+		return x.SetInt64(eofValue)
+	}
+	if err != nil {
 		panic("readi: " + err.Error())
 	}
-	x, ok := x.SetString(line[:len(line)-1], 10)
+	line = strings.TrimSuffix(line, "\n")
+	x, ok := x.SetString(line, 10)
 	if !ok {
-		panic("invalid number")
+		panic("invalid number: " + line)
 	}
 	return x
 }

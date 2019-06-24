@@ -23,7 +23,6 @@ func main() {
 	for instr := range instrChan {
 		instrs = append(instrs, instr)
 	}
-	fmt.Println("Running:")
 	vm, err := ws.NewVM(instrs)
 	if err != nil {
 		fmt.Println(err)
