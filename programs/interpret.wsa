@@ -894,17 +894,19 @@ check_stack_underflow:
     push 'c'
     push 'n'
     push 'i'
-    jmp .print_error
+    call .println_error
+    end
 
-.error_invalid_instr_space_tab_tab:    drop; push 0;                  call .string_tab;   call .string_tab;   call .string_space; jmp .error_invalid_instr
-.error_invalid_instr_tab_space_lf:     drop; push 0;                  call .string_lf;    call .string_space; call .string_tab;   jmp .error_invalid_instr
-.error_invalid_instr_tab_space_tab_lf: drop; push 0; call .string_lf; call .string_tab;   call .string_space; call .string_tab;   jmp .error_invalid_instr
-.error_invalid_instr_tab_tab_lf:       drop; push 0;                  call .string_lf;    call .string_tab;   call .string_tab;   jmp .error_invalid_instr
-.error_invalid_instr_tab_lf_lf:        drop; push 0;                  call .string_lf;    call .string_lf;    call .string_tab;   jmp .error_invalid_instr
-.error_invalid_instr_tab_lf_space_lf:  drop; push 0; call .string_lf; call .string_space; call .string_lf;    call .string_tab;   jmp .error_invalid_instr
-.error_invalid_instr_tab_lf_tab_lf:    drop; push 0; call .string_lf; call .string_tab;   call .string_lf;    call .string_tab;   jmp .error_invalid_instr
-.error_invalid_instr_lf_lf_space:      drop; push 0;                  call .string_space; call .string_lf;    call .string_lf;    jmp .error_invalid_instr
-.error_invalid_instr_lf_lf_tab:        drop; push 0;                  call .string_tab;   call .string_lf;    call .string_lf;    # fallthrough
+# expects a temp value on stack
+.error_invalid_instr_space_tab_tab:    push 0;                  call .string_tab;   call .string_tab;   call .string_space; jmp .error_invalid_instr
+.error_invalid_instr_tab_space_lf:     push 0;                  call .string_lf;    call .string_space; call .string_tab;   jmp .error_invalid_instr
+.error_invalid_instr_tab_space_tab_lf: push 0; call .string_lf; call .string_tab;   call .string_space; call .string_tab;   jmp .error_invalid_instr
+.error_invalid_instr_tab_tab_lf:       push 0;                  call .string_lf;    call .string_tab;   call .string_tab;   jmp .error_invalid_instr
+.error_invalid_instr_tab_lf_lf:        push 0;                  call .string_lf;    call .string_lf;    call .string_tab;   jmp .error_invalid_instr
+.error_invalid_instr_tab_lf_space_lf:  push 0; call .string_lf; call .string_space; call .string_lf;    call .string_tab;   jmp .error_invalid_instr
+.error_invalid_instr_tab_lf_tab_lf:    push 0; call .string_lf; call .string_tab;   call .string_lf;    call .string_tab;   jmp .error_invalid_instr
+.error_invalid_instr_lf_lf_space:      push 0;                  call .string_space; call .string_lf;    call .string_lf;    jmp .error_invalid_instr
+.error_invalid_instr_lf_lf_tab:        push 0;                  call .string_tab;   call .string_lf;    call .string_lf;    # fallthrough
 
 .error_invalid_instr:
     push ' '
@@ -918,7 +920,9 @@ check_stack_underflow:
     push 'v'
     push 'n'
     push 'i'
-    jmp .print_error
+    call .println_error
+    drop
+    end
 
 # expects a temp value, partially parsed number, and zero on stack
 .error_unterminated_number:
@@ -943,15 +947,13 @@ check_stack_underflow:
     push 't'
     push 'n'
     push 'u'
-    call .string_error
-    call print
+    call .print_error
     printi
     push '\n'; printc
     drop
     end
 
 .error_unimplemented_instr:
-    drop
     push 0
     call .string_instruction
     push ' '
@@ -968,7 +970,9 @@ check_stack_underflow:
     push 'i'
     push 'n'
     push 'u'
-    jmp .print_error
+    call .println_error
+    drop
+    end
 
 # expects temp value, loop bound, address of address in jump list, and two loop bounds on stack
 .error_label_not_found:
@@ -990,8 +994,7 @@ check_stack_underflow:
     push 'b'
     push 'a'
     push 'l'
-    call .string_error
-    call print
+    call .print_error
     drop
     drop
     retrieve; retrieve; printi
@@ -1002,7 +1005,6 @@ check_stack_underflow:
 
 # expects temp value on stack
 .error_stack_underflow:
-    drop
     push 0
     push 'w'
     push 'o'
@@ -1019,7 +1021,9 @@ check_stack_underflow:
     push 'a'
     push 't'
     push 's'
-    jmp .print_error
+    call .println_error
+    drop
+    end
 
 # expects four values, numerator, and zero (denominator) on stack
 .error_division_by_zero:
@@ -1041,8 +1045,7 @@ check_stack_underflow:
     push 'v'
     push 'i'
     push 'd'
-    call .string_error
-    call print
+    call .print_error
     printi
     push 0
     push '\n'
@@ -1053,12 +1056,6 @@ check_stack_underflow:
     drop
     drop
     drop
-    end
-
-.print_error:
-    call .string_error
-    call print
-    push '\n'; printc
     end
 
 .string_space:
@@ -1105,6 +1102,14 @@ check_stack_underflow:
     push 'n'
     push 'i'
     ret
+
+.println_error:
+    call .print_error
+    push '\n'; printc
+    ret
+.print_error:
+    call .string_error
+    # fallthrough
 
 # print prints a string on the stack terminated with 0
 # params: char..., 0
