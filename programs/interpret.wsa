@@ -539,7 +539,7 @@ interpret:
 
 
 .do_push:
-    # push 'p'; printc; push 'u'; printc; push 's'; printc; push 'h'; printc; push '\n'; printc; # debug
+    push 0; push 'h'; push 's'; push 'u'; push 'p'; call .debug_instr_arg
 
     # push SP and address for top+1 of stack
     push SP
@@ -563,7 +563,7 @@ interpret:
     jmp .select_next_instr
 
 .do_dup:
-    # push 'd'; printc; push 'u'; printc; push 'p'; printc; push '\n'; printc # debug
+    push 0; push 'p'; push 'u'; push 'd'; call .debug_instr
 
     push 1; call check_stack_underflow
 
@@ -588,15 +588,15 @@ interpret:
     jmp .select_next_instr
 
 .do_copy:
-    # push 'c'; printc; push 'o'; printc; push 'p'; printc; push 'y'; printc; push '\n'; printc # debug
+    push 0; push 'y'; push 'p'; push 'o'; push 'c'; call .debug_instr_arg
     jmp .error_unimplemented_instr
 
 .do_swap:
-    # push 's'; printc; push 'w'; printc; push 'a'; printc; push 'p'; printc; push '\n'; printc # debug
+    push 0; push 'p'; push 'a'; push 'w'; push 's'; call .debug_instr
     jmp .error_unimplemented_instr
 
 .do_drop:
-    # push 'd'; printc; push 'r'; printc; push 'o'; printc; push 'p'; printc; push '\n'; printc # debug
+    push 0; push 'p'; push 'o'; push 'r'; push 'd'; call .debug_instr
 
     push 1; call check_stack_underflow
 
@@ -611,42 +611,42 @@ interpret:
     jmp .select_next_instr
 
 .do_slide:
-    # push 's'; printc; push 'l'; printc; push 'i'; printc; push 'd'; printc; push 'e'; printc; push '\n'; printc # debug
+    push 0; push 'e'; push 'd'; push 'i'; push 'l'; push 's'; call .debug_instr
     jmp .error_unimplemented_instr
 
 .do_add:
-    # push 'a'; printc; push 'd'; printc; push 'd'; printc; push '\n'; printc # debug
+    push 0; push 'd'; push 'd'; push 'a'; call .debug_instr
     call .arith_retrieve
     add
     jmp .arith_store
 
 .do_sub:
-    # push 's'; printc; push 'u'; printc; push 'b'; printc; push '\n'; printc # debug
+    push 0; push 'b'; push 'u'; push 's'; call .debug_instr
     call .arith_retrieve
     sub
     jmp .arith_store
 
 .do_mul:
-    # push 'm'; printc; push 'u'; printc; push 'l'; printc; push '\n'; printc # debug
+    push 0; push 'l'; push 'u'; push 'm'; call .debug_instr
     call .arith_retrieve
     mul
     jmp .arith_store
 
 .do_div:
-    # push 'd'; printc; push 'i'; printc; push 'v'; printc; push '\n'; printc # debug
+    push 0; push 'v'; push 'i'; push 'd'; call .debug_instr
     call .arith_retrieve
     dup; jz .error_division_by_zero
     div
     jmp .arith_store
 
 .do_mod:
-    # push 'm'; printc; push 'o'; printc; push 'd'; printc; push '\n'; printc # debug
+    push 0; push 'd'; push 'o'; push 'm'; call .debug_instr
     call .arith_retrieve
     mod
     jmp .arith_store
 
 .do_store:
-    # push 's'; printc; push 't'; printc; push 'o'; printc; push 'r'; printc; push 'e'; printc; push '\n'; printc # debug
+    push 0; push 'e'; push 'r'; push 'o'; push 't'; push 's'; call .debug_instr
 
     push 2; call check_stack_underflow
 
@@ -672,7 +672,7 @@ interpret:
     jmp .select_next_instr
 
 .do_retrieve:
-    # push 'r'; printc; push 'e'; printc; push 't'; printc; push 'r'; printc; push 'i'; printc; push 'e'; printc; push 'v'; printc; push 'e'; printc; push '\n'; printc # debug
+    push 0; push 'e'; push 'v'; push 'e'; push 'i'; push 'r'; push 't'; push 'e'; push 'r'; call .debug_instr
 
     push 1; call check_stack_underflow
 
@@ -691,7 +691,7 @@ interpret:
     jmp .select_next_instr
 
 .do_call:
-    # push 'c'; printc; push 'a'; printc; push 'l'; printc; push 'l'; printc; push '\n'; printc # debug
+    push 0; push 'l'; push 'l'; push 'a'; push 'c'; call .debug_instr_arg
 
     # push CP and *CP
     push CP
@@ -715,7 +715,7 @@ interpret:
     # fallthrough
 
 .do_jmp:
-    # push 'j'; printc; push 'm'; printc; push 'p'; printc; push '\n'; printc # debug
+    push 0; push 'p'; push 'm'; push 'j'; call .debug_instr_arg
 
     # push IP and address of jmp label
     push IP
@@ -731,46 +731,46 @@ interpret:
     jmp .select_instr
 
 .do_jz:
-    # push 'j'; printc; push 'z'; printc; push '\n'; printc # debug
+    push 0; push 'z'; push 'j'; call .debug_instr_arg
 
     call .pop_stack
     jz .do_jmp
     jmp .select_next_instr
 
 .do_jn:
-    # push 'j'; printc; push 'n'; printc; push '\n'; printc # debug
+    push 0; push 'n'; push 'j'; call .debug_instr_arg
 
     call .pop_stack
     jn .do_jmp
     jmp .select_next_instr
 
 .do_ret:
-    # push 'r'; printc; push 'e'; printc; push 't'; printc; push '\n'; printc # debug
+    push 0; push 't'; push 'e'; push 'r'; call .debug_instr_arg
     jmp .error_unimplemented_instr
 
 .do_end:
-    # push 'e'; printc; push 'n'; printc; push 'd'; printc; push '\n'; printc # debug
+    push 0; push 'd'; push 'n'; push 'e'; call .debug_instr_arg
 
     # drop temp value and end
     drop
     end
 
 .do_printc:
-    # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'c'; printc; push '\n'; printc # debug
+    push 0; push 'c'; push 't'; push 'n'; push 'i'; push 'r'; push 'p'; call .debug_instr
 
     call .pop_stack
     printc
     jmp .select_next_instr
 
 .do_printi:
-    # push 'p'; printc; push 'r'; printc; push 'i'; printc; push 'n'; printc; push 't'; printc; push 'i'; printc; push '\n'; printc # debug
+    push 0; push 'i'; push 't'; push 'n'; push 'i'; push 'r'; push 'p'; call .debug_instr
 
     call .pop_stack
     printi
     jmp .select_next_instr
 
 .do_readc:
-    # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'c'; printc; push '\n'; printc # debug
+    push 0; push 'c'; push 'd'; push 'a'; push 'e'; push 'r'; call .debug_instr
 
     call .pop_stack
     call .to_heap_addr
@@ -778,7 +778,7 @@ interpret:
     jmp .select_next_instr
 
 .do_readi:
-    # push 'r'; printc; push 'e'; printc; push 'a'; printc; push 'd'; printc; push 'i'; printc; push '\n'; printc # debug
+    push 0; push 'i'; push 'd'; push 'a'; push 'e'; push 'r'; call .debug_instr
 
     call .pop_stack
     call .to_heap_addr
@@ -1104,12 +1104,25 @@ check_stack_underflow:
     ret
 
 .println_error:
-    call .print_error
-    push '\n'; printc
-    ret
+    call .string_error
+    jmp println
 .print_error:
     call .string_error
-    # fallthrough
+    jmp print
+
+.debug_instr:
+    jmp println
+.debug_instr_arg:
+    call print
+    push ' '; printc
+    push IP
+    retrieve
+    push 1
+    add
+    retrieve
+    printi
+    push '\n'; printc
+    ret
 
 # print prints a string on the stack terminated with 0
 # params: char..., 0
@@ -1119,4 +1132,11 @@ print:
     jmp print
 .print_done:
     drop
+    ret
+
+# println prints a string on the stack terminated with 0 and a LF
+# params: char..., 0
+println:
+    call print
+    push '\n'; printc
     ret
