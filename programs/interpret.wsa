@@ -696,10 +696,11 @@ interpret:
 .do_call:
     # push 0; push 'l'; push 'l'; push 'a'; push 'c'; call .debug_instr_arg
 
-    # push CP and *CP
+    # push CP, *CP, and *CP
     push CP
     dup
     retrieve
+    dup
 
     # push *IP+2
     push IP
@@ -749,7 +750,24 @@ interpret:
 
 .do_ret:
     # push 0; push 't'; push 'e'; push 'r'; call .debug_instr
-    jmp .error_unimplemented_instr
+
+    # push CP and *CP-1
+    push CP
+    dup
+    retrieve
+    push 1
+    sub
+
+    # return to caller
+    push IP
+    copy 1
+    retrieve
+    store
+
+    # decrement CP
+    store
+
+    jmp .select_instr
 
 .do_end:
     # push 0; push 'd'; push 'n'; push 'e'; call .debug_instr
