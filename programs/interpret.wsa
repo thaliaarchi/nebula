@@ -920,8 +920,10 @@ check_stack_underflow:
     push 'i'
     jmp .print_error
 
-# expects zero on top of stack
+# expects a temp value, partially parsed number, and zero on stack
 .error_unterminated_number:
+    push ' '
+    push ':'
     push 'r'
     push 'e'
     push 'b'
@@ -941,7 +943,12 @@ check_stack_underflow:
     push 't'
     push 'n'
     push 'u'
-    jmp .print_error
+    call .string_error
+    call print
+    printi
+    push '\n'; printc
+    drop
+    end
 
 .error_unimplemented_instr:
     drop
@@ -963,9 +970,11 @@ check_stack_underflow:
     push 'u'
     jmp .print_error
 
+# expects temp value, loop bound, address of address in jump list, and two loop bounds on stack
 .error_label_not_found:
-    drop
     push 0
+    push ' '
+    push ':'
     push 'd'
     push 'n'
     push 'u'
@@ -981,8 +990,17 @@ check_stack_underflow:
     push 'b'
     push 'a'
     push 'l'
-    jmp .print_error
+    call .string_error
+    call print
+    drop
+    drop
+    retrieve; retrieve; printi
+    push '\n'; printc
+    drop
+    drop
+    end
 
+# expects temp value on stack
 .error_stack_underflow:
     drop
     push 0
@@ -1003,10 +1021,10 @@ check_stack_underflow:
     push 's'
     jmp .print_error
 
+# expects four values, numerator, and zero (denominator) on stack
 .error_division_by_zero:
-    drop
-    drop
-    drop
+    push ' '
+    push ':'
     push 'o'
     push 'r'
     push 'e'
@@ -1023,17 +1041,24 @@ check_stack_underflow:
     push 'v'
     push 'i'
     push 'd'
-    jmp .print_error
+    call .string_error
+    call print
+    printi
+    push 0
+    push '\n'
+    push '0'
+    push '/'
+    call print
+    drop
+    drop
+    drop
+    drop
+    end
 
 .print_error:
-    push ' '
-    push ':'
-    push 'r'
-    push 'o'
-    push 'r'
-    push 'r'
-    push 'E'
-    call println
+    call .string_error
+    call print
+    push '\n'; printc
     end
 
 .string_space:
@@ -1058,6 +1083,15 @@ check_stack_underflow:
     push 'L'
     push '['
     ret
+.string_error:
+    push ' '
+    push ':'
+    push 'r'
+    push 'o'
+    push 'r'
+    push 'r'
+    push 'E'
+    ret
 .string_instruction:
     push 'n'
     push 'o'
@@ -1072,14 +1106,12 @@ check_stack_underflow:
     push 'i'
     ret
 
-# println prints a string on the stack terminated with 0
+# print prints a string on the stack terminated with 0
 # params: char..., 0
-println:
-    dup; jz .println_done
+print:
+    dup; jz .print_done
     printc
-    jmp println
-.println_done:
+    jmp print
+.print_done:
     drop
-    push '\n'
-    printc
     ret
