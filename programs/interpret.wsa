@@ -541,12 +541,12 @@ interpret:
 .do_push:
     # push 0; push 'h'; push 's'; push 'u'; push 'p'; call .debug_instr_arg
 
-    # push SP and address for top+1 of stack
+    # push SP and *SP
     push SP
     dup
     retrieve
 
-    # push argument to stack
+    # store argument in stack
     dup
     push IP
     retrieve
@@ -567,7 +567,7 @@ interpret:
 
     push 1; call .check_stack_underflow
 
-    # push SP and address for top+1 of stack
+    # push SP and *SP
     push SP
     dup
     retrieve
@@ -589,11 +589,65 @@ interpret:
 
 .do_copy:
     # push 0; push 'y'; push 'p'; push 'o'; push 'c'; call .debug_instr_arg
-    jmp .error_unimplemented_instr
+
+    # replace temp value with argument
+    drop
+
+    # push argument+1
+    push IP
+    retrieve
+    push 1
+    add
+    retrieve
+    push 1
+    add
+
+    dup; call .check_stack_underflow
+
+    # push SP and *SP
+    push SP
+    dup
+    retrieve
+
+    # store *(*SP-n-1) in stack
+    dup
+    dup
+    copy 4
+    sub
+    retrieve
+    store
+
+    # increment SP
+    push 1
+    add
+    store
+
+    jmp .select_next_instr
 
 .do_swap:
     # push 0; push 'p'; push 'a'; push 'w'; push 's'; call .debug_instr
-    jmp .error_unimplemented_instr
+
+    push 2; call .check_stack_underflow
+
+    # push *SP-1, *(*SP-2), *SP-2, and *(*SP-1)
+    push SP
+    retrieve
+    push 1
+    sub
+    dup
+    push 1
+    sub
+    dup
+    retrieve
+    swap
+    copy 2
+    retrieve
+
+    # swap top two items
+    store
+    store
+
+    jmp .select_next_instr
 
 .do_drop:
     # push 0; push 'p'; push 'o'; push 'r'; push 'd'; call .debug_instr
@@ -650,14 +704,14 @@ interpret:
 
     push 2; call .check_stack_underflow
 
-    # push SP and address for top-2 of stack
+    # push SP and *SP-2
     push SP
     dup
     retrieve
     push 2
     sub
 
-    # push transformed address at top-2 and value at top-1 of stack
+    # push transformed *SP-2 and *SP-1
     dup
     retrieve
     call .to_heap_addr
@@ -678,7 +732,7 @@ interpret:
 
     push 1; call .check_stack_underflow
 
-    # push SP and address for top-1 of stack
+    # push SP and *SP-1
     push SP
     retrieve
     push 1
@@ -808,25 +862,25 @@ interpret:
     readi
     jmp .select_next_instr
 
-# returns SP, address for top of stack, address of top-1 of stack, value at top-1 of stack, and value at top of stack
+# returns SP, *SP-1, *SP-2, *(*SP-2), and *(*SP-1)
 .arith_retrieve:
-    # push SP and address for top of stack
+    # push SP and *SP-1
     push SP
     dup
     retrieve
     push 1
     sub
 
-    # push address for top-1 of stack
+    # push *SP-2
     dup
     push 1
     sub
 
-    # push value at top-1 of stack
+    # push *(*SP-2)
     dup
     retrieve
 
-    # push value at top of stack
+    # push *(*SP-1)
     copy 2
     retrieve
 
@@ -842,7 +896,7 @@ interpret:
 .pop_stack:
     push 1; call .check_stack_underflow
 
-    # push SP and address for top of stack
+    # push SP and *SP-1
     push SP
     dup
     retrieve
@@ -854,21 +908,25 @@ interpret:
     copy 1
     store
 
-    # push value at top of stack
+    # push *(*SP-1)
     retrieve
 
     ret
 
 # params: addr
 .to_heap_addr:
-    push 2; mul
+    push 2
+    mul
     dup; jn .to_heap_addr_neg
 .to_heap_addr_done:
-    push HMIN; add
+    push HMIN
+    add
     ret
 .to_heap_addr_neg:
-    push -1; mul
-    push 1; add
+    push -1
+    mul
+    push 1
+    add
     jmp .to_heap_addr_done
 
 # params: count
@@ -1032,7 +1090,9 @@ interpret:
     call .print_error
     drop
     drop
-    retrieve; retrieve; printi
+    retrieve
+    retrieve
+    printi
     push '\n'; printc
     drop
     drop
