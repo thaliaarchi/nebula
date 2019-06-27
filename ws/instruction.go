@@ -23,29 +23,42 @@ func (instr *Instr) String() string {
 
 type InstrType uint8
 
+const Illegal InstrType = 0
 const (
-	Invalid InstrType = iota
-	Push
+	StackInstr = InstrType(8)
+	Push       = StackInstr | iota
 	Dup
 	Copy
 	Swap
 	Drop
 	Slide
-	Add
+)
+const (
+	ArithInstr = InstrType(16)
+	Add        = ArithInstr | iota
 	Sub
 	Mul
 	Div
 	Mod
-	Store
+)
+const (
+	HeapInstr = InstrType(32)
+	Store     = HeapInstr | iota
 	Retrieve
-	Label
+)
+const (
+	FlowInstr = InstrType(64)
+	Label     = FlowInstr | iota
 	Call
 	Jmp
 	Jz
 	Jn
 	Ret
 	End
-	Printc
+)
+const (
+	IOInstr = InstrType(128)
+	Printc  = IOInstr | iota
 	Printi
 	Readc
 	Readi
@@ -53,8 +66,8 @@ const (
 
 func (typ *InstrType) String() string {
 	switch *typ {
-	case Invalid:
-		return "invalid"
+	case StackInstr:
+		return "stack"
 	case Push:
 		return "push"
 	case Dup:
@@ -67,6 +80,8 @@ func (typ *InstrType) String() string {
 		return "drop"
 	case Slide:
 		return "slide"
+	case ArithInstr:
+		return "arith"
 	case Add:
 		return "add"
 	case Sub:
@@ -77,10 +92,14 @@ func (typ *InstrType) String() string {
 		return "div"
 	case Mod:
 		return "mod"
+	case HeapInstr:
+		return "heap"
 	case Store:
 		return "store"
 	case Retrieve:
 		return "retrieve"
+	case FlowInstr:
+		return "flow"
 	case Label:
 		return "label"
 	case Call:
@@ -95,6 +114,8 @@ func (typ *InstrType) String() string {
 		return "ret"
 	case End:
 		return "end"
+	case IOInstr:
+		return "io"
 	case Printc:
 		return "printc"
 	case Printi:
@@ -104,5 +125,5 @@ func (typ *InstrType) String() string {
 	case Readi:
 		return "readi"
 	}
-	return "unknown"
+	return "illegal"
 }
