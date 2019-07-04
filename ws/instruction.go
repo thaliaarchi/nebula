@@ -13,11 +13,17 @@ type Instr struct {
 func (instr *Instr) String() string {
 	switch {
 	case instr.Type == Label:
+		if instr.Arg == nil {
+			return "label_0:"
+		}
 		return fmt.Sprintf("label_%s:", instr.Arg)
-	case instr.Arg == nil:
-		return fmt.Sprintf("    %s", &instr.Type)
+	case instr.Type.HasArg():
+		if instr.Arg == nil {
+			return fmt.Sprintf("%s 0", instr.Type)
+		}
+		return fmt.Sprintf("%s %d", instr.Type, instr.Arg)
 	default:
-		return fmt.Sprintf("    %s %d", &instr.Type, instr.Arg)
+		return fmt.Sprintf("%s", instr.Type)
 	}
 }
 
@@ -86,8 +92,18 @@ func (typ InstrType) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
 // IsIO returns true for tokens corresponding to i/o instructions.
 func (typ InstrType) IsIO() bool { return ioBeg < typ && typ < ioEnd }
 
-func (typ *InstrType) String() string {
-	switch *typ {
+// HasArg returns true for instructions that require an argument.
+func (typ InstrType) HasArg() bool {
+	switch typ {
+	case Push, Copy, Slide, Label, Call, Jmp, Jz, Jn:
+		return true
+	default:
+		return false
+	}
+}
+
+func (typ InstrType) String() string {
+	switch typ {
 	case Push:
 		return "push"
 	case Dup:
