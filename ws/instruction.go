@@ -23,51 +23,71 @@ func (instr *Instr) String() string {
 
 type InstrType uint8
 
-const Illegal InstrType = 0
 const (
-	StackInstr = InstrType(8)
-	Push       = StackInstr | iota
+	Illegal InstrType = iota
+
+	stackBeg
+	// Stack manipulation instructions
+	Push
 	Dup
 	Copy
 	Swap
 	Drop
 	Slide
-)
-const (
-	ArithInstr = InstrType(16)
-	Add        = ArithInstr | iota
+	stackEnd
+
+	arithBeg
+	// Arithmetic instructions
+	Add
 	Sub
 	Mul
 	Div
 	Mod
-)
-const (
-	HeapInstr = InstrType(32)
-	Store     = HeapInstr | iota
+	arithEnd
+
+	heapBeg
+	// Heap access instructions
+	Store
 	Retrieve
-)
-const (
-	FlowInstr = InstrType(64)
-	Label     = FlowInstr | iota
+	heapEnd
+
+	flowBeg
+	// Flow control instructions
+	Label
 	Call
 	Jmp
 	Jz
 	Jn
 	Ret
 	End
-)
-const (
-	IOInstr = InstrType(128)
-	Printc  = IOInstr | iota
+	flowEnd
+
+	ioBeg
+	// I/O instructions
+	Printc
 	Printi
 	Readc
 	Readi
+	ioEnd
 )
+
+// IsStack returns true for tokens corresponding to stack manipulation instructions.
+func (typ InstrType) IsStack() bool { return stackBeg < typ && typ < stackEnd }
+
+// IsArith returns true for tokens corresponding to arithmetic instructions.
+func (typ InstrType) IsArith() bool { return arithBeg < typ && typ < arithEnd }
+
+// IsHeap returns true for tokens corresponding to heap access instructions.
+func (typ InstrType) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
+
+// IsFlow returns true for tokens corresponding to flow control instructions.
+func (typ InstrType) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
+
+// IsIO returns true for tokens corresponding to i/o instructions.
+func (typ InstrType) IsIO() bool { return ioBeg < typ && typ < ioEnd }
 
 func (typ *InstrType) String() string {
 	switch *typ {
-	case StackInstr:
-		return "stack"
 	case Push:
 		return "push"
 	case Dup:
@@ -80,8 +100,6 @@ func (typ *InstrType) String() string {
 		return "drop"
 	case Slide:
 		return "slide"
-	case ArithInstr:
-		return "arith"
 	case Add:
 		return "add"
 	case Sub:
@@ -92,14 +110,10 @@ func (typ *InstrType) String() string {
 		return "div"
 	case Mod:
 		return "mod"
-	case HeapInstr:
-		return "heap"
 	case Store:
 		return "store"
 	case Retrieve:
 		return "retrieve"
-	case FlowInstr:
-		return "flow"
 	case Label:
 		return "label"
 	case Call:
@@ -114,8 +128,6 @@ func (typ *InstrType) String() string {
 		return "ret"
 	case End:
 		return "end"
-	case IOInstr:
-		return "io"
 	case Printc:
 		return "printc"
 	case Printi:

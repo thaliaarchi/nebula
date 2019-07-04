@@ -8,6 +8,7 @@
 - Replace `swap; drop` with `slide 1`
 - Remove `push n; drop`
 - Remove `swap; swap`
+- Replace n>2 successive drops with `slide n-1; drop`
 - Remove uncalled labels
 - Remove unreachable blocks after `jmp`, `ret`, `end`, or unreturned `jmp`
 - Replace `call` that has no corresponding return with `jmp`
@@ -24,6 +25,7 @@
 - Specialize instructions with non-arbitrary size arguments
 - Consolidate successive stack underflow checks
 - Replace calls to standard library with efficient interpreter operations
+- Replace `mul` and `div` of powers of two with shl and shr
 
 ## Runtime analysis
 - Insert profile points to identify slow points

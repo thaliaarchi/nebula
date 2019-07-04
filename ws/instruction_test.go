@@ -4,26 +4,32 @@ import "testing"
 
 func TestInstrTypeGroups(t *testing.T) {
 	tests := []struct {
-		Group  InstrType
-		Instrs []InstrType
+		IsStack, IsArith, IsHeap, IsFlow, IsIO bool
+		Instrs                                 []InstrType
 	}{
-		{StackInstr, []InstrType{Push, Dup, Copy, Swap, Drop, Slide}},
-		{ArithInstr, []InstrType{Add, Sub, Mul, Div, Mod}},
-		{HeapInstr, []InstrType{Store, Retrieve}},
-		{FlowInstr, []InstrType{Label, Call, Jmp, Jz, Jn, Ret, End}},
-		{IOInstr, []InstrType{Printc, Printi, Readc, Readi}},
+		{true, false, false, false, false, []InstrType{Push, Dup, Copy, Swap, Drop, Slide}},
+		{false, true, false, false, false, []InstrType{Add, Sub, Mul, Div, Mod}},
+		{false, false, true, false, false, []InstrType{Store, Retrieve}},
+		{false, false, false, true, false, []InstrType{Label, Call, Jmp, Jz, Jn, Ret, End}},
+		{false, false, false, false, true, []InstrType{Printc, Printi, Readc, Readi}},
 	}
-	groups := []InstrType{StackInstr, ArithInstr, HeapInstr, FlowInstr, IOInstr}
 
 	for _, test := range tests {
 		for _, instr := range test.Instrs {
-			if instr&test.Group == 0 {
-				t.Errorf("Instruction %s is not in group %s", &instr, &test.Group)
+			if instr.IsStack() != test.IsStack {
+				t.Errorf("(%s).IsStack() = %t, want %t", &instr, instr.IsStack(), test.IsStack)
 			}
-			for _, group := range groups {
-				if group != test.Group && instr&group != 0 {
-					t.Errorf("Instruction %s is in incorrect group %s", &instr, &group)
-				}
+			if instr.IsArith() != test.IsArith {
+				t.Errorf("(%s).IsArith() = %t, want %t", &instr, instr.IsArith(), test.IsArith)
+			}
+			if instr.IsHeap() != test.IsHeap {
+				t.Errorf("(%s).IsHeap() = %t, want %t", &instr, instr.IsHeap(), test.IsHeap)
+			}
+			if instr.IsFlow() != test.IsFlow {
+				t.Errorf("(%s).IsFlow() = %t, want %t", &instr, instr.IsFlow(), test.IsFlow)
+			}
+			if instr.IsIO() != test.IsIO {
+				t.Errorf("(%s).IsIO() = %t, want %t", &instr, instr.IsIO(), test.IsIO)
 			}
 		}
 	}
