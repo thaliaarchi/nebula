@@ -17,13 +17,13 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	l := ws.NewLexer(f)
-	instrChan := ws.Parse(l)
-	var instrs []ws.Instr
-	for instr := range instrChan {
-		instrs = append(instrs, instr)
+	r := ws.NewTextReader(f)
+	tokenChan := ws.Lex(r)
+	var tokens []ws.Token
+	for token := range tokenChan {
+		tokens = append(tokens, token)
 	}
-	vm, err := ws.NewVM(instrs)
+	vm, err := ws.NewVM(tokens)
 	if err != nil {
 		fmt.Println(err)
 		return

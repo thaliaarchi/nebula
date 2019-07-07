@@ -5,32 +5,32 @@ import (
 	"math/big"
 )
 
-type Instr struct {
-	Type InstrType
+type Token struct {
+	Type TokenType
 	Arg  *big.Int
 }
 
-func (instr *Instr) String() string {
+func (tok *Token) String() string {
 	switch {
-	case instr.Type == Label:
-		if instr.Arg == nil {
+	case tok.Type == Label:
+		if tok.Arg == nil {
 			return "label_0:"
 		}
-		return fmt.Sprintf("label_%s:", instr.Arg)
-	case instr.Type.HasArg():
-		if instr.Arg == nil {
-			return fmt.Sprintf("%s 0", instr.Type)
+		return fmt.Sprintf("label_%s:", tok.Arg)
+	case tok.Type.HasArg():
+		if tok.Arg == nil {
+			return fmt.Sprintf("%s 0", tok.Type)
 		}
-		return fmt.Sprintf("%s %d", instr.Type, instr.Arg)
+		return fmt.Sprintf("%s %d", tok.Type, tok.Arg)
 	default:
-		return fmt.Sprintf("%s", instr.Type)
+		return tok.Type.String()
 	}
 }
 
-type InstrType uint8
+type TokenType uint8
 
 const (
-	Illegal InstrType = iota
+	Illegal TokenType = iota
 
 	stackBeg
 	// Stack manipulation instructions
@@ -78,22 +78,22 @@ const (
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
-func (typ InstrType) IsStack() bool { return stackBeg < typ && typ < stackEnd }
+func (typ TokenType) IsStack() bool { return stackBeg < typ && typ < stackEnd }
 
 // IsArith returns true for tokens corresponding to arithmetic instructions.
-func (typ InstrType) IsArith() bool { return arithBeg < typ && typ < arithEnd }
+func (typ TokenType) IsArith() bool { return arithBeg < typ && typ < arithEnd }
 
 // IsHeap returns true for tokens corresponding to heap access instructions.
-func (typ InstrType) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
+func (typ TokenType) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
 
 // IsFlow returns true for tokens corresponding to flow control instructions.
-func (typ InstrType) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
+func (typ TokenType) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
 
 // IsIO returns true for tokens corresponding to i/o instructions.
-func (typ InstrType) IsIO() bool { return ioBeg < typ && typ < ioEnd }
+func (typ TokenType) IsIO() bool { return ioBeg < typ && typ < ioEnd }
 
 // HasArg returns true for instructions that require an argument.
-func (typ InstrType) HasArg() bool {
+func (typ TokenType) HasArg() bool {
 	switch typ {
 	case Push, Copy, Slide, Label, Call, Jmp, Jz, Jn:
 		return true
@@ -102,7 +102,7 @@ func (typ InstrType) HasArg() bool {
 	}
 }
 
-func (typ InstrType) String() string {
+func (typ TokenType) String() string {
 	switch typ {
 	case Push:
 		return "push"

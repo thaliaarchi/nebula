@@ -7,24 +7,24 @@ import (
 	"math/big"
 )
 
-type Parser struct {
-	l      SpaceLexer
-	instrs chan Instr
+type Lexer struct {
+	l      SpaceReader
+	instrs chan Token
 }
 
-func Parse(l SpaceLexer) chan Instr {
-	p := &Parser{
+func Lex(l SpaceReader) chan Token {
+	p := &Lexer{
 		l:      l,
-		instrs: make(chan Instr),
+		instrs: make(chan Token),
 	}
 	go p.run()
 	return p.instrs
 }
 
-func (p *Parser) run() error {
+func (p *Lexer) run() error {
 	defer close(p.instrs)
 	var err error
-	for state := parseInstr; state != nil; {
+	for state := lexInstr; state != nil; {
 		state, err = state(p)
 		if err != nil {
 			return err
@@ -33,7 +33,7 @@ func (p *Parser) run() error {
 	return nil
 }
 
-type stateFn func(*Parser) (stateFn, error)
+type stateFn func(*Lexer) (stateFn, error)
 
 type states struct {
 	Space stateFn
@@ -43,7 +43,7 @@ type states struct {
 }
 
 func transition(s states) stateFn {
-	return func(p *Parser) (stateFn, error) {
+	return func(p *Lexer) (stateFn, error) {
 		t, err := p.l.Next()
 		if err != nil {
 			return nil, err
@@ -65,45 +65,45 @@ func transition(s states) stateFn {
 	}
 }
 
-func emitInstr(typ InstrType) stateFn {
-	return func(p *Parser) (stateFn, error) {
-		p.instrs <- Instr{typ, nil}
-		return parseInstr, nil
+func emitInstr(typ TokenType) stateFn {
+	return func(p *Lexer) (stateFn, error) {
+		p.instrs <- Token{typ, nil}
+		return lexInstr, nil
 	}
 }
 
-func parseInstrNumber(typ InstrType) stateFn {
-	return func(p *Parser) (stateFn, error) {
-		arg, err := parseSigned(p)
+func lexInstrNumber(typ TokenType) stateFn {
+	return func(p *Lexer) (stateFn, error) {
+		arg, err := lexSigned(p)
 		if err != nil {
 			return nil, err
 		}
-		p.instrs <- Instr{typ, arg}
-		return parseInstr, nil
+		p.instrs <- Token{typ, arg}
+		return lexInstr, nil
 	}
 }
 
-func parseInstrLabel(typ InstrType) stateFn {
-	return func(p *Parser) (stateFn, error) {
-		arg, err := parseUnsigned(p)
+func lexInstrLabel(typ TokenType) stateFn {
+	return func(p *Lexer) (stateFn, error) {
+		arg, err := lexUnsigned(p)
 		if err != nil {
 			return nil, err
 		}
-		p.instrs <- Instr{typ, arg}
-		return parseInstr, nil
+		p.instrs <- Token{typ, arg}
+		return lexInstr, nil
 	}
 }
 
-func parseSigned(p *Parser) (*big.Int, error) {
+func lexSigned(p *Lexer) (*big.Int, error) {
 	t, err := p.l.Next()
 	if err != nil {
 		return nil, err
 	}
 	switch t {
 	case Space:
-		return parseUnsigned(p)
+		return lexUnsigned(p)
 	case Tab:
-		num, err := parseUnsigned(p)
+		num, err := lexUnsigned(p)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +119,7 @@ func parseSigned(p *Parser) (*big.Int, error) {
 
 var bigOne = new(big.Int).SetInt64(1)
 
-func parseUnsigned(p *Parser) (*big.Int, error) {
+func lexUnsigned(p *Lexer) (*big.Int, error) {
 	num := new(big.Int)
 	for {
 		t, err := p.l.Next()
@@ -141,30 +141,30 @@ func parseUnsigned(p *Parser) (*big.Int, error) {
 	}
 }
 
-func invalidToken(t Token) string {
+func invalidToken(t SpaceToken) string {
 	return fmt.Sprintf("invalid token: %d", t)
 }
 
 func init() {
-	parseInstr = transition(states{
-		Space: parseStack,
+	lexInstr = transition(states{
+		Space: lexStack,
 		Tab: transition(states{
-			Space: parseArith,
-			Tab:   parseHeap,
-			LF:    parseIO,
+			Space: lexArith,
+			Tab:   lexHeap,
+			LF:    lexIO,
 		}),
-		LF:   parseFlow,
+		LF:   lexFlow,
 		Root: true,
 	})
 }
 
-var parseInstr stateFn
+var lexInstr stateFn
 
-var parseStack = transition(states{
-	Space: parseInstrNumber(Push),
+var lexStack = transition(states{
+	Space: lexInstrNumber(Push),
 	Tab: transition(states{
-		Space: parseInstrNumber(Copy),
-		LF:    parseInstrNumber(Slide),
+		Space: lexInstrNumber(Copy),
+		LF:    lexInstrNumber(Slide),
 	}),
 	LF: transition(states{
 		Space: emitInstr(Dup),
@@ -173,7 +173,7 @@ var parseStack = transition(states{
 	}),
 })
 
-var parseArith = transition(states{
+var lexArith = transition(states{
 	Space: transition(states{
 		Space: emitInstr(Add),
 		Tab:   emitInstr(Sub),
@@ -185,12 +185,12 @@ var parseArith = transition(states{
 	}),
 })
 
-var parseHeap = transition(states{
+var lexHeap = transition(states{
 	Space: emitInstr(Store),
 	Tab:   emitInstr(Retrieve),
 })
 
-var parseIO = transition(states{
+var lexIO = transition(states{
 	Space: transition(states{
 		Space: emitInstr(Printc),
 		Tab:   emitInstr(Printi),
@@ -201,15 +201,15 @@ var parseIO = transition(states{
 	}),
 })
 
-var parseFlow = transition(states{
+var lexFlow = transition(states{
 	Space: transition(states{
-		Space: parseInstrLabel(Label),
-		Tab:   parseInstrLabel(Call),
-		LF:    parseInstrLabel(Jmp),
+		Space: lexInstrLabel(Label),
+		Tab:   lexInstrLabel(Call),
+		LF:    lexInstrLabel(Jmp),
 	}),
 	Tab: transition(states{
-		Space: parseInstrLabel(Jz),
-		Tab:   parseInstrLabel(Jn),
+		Space: lexInstrLabel(Jz),
+		Tab:   lexInstrLabel(Jn),
 		LF:    emitInstr(Ret),
 	}),
 	LF: transition(states{

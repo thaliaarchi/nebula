@@ -7,36 +7,36 @@ import (
 	"github.com/icza/bitio"
 )
 
-type Token uint8
+type SpaceToken uint8
 
 const (
-	EOF Token = iota
+	EOF SpaceToken = iota
 	Space
 	Tab
 	LF
 )
 
-type SpaceLexer interface {
-	Next() (Token, error)
+type SpaceReader interface {
+	Next() (SpaceToken, error)
 	Pos() (int, int)
 }
 
-type Lexer struct {
+type TextReader struct {
 	br   io.ByteReader
 	line int
 	col  int
 }
 
-func NewLexer(r io.Reader) *Lexer {
+func NewTextReader(r io.Reader) *TextReader {
 	var br io.ByteReader
 	br, ok := r.(io.ByteReader)
 	if !ok {
 		br = bufio.NewReader(r)
 	}
-	return &Lexer{br, 1, 1}
+	return &TextReader{br, 1, 1}
 }
 
-func (l *Lexer) Next() (Token, error) {
+func (l *TextReader) Next() (SpaceToken, error) {
 	for {
 		b, err := l.br.ReadByte()
 		if err == io.EOF {
@@ -59,25 +59,25 @@ func (l *Lexer) Next() (Token, error) {
 	}
 }
 
-func (l *Lexer) Pos() (int, int) {
+func (l *TextReader) Pos() (int, int) {
 	return l.line, l.col
 }
 
-type BitLexer struct {
+type BitReader struct {
 	br  bitio.Reader
 	pos int
 }
 
-func NewBitLexer(r io.Reader) *BitLexer {
+func NewBitReader(r io.Reader) *BitReader {
 	var br bitio.Reader
 	br, ok := r.(bitio.Reader)
 	if !ok {
 		br = bitio.NewReader(r)
 	}
-	return &BitLexer{br, 0}
+	return &BitReader{br, 0}
 }
 
-func (l *BitLexer) Next() (Token, error) {
+func (l *BitReader) Next() (SpaceToken, error) {
 	b, err := l.br.ReadBool()
 	if err == io.EOF {
 		return EOF, nil
@@ -103,6 +103,6 @@ func (l *BitLexer) Next() (Token, error) {
 	return Tab, nil
 }
 
-func (l *BitLexer) Pos() (int, int) {
+func (l *BitReader) Pos() (int, int) {
 	return (l.pos / 8) + 1, (l.pos % 8) + 1
 }

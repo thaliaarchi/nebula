@@ -14,7 +14,7 @@ import (
 const eofValue = 0
 
 type VM struct {
-	instrs  []InstrExecer
+	instrs  []Instr
 	pc      int
 	callers []int
 	stack   Stack
@@ -22,13 +22,13 @@ type VM struct {
 	in      *bufio.Reader
 }
 
-func NewVM(instrs []Instr) (*VM, error) {
-	execs, err := instrExecs(instrs)
+func NewVM(tokens []Token) (*VM, error) {
+	instrs, err := tokensToInstrs(tokens)
 	if err != nil {
 		return nil, err
 	}
 	return &VM{
-		instrs:  execs,
+		instrs:  instrs,
 		pc:      0,
 		callers: nil,
 		stack:   *NewStack(),
@@ -45,7 +45,7 @@ func (vm *VM) Run() {
 	fmt.Printf("Heap: %s\n", &vm.heap)
 }
 
-type InstrExecer interface {
+type Instr interface {
 	Exec(vm *VM)
 }
 
@@ -264,103 +264,103 @@ func bigIntRune(x *big.Int) rune {
 	return rune(v)
 }
 
-func instrExecs(instrs []Instr) ([]InstrExecer, error) {
-	labels, err := getLabels(instrs)
+func tokensToInstrs(tokens []Token) ([]Instr, error) {
+	labels, err := getLabels(tokens)
 	if err != nil {
 		return nil, err
 	}
-	execs := make([]InstrExecer, 0, len(instrs))
-	for _, instr := range instrs {
-		var instrExec InstrExecer
-		switch instr.Type {
+	instrs := make([]Instr, 0, len(tokens))
+	for _, token := range tokens {
+		var instr Instr
+		switch token.Type {
 		case Push:
-			instrExec = &PushInstr{instr.Arg}
+			instr = &PushInstr{token.Arg}
 		case Dup:
-			instrExec = &DupInstr{}
+			instr = &DupInstr{}
 		case Copy:
-			arg, err := getArg(instr.Arg, "copy")
+			arg, err := getArg(token.Arg, "copy")
 			if err != nil {
 				return nil, err
 			}
-			instrExec = &CopyInstr{arg}
+			instr = &CopyInstr{arg}
 		case Swap:
-			instrExec = &SwapInstr{}
+			instr = &SwapInstr{}
 		case Drop:
-			instrExec = &DropInstr{}
+			instr = &DropInstr{}
 		case Slide:
-			arg, err := getArg(instr.Arg, "slide")
+			arg, err := getArg(token.Arg, "slide")
 			if err != nil {
 				return nil, err
 			}
-			instrExec = &SlideInstr{arg}
+			instr = &SlideInstr{arg}
 		case Add:
-			instrExec = &AddInstr{}
+			instr = &AddInstr{}
 		case Sub:
-			instrExec = &SubInstr{}
+			instr = &SubInstr{}
 		case Mul:
-			instrExec = &MulInstr{}
+			instr = &MulInstr{}
 		case Div:
-			instrExec = &DivInstr{}
+			instr = &DivInstr{}
 		case Mod:
-			instrExec = &ModInstr{}
+			instr = &ModInstr{}
 		case Store:
-			instrExec = &StoreInstr{}
+			instr = &StoreInstr{}
 		case Retrieve:
-			instrExec = &RetrieveInstr{}
+			instr = &RetrieveInstr{}
 		case Label:
 			continue
 		case Call:
-			label, err := getLabel(instr.Arg, labels, "call")
+			label, err := getLabel(token.Arg, labels, "call")
 			if err != nil {
 				return nil, err
 			}
-			instrExec = &CallInstr{label}
+			instr = &CallInstr{label}
 		case Jmp:
-			label, err := getLabel(instr.Arg, labels, "jmp")
+			label, err := getLabel(token.Arg, labels, "jmp")
 			if err != nil {
 				return nil, err
 			}
-			instrExec = &JmpInstr{label}
+			instr = &JmpInstr{label}
 		case Jz:
-			label, err := getLabel(instr.Arg, labels, "jz")
+			label, err := getLabel(token.Arg, labels, "jz")
 			if err != nil {
 				return nil, err
 			}
-			instrExec = &JzInstr{label}
+			instr = &JzInstr{label}
 		case Jn:
-			label, err := getLabel(instr.Arg, labels, "jn")
+			label, err := getLabel(token.Arg, labels, "jn")
 			if err != nil {
 				return nil, err
 			}
-			instrExec = &JnInstr{label}
+			instr = &JnInstr{label}
 		case Ret:
-			instrExec = &RetInstr{}
+			instr = &RetInstr{}
 		case End:
-			instrExec = &EndInstr{}
+			instr = &EndInstr{}
 		case Printc:
-			instrExec = &PrintcInstr{}
+			instr = &PrintcInstr{}
 		case Printi:
-			instrExec = &PrintiInstr{}
+			instr = &PrintiInstr{}
 		case Readc:
-			instrExec = &ReadcInstr{}
+			instr = &ReadcInstr{}
 		case Readi:
-			instrExec = &ReadiInstr{}
+			instr = &ReadiInstr{}
 		default:
-			return nil, fmt.Errorf("invalid instruction type: %d", instr.Type)
+			return nil, fmt.Errorf("invalid token type: %d", token.Type)
 		}
-		execs = append(execs, instrExec)
+		instrs = append(instrs, instr)
 	}
-	return execs, nil
+	return instrs, nil
 }
 
-func getLabels(instrs []Instr) (*Map, error) {
+func getLabels(tokens []Token) (*Map, error) {
 	labels := NewMap(func() interface{} { return 0 })
 	var i int
-	for _, instr := range instrs {
-		if instr.Type == Label {
-			replace := labels.Put(instr.Arg, i)
+	for _, token := range tokens {
+		if token.Type == Label {
+			replace := labels.Put(token.Arg, i)
 			if replace {
-				return nil, fmt.Errorf("duplicate label: %s", instr.Arg)
+				return nil, fmt.Errorf("duplicate label: %s", token.Arg)
 			}
 			continue
 		}
