@@ -65,84 +65,33 @@ func (slide *SlideInstr) Exec(vm *VM) {
 }
 
 type AddInstr struct{}
-type AddVInstr instrVal
 type SubInstr struct{}
+type MulInstr struct{}
+type DivInstr struct{}
+type ModInstr struct{}
+type AddVInstr instrVal
 type SubRInstr instrVal
 type SubLInstr instrVal
-type MulInstr struct{}
 type MulVInstr instrVal
-type DivInstr struct{}
 type DivRInstr instrVal
 type DivLInstr instrVal
-type ModInstr struct{}
 type ModRInstr instrVal
 type ModLInstr instrVal
 type NegInstr struct{}
 
-// Exec executes an add instruction.
-func (*AddInstr) Exec(vm *VM) {
-	vm.arith((*big.Int).Add)
-}
-
-// Exec executes an add instruction with a constant value.
-func (addV *AddVInstr) Exec(vm *VM) {
-	vm.arithRHS((*big.Int).Add, addV.val)
-}
-
-// Exec executes a sub instruction.
-func (*SubInstr) Exec(vm *VM) {
-	vm.arith((*big.Int).Sub)
-}
-
-// Exec executes a sub instruction with a constant rhs.
-func (subR *SubRInstr) Exec(vm *VM) {
-	vm.arithRHS((*big.Int).Sub, subR.val)
-}
-
-// Exec executes a sub instruction with a constant lhs.
-func (subL *SubLInstr) Exec(vm *VM) {
-	vm.arithLHS((*big.Int).Sub, subL.val)
-}
-
-// Exec executes a mul instruction.
-func (*MulInstr) Exec(vm *VM) {
-	vm.arith((*big.Int).Mul)
-}
-
-// Exec executes a mul instruction with a constant value.
-func (mulV *MulVInstr) Exec(vm *VM) {
-	vm.arithRHS((*big.Int).Mul, mulV.val)
-}
-
-// Exec executes a div instruction.
-func (*DivInstr) Exec(vm *VM) {
-	vm.arith((*big.Int).Div)
-}
-
-// Exec executes a div instruction with a constant rhs.
-func (divR *DivRInstr) Exec(vm *VM) {
-	vm.arithRHS((*big.Int).Div, divR.val)
-}
-
-// Exec executes a div instruction with a constant lhs.
-func (divL *DivLInstr) Exec(vm *VM) {
-	vm.arithLHS((*big.Int).Div, divL.val)
-}
-
-// Exec executes a mod instruction.
-func (*ModInstr) Exec(vm *VM) {
-	vm.arith((*big.Int).Mod)
-}
-
-// Exec executes a mod instruction with a constant rhs.
-func (modR *ModRInstr) Exec(vm *VM) {
-	vm.arithLHS((*big.Int).Mod, modR.val)
-}
-
-// Exec executes a mod instruction with a constant lhs.
-func (modL *ModLInstr) Exec(vm *VM) {
-	vm.arithLHS((*big.Int).Mod, modL.val)
-}
+func (*AddInstr) Exec(vm *VM)       { vm.arith((*big.Int).Add) }
+func (*SubInstr) Exec(vm *VM)       { vm.arith((*big.Int).Sub) }
+func (*MulInstr) Exec(vm *VM)       { vm.arith((*big.Int).Mul) }
+func (*DivInstr) Exec(vm *VM)       { vm.arith((*big.Int).Div) }
+func (*ModInstr) Exec(vm *VM)       { vm.arith((*big.Int).Mod) }
+func (addV *AddVInstr) Exec(vm *VM) { vm.arithRHS((*big.Int).Add, addV.val) }
+func (subR *SubRInstr) Exec(vm *VM) { vm.arithRHS((*big.Int).Sub, subR.val) }
+func (subL *SubLInstr) Exec(vm *VM) { vm.arithLHS((*big.Int).Sub, subL.val) }
+func (mulV *MulVInstr) Exec(vm *VM) { vm.arithRHS((*big.Int).Mul, mulV.val) }
+func (divR *DivRInstr) Exec(vm *VM) { vm.arithRHS((*big.Int).Div, divR.val) }
+func (divL *DivLInstr) Exec(vm *VM) { vm.arithLHS((*big.Int).Div, divL.val) }
+func (modR *ModRInstr) Exec(vm *VM) { vm.arithLHS((*big.Int).Mod, modR.val) }
+func (modL *ModLInstr) Exec(vm *VM) { vm.arithLHS((*big.Int).Mod, modL.val) }
 
 // Exec executes a neg instruction.
 func (*NegInstr) Exec(vm *VM) {
@@ -214,72 +163,20 @@ func (call *CallInstr) Exec(vm *VM) {
 	vm.pc = call.label
 }
 
-// Exec executes a jmp instruction.
-func (jmp *JmpInstr) Exec(vm *VM) {
-	vm.pc = jmp.label
-}
+func (jmp *JmpInstr) Exec(vm *VM)     { vm.pc = jmp.label }
+func (jz *JzInstr) Exec(vm *VM)       { vm.jmpSign(0, jz.label) }
+func (jn *JnInstr) Exec(vm *VM)       { vm.jmpSign(-1, jn.label) }
+func (jp *JpInstr) Exec(vm *VM)       { vm.jmpSign(1, jp.label) }
+func (je *JeInstr) Exec(vm *VM)       { vm.jmpCmp(0, je.label, je.val) }
+func (jl *JlInstr) Exec(vm *VM)       { vm.jmpCmp(-1, jl.label, jl.val) }
+func (jg *JgInstr) Exec(vm *VM)       { vm.jmpCmp(1, jg.label, jg.val) }
+func (jzTop *JzTopInstr) Exec(vm *VM) { vm.jmpSignTop(0, jzTop.label) }
+func (jnTop *JnTopInstr) Exec(vm *VM) { vm.jmpSignTop(-1, jnTop.label) }
+func (jpTop *JpTopInstr) Exec(vm *VM) { vm.jmpSignTop(1, jpTop.label) }
+func (jeTop *JeTopInstr) Exec(vm *VM) { vm.jmpCmpTop(0, jeTop.label, jeTop.val) }
+func (jlTop *JlTopInstr) Exec(vm *VM) { vm.jmpCmpTop(-1, jlTop.label, jlTop.val) }
+func (jgTop *JgTopInstr) Exec(vm *VM) { vm.jmpCmpTop(1, jgTop.label, jgTop.val) }
 
-// Exec executes a jz instruction.
-func (jz *JzInstr) Exec(vm *VM) {
-	vm.jmpSign(0, jz.label)
-}
-
-// Exec executes a jn instruction.
-func (jn *JnInstr) Exec(vm *VM) {
-	vm.jmpSign(-1, jn.label)
-}
-
-// Exec executes a jp instruction.
-func (jp *JpInstr) Exec(vm *VM) {
-	vm.jmpSign(1, jp.label)
-}
-
-// Exec executes a je instruction with a constant value.
-func (je *JeInstr) Exec(vm *VM) {
-	vm.jmpCmp(0, je.label, je.val)
-}
-
-// Exec executes a jl instruction with a constant value.
-func (jl *JlInstr) Exec(vm *VM) {
-	vm.jmpCmp(-1, jl.label, jl.val)
-}
-
-// Exec executes a jg instruction with a constant value.
-func (jg *JgInstr) Exec(vm *VM) {
-	vm.jmpCmp(1, jg.label, jg.val)
-}
-
-// Exec executes a jz instruction and leaving the top stack value.
-func (jzTop *JzTopInstr) Exec(vm *VM) {
-	vm.jmpSignTop(0, jzTop.label)
-}
-
-// Exec executes a jn instruction and leaving the top stack value.
-func (jnTop *JnTopInstr) Exec(vm *VM) {
-	vm.jmpSignTop(-1, jnTop.label)
-}
-
-// Exec executes a jp instruction and leaving the top stack value.
-func (jpTop *JpTopInstr) Exec(vm *VM) {
-	vm.jmpSignTop(1, jpTop.label)
-}
-
-// Exec executes a je instruction with a constant value and leaving the top stack value.
-func (jeTop *JeTopInstr) Exec(vm *VM) {
-	vm.jmpCmpTop(0, jeTop.label, jeTop.val)
-}
-
-// Exec executes a jl instruction with a constant value and leaving the top stack value.
-func (jlTop *JlTopInstr) Exec(vm *VM) {
-	vm.jmpCmpTop(-1, jlTop.label, jlTop.val)
-}
-
-// Exec executes a jg instruction with a constant value and leaving the top stack value.
-func (jgTop *JgTopInstr) Exec(vm *VM) {
-	vm.jmpCmpTop(1, jgTop.label, jgTop.val)
-}
-
-// Exec executes a ret instruction.
 func (ret *RetInstr) Exec(vm *VM) {
 	if len(vm.callers) == 0 {
 		panic("call stack underflow: ret")
