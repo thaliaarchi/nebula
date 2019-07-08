@@ -45,8 +45,34 @@ func (vm *VM) Run() {
 	fmt.Printf("Heap: %s\n", &vm.heap)
 }
 
-func (vm *VM) jmpCond(sign int, label int) {
+func (vm *VM) arith(op func(z, x, y *big.Int) *big.Int) {
+	y, x := vm.stack.Pop(), vm.stack.Top()
+	op(x, x, y)
+	vm.pc++
+}
+
+func (vm *VM) arithRHS(op func(z, x, y *big.Int) *big.Int, rhs *big.Int) {
+	x := vm.stack.Top()
+	op(x, x, rhs)
+	vm.pc++
+}
+
+func (vm *VM) arithLHS(op func(z, x, y *big.Int) *big.Int, lhs *big.Int) {
+	x := vm.stack.Top()
+	op(x, lhs, x)
+	vm.pc++
+}
+
+func (vm *VM) jmpSign(sign, label int) {
 	if vm.stack.Pop().Sign() == sign {
+		vm.pc = label
+	} else {
+		vm.pc++
+	}
+}
+
+func (vm *VM) jmpCmp(cmp, label int, val *big.Int) {
+	if vm.stack.Pop().Cmp(val) == cmp {
 		vm.pc = label
 	} else {
 		vm.pc++

@@ -59,87 +59,89 @@ func (slide *SlideInstr) Exec(vm *VM) {
 type AddInstr struct{}
 type AddVInstr struct{ val *big.Int }
 type SubInstr struct{}
-type SubLInstr struct{ lhs *big.Int }
 type SubRInstr struct{ rhs *big.Int }
+type SubLInstr struct{ lhs *big.Int }
 type MulInstr struct{}
 type MulVInstr struct{ val *big.Int }
 type DivInstr struct{}
-type DivLInstr struct{ lhs *big.Int }
 type DivRInstr struct{ rhs *big.Int }
+type DivLInstr struct{ lhs *big.Int }
 type ModInstr struct{}
-type ModLInstr struct{ lhs *big.Int }
 type ModRInstr struct{ rhs *big.Int }
+type ModLInstr struct{ lhs *big.Int }
 type NegInstr struct{}
-type LshInstr struct{ val *big.Int }
-type RshInstr struct{ val *big.Int }
 
 // Exec executes an add instruction.
 func (*AddInstr) Exec(vm *VM) {
-	y, x := vm.stack.Pop(), vm.stack.Top()
-	x.Add(x, y)
-	vm.pc++
+	vm.arith((*big.Int).Add)
 }
 
 // Exec executes an add instruction with a constant value.
-func (addV *AddVInstr) Exec(vm *VM)
+func (addV *AddVInstr) Exec(vm *VM) {
+	vm.arithRHS((*big.Int).Add, addV.val)
+}
 
 // Exec executes a sub instruction.
 func (*SubInstr) Exec(vm *VM) {
-	y, x := vm.stack.Pop(), vm.stack.Top()
-	x.Sub(x, y)
-	vm.pc++
+	vm.arith((*big.Int).Sub)
+}
+
+// Exec executes a sub instruction with a constant rhs.
+func (subR *SubRInstr) Exec(vm *VM) {
+	vm.arithRHS((*big.Int).Sub, subR.rhs)
 }
 
 // Exec executes a sub instruction with a constant lhs.
-func (subL *SubLInstr) Exec(vm *VM)
-
-// Exec executes a sub instruction with a constant rhs.
-func (subR *SubRInstr) Exec(vm *VM)
+func (subL *SubLInstr) Exec(vm *VM) {
+	vm.arithLHS((*big.Int).Sub, subL.lhs)
+}
 
 // Exec executes a mul instruction.
 func (*MulInstr) Exec(vm *VM) {
-	y, x := vm.stack.Pop(), vm.stack.Top()
-	x.Mul(x, y)
-	vm.pc++
+	vm.arith((*big.Int).Mul)
 }
 
 // Exec executes a mul instruction with a constant value.
-func (mulV *MulVInstr) Exec(vm *VM)
+func (mulV *MulVInstr) Exec(vm *VM) {
+	vm.arithRHS((*big.Int).Mul, mulV.val)
+}
 
 // Exec executes a div instruction.
 func (*DivInstr) Exec(vm *VM) {
-	y, x := vm.stack.Pop(), vm.stack.Top()
-	x.Div(x, y)
-	vm.pc++
+	vm.arith((*big.Int).Div)
+}
+
+// Exec executes a div instruction with a constant rhs.
+func (divR *DivRInstr) Exec(vm *VM) {
+	vm.arithRHS((*big.Int).Div, divR.rhs)
 }
 
 // Exec executes a div instruction with a constant lhs.
-func (divL *DivLInstr) Exec(vm *VM)
-
-// Exec executes a div instruction with a constant rhs.
-func (divR *DivRInstr) Exec(vm *VM)
+func (divL *DivLInstr) Exec(vm *VM) {
+	vm.arithLHS((*big.Int).Div, divL.lhs)
+}
 
 // Exec executes a mod instruction.
 func (*ModInstr) Exec(vm *VM) {
-	y, x := vm.stack.Pop(), vm.stack.Top()
-	x.Mod(x, y)
-	vm.pc++
+	vm.arith((*big.Int).Mod)
+}
+
+// Exec executes a mod instruction with a constant rhs.
+func (modR *ModRInstr) Exec(vm *VM) {
+	vm.arithLHS((*big.Int).Mod, modR.rhs)
 }
 
 // Exec executes a mod instruction with a constant lhs.
-func (modL *ModLInstr) Exec(vm *VM)
-
-// Exec executes a mod instruction with a constant rhs.
-func (modR *ModRInstr) Exec(vm *VM)
+func (modL *ModLInstr) Exec(vm *VM) {
+	vm.arithLHS((*big.Int).Mod, modL.lhs)
+}
 
 // Exec executes a neg instruction.
-func (*NegInstr) Exec(vm *VM)
-
-// Exec executes a lsh instruction with a constant value.
-func (lsh *LshInstr) Exec(vm *VM)
-
-// Exec executes a rsh instruction with a constant value.
-func (rsh *RshInstr) Exec(vm *VM)
+func (*NegInstr) Exec(vm *VM) {
+	x := vm.stack.Top()
+	x.Neg(x)
+	vm.pc++
+}
 
 type StoreInstr struct{}
 type StoreAInstr struct{ addr *big.Int }
@@ -156,13 +158,24 @@ func (*StoreInstr) Exec(vm *VM) {
 }
 
 // Exec executes a store instruction with a constant address.
-func (storeA *StoreAInstr) Exec(vm *VM)
+func (storeA *StoreAInstr) Exec(vm *VM) {
+	val := vm.stack.Pop()
+	vm.heap.Retrieve(storeA.addr).(*big.Int).Set(val)
+	vm.pc++
+}
 
 // Exec executes a store instruction with a constant value.
-func (storeV *StoreVInstr) Exec(vm *VM)
+func (storeV *StoreVInstr) Exec(vm *VM) {
+	addr := vm.stack.Pop()
+	vm.heap.Retrieve(addr).(*big.Int).Set(storeV.val)
+	vm.pc++
+}
 
 // Exec executes a store instruction with a constant address and value.
-func (storeAV *StoreAVInstr) Exec(vm *VM)
+func (storeAV *StoreAVInstr) Exec(vm *VM) {
+	vm.heap.Retrieve(storeAV.addr).(*big.Int).Set(storeAV.val)
+	vm.pc++
+}
 
 // Exec executes a retrieve instruction.
 func (*RetrieveInstr) Exec(vm *VM) {
@@ -172,7 +185,10 @@ func (*RetrieveInstr) Exec(vm *VM) {
 }
 
 // Exec executes a retrieve instruction with a constant address.
-func (retrieveA *RetrieveAInstr) Exec(vm *VM)
+func (retrieveA *RetrieveAInstr) Exec(vm *VM) {
+	vm.stack.Push(vm.heap.Retrieve(retrieveA.addr).(*big.Int))
+	vm.pc++
+}
 
 type CallInstr struct{ label int }
 type JmpInstr struct{ label int }
@@ -207,27 +223,33 @@ func (jmp *JmpInstr) Exec(vm *VM) {
 
 // Exec executes a jz instruction.
 func (jz *JzInstr) Exec(vm *VM) {
-	vm.jmpCond(0, jz.label)
+	vm.jmpSign(0, jz.label)
 }
 
 // Exec executes a jn instruction.
 func (jn *JnInstr) Exec(vm *VM) {
-	vm.jmpCond(-1, jn.label)
+	vm.jmpSign(-1, jn.label)
 }
 
 // Exec executes a jp instruction.
 func (jp *JpInstr) Exec(vm *VM) {
-	vm.jmpCond(1, jp.label)
+	vm.jmpSign(1, jp.label)
 }
 
 // Exec executes a je instruction with a constant value.
-func (je *JeInstr) Exec(vm *VM)
+func (je *JeInstr) Exec(vm *VM) {
+	vm.jmpCmp(0, je.label, je.val)
+}
 
 // Exec executes a jl instruction with a constant value.
-func (jl *JlInstr) Exec(vm *VM)
+func (jl *JlInstr) Exec(vm *VM) {
+	vm.jmpCmp(-1, jl.label, jl.val)
+}
 
 // Exec executes a jg instruction with a constant value.
-func (jg *JgInstr) Exec(vm *VM)
+func (jg *JgInstr) Exec(vm *VM) {
+	vm.jmpCmp(1, jg.label, jg.val)
+}
 
 // Exec executes a ret instruction.
 func (ret *RetInstr) Exec(vm *VM) {
@@ -283,7 +305,10 @@ func (readc *ReadcInstr) Exec(vm *VM) {
 }
 
 // Exec executes a readc instruction with a constant address.
-func (readcA *ReadcAInstr) Exec(vm *VM)
+func (readcA *ReadcAInstr) Exec(vm *VM) {
+	vm.readRune(vm.heap.Retrieve(readcA.addr).(*big.Int))
+	vm.pc++
+}
 
 // Exec executes a readi instruction.
 func (readi *ReadiInstr) Exec(vm *VM) {
@@ -292,4 +317,7 @@ func (readi *ReadiInstr) Exec(vm *VM) {
 }
 
 // Exec executes a readi instruction with a constant address.
-func (readiA *ReadiAInstr) Exec(vm *VM)
+func (readiA *ReadiAInstr) Exec(vm *VM) {
+	vm.readInt(vm.heap.Retrieve(readiA.addr).(*big.Int))
+	vm.pc++
+}
