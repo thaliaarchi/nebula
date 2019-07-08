@@ -39,7 +39,8 @@ func NewVM(tokens []Token) (*VM, error) {
 
 func (vm *VM) Run() {
 	for vm.pc < len(vm.instrs) {
-		vm.instrs[vm.pc].Exec(vm)
+		vm.pc++
+		vm.instrs[vm.pc-1].Exec(vm)
 	}
 	fmt.Printf("\nStack: %s\n", &vm.stack)
 	fmt.Printf("Heap: %s\n", &vm.heap)
@@ -48,43 +49,40 @@ func (vm *VM) Run() {
 func (vm *VM) arith(op func(z, x, y *big.Int) *big.Int) {
 	y, x := vm.stack.Pop(), vm.stack.Top()
 	op(x, x, y)
-	vm.pc++
 }
 
 func (vm *VM) arithRHS(op func(z, x, y *big.Int) *big.Int, rhs *big.Int) {
 	x := vm.stack.Top()
 	op(x, x, rhs)
-	vm.pc++
 }
 
 func (vm *VM) arithLHS(op func(z, x, y *big.Int) *big.Int, lhs *big.Int) {
 	x := vm.stack.Top()
 	op(x, lhs, x)
-	vm.pc++
-}
-
-func (vm *VM) jmpCond(cond bool, label int) {
-	if cond {
-		vm.pc = label
-	} else {
-		vm.pc++
-	}
 }
 
 func (vm *VM) jmpSign(sign, label int) {
-	vm.jmpCond(vm.stack.Pop().Sign() == sign, label)
+	if vm.stack.Pop().Sign() == sign {
+		vm.pc = label
+	}
 }
 
 func (vm *VM) jmpCmp(cmp, label int, val *big.Int) {
-	vm.jmpCond(vm.stack.Pop().Cmp(val) == cmp, label)
+	if vm.stack.Pop().Cmp(val) == cmp {
+		vm.pc = label
+	}
 }
 
 func (vm *VM) jmpSignTop(sign, label int) {
-	vm.jmpCond(vm.stack.Top().Sign() == sign, label)
+	if vm.stack.Top().Sign() == sign {
+		vm.pc = label
+	}
 }
 
 func (vm *VM) jmpCmpTop(cmp, label int, val *big.Int) {
-	vm.jmpCond(vm.stack.Top().Cmp(val) == cmp, label)
+	if vm.stack.Top().Cmp(val) == cmp {
+		vm.pc = label
+	}
 }
 
 func (vm *VM) readRune(x *big.Int) *big.Int {

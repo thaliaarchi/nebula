@@ -53,6 +53,12 @@ func (s *Stack) Swap() {
 	s.items[s.len-1], s.items[s.len-2] = s.items[s.len-2], s.items[s.len-1]
 }
 
+// PopN pops n items off the stack.
+func (s *Stack) PopN(n int) {
+	s.checkUnderflow(n)
+	s.len -= n
+}
+
 // Slide n items off the stack, keeping the top item.
 func (s *Stack) Slide(n int) {
 	s.checkUnderflow(n + 1)
