@@ -207,6 +207,21 @@ type JgInstr struct {
 	label int
 	val   *big.Int
 }
+type JzTopInstr struct{ label int }
+type JnTopInstr struct{ label int }
+type JpTopInstr struct{ label int }
+type JeTopInstr struct {
+	label int
+	val   *big.Int
+}
+type JlTopInstr struct {
+	label int
+	val   *big.Int
+}
+type JgTopInstr struct {
+	label int
+	val   *big.Int
+}
 type RetInstr struct{}
 type EndInstr struct{}
 
@@ -249,6 +264,36 @@ func (jl *JlInstr) Exec(vm *VM) {
 // Exec executes a jg instruction with a constant value.
 func (jg *JgInstr) Exec(vm *VM) {
 	vm.jmpCmp(1, jg.label, jg.val)
+}
+
+// Exec executes a jz instruction and leaving the top stack value.
+func (jzTop *JzTopInstr) Exec(vm *VM) {
+	vm.jmpSignTop(0, jzTop.label)
+}
+
+// Exec executes a jn instruction and leaving the top stack value.
+func (jnTop *JnTopInstr) Exec(vm *VM) {
+	vm.jmpSignTop(-1, jnTop.label)
+}
+
+// Exec executes a jp instruction and leaving the top stack value.
+func (jpTop *JpTopInstr) Exec(vm *VM) {
+	vm.jmpSignTop(1, jpTop.label)
+}
+
+// Exec executes a je instruction with a constant value and leaving the top stack value.
+func (jeTop *JeTopInstr) Exec(vm *VM) {
+	vm.jmpCmpTop(0, jeTop.label, jeTop.val)
+}
+
+// Exec executes a jl instruction with a constant value and leaving the top stack value.
+func (jlTop *JlTopInstr) Exec(vm *VM) {
+	vm.jmpCmpTop(-1, jlTop.label, jlTop.val)
+}
+
+// Exec executes a jg instruction with a constant value and leaving the top stack value.
+func (jgTop *JgTopInstr) Exec(vm *VM) {
+	vm.jmpCmpTop(1, jgTop.label, jgTop.val)
 }
 
 // Exec executes a ret instruction.

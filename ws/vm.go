@@ -63,20 +63,28 @@ func (vm *VM) arithLHS(op func(z, x, y *big.Int) *big.Int, lhs *big.Int) {
 	vm.pc++
 }
 
-func (vm *VM) jmpSign(sign, label int) {
-	if vm.stack.Pop().Sign() == sign {
+func (vm *VM) jmpCond(cond bool, label int) {
+	if cond {
 		vm.pc = label
 	} else {
 		vm.pc++
 	}
 }
 
+func (vm *VM) jmpSign(sign, label int) {
+	vm.jmpCond(vm.stack.Pop().Sign() == sign, label)
+}
+
 func (vm *VM) jmpCmp(cmp, label int, val *big.Int) {
-	if vm.stack.Pop().Cmp(val) == cmp {
-		vm.pc = label
-	} else {
-		vm.pc++
-	}
+	vm.jmpCond(vm.stack.Pop().Cmp(val) == cmp, label)
+}
+
+func (vm *VM) jmpSignTop(sign, label int) {
+	vm.jmpCond(vm.stack.Top().Sign() == sign, label)
+}
+
+func (vm *VM) jmpCmpTop(cmp, label int, val *big.Int) {
+	vm.jmpCond(vm.stack.Top().Cmp(val) == cmp, label)
 }
 
 func (vm *VM) readRune(x *big.Int) *big.Int {
