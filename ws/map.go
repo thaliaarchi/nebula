@@ -9,25 +9,26 @@ import (
 
 // Map is a hash table for big int keys.
 type Map struct {
-	m   map[int64][]mapEntry
+	m   map[int64][]MapEntry
 	new func() interface{}
 }
 
-type mapEntry struct {
-	k *big.Int
-	v interface{}
+// MapEntry is a key-value pair.
+type MapEntry struct {
+	K *big.Int
+	V interface{}
 }
 
 // NewMap constructs a Map.
 func NewMap(new func() interface{}) *Map {
-	return &Map{make(map[int64][]mapEntry), new}
+	return &Map{make(map[int64][]MapEntry), new}
 }
 
 // Get the value at the key.
 func (m *Map) Get(k *big.Int) (interface{}, bool) {
 	for _, e := range m.m[k.Int64()] {
-		if e.k.Cmp(k) == 0 {
-			return e.v, true
+		if e.K.Cmp(k) == 0 {
+			return e.V, true
 		}
 	}
 	return nil, false
@@ -37,12 +38,12 @@ func (m *Map) Get(k *big.Int) (interface{}, bool) {
 func (m *Map) Retrieve(k *big.Int) interface{} {
 	hash := k.Int64()
 	for _, e := range m.m[hash] {
-		if e.k.Cmp(k) == 0 {
-			return e.v
+		if e.K.Cmp(k) == 0 {
+			return e.V
 		}
 	}
 	v := m.new()
-	m.m[hash] = append(m.m[hash], mapEntry{new(big.Int).Set(k), v})
+	m.m[hash] = append(m.m[hash], MapEntry{new(big.Int).Set(k), v})
 	return v
 }
 
@@ -51,32 +52,46 @@ func (m *Map) Put(k *big.Int, v interface{}) bool {
 	hash := k.Int64()
 	entries := m.m[hash]
 	for _, e := range entries {
-		if e.k.Cmp(k) == 0 {
-			e.v = v
+		if e.K.Cmp(k) == 0 {
+			e.V = v
 			return true
 		}
 	}
-	m.m[hash] = append(entries, mapEntry{new(big.Int).Set(k), v})
+	m.m[hash] = append(entries, MapEntry{new(big.Int).Set(k), v})
 	return false
 }
 
+// Entries returns a channel to iterate the entries of the map.
+func (m *Map) Entries() <-chan MapEntry {
+	entryChan := make(chan MapEntry)
+	go func() {
+		for _, entries := range m.m {
+			for _, entry := range entries {
+				entryChan <- entry
+			}
+		}
+		close(entryChan)
+	}()
+	return entryChan
+}
+
 func (m Map) String() string {
-	var entries []mapEntry
+	var entries []MapEntry
 	for _, bucket := range m.m {
-		for _, e := range bucket {
-			entries = append(entries, e)
+		for _, entry := range bucket {
+			entries = append(entries, entry)
 		}
 	}
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].k.Cmp(entries[j].k) < 0
+		return entries[i].K.Cmp(entries[j].K) < 0
 	})
 	var b strings.Builder
 	b.WriteRune('{')
-	for i, e := range entries {
+	for i, entry := range entries {
 		if i != 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(fmt.Sprintf("%s:%s", e.k, e.v))
+		b.WriteString(fmt.Sprintf("%s:%s", entry.K, entry.V))
 	}
 	b.WriteRune('}')
 	return b.String()
