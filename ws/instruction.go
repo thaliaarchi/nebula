@@ -238,3 +238,84 @@ func (readi *ReadiInstr) Exec(vm *VM) {
 func (readiA *ReadiAInstr) Exec(vm *VM) {
 	vm.readInt(vm.heap.Retrieve(readiA.addr).(*big.Int))
 }
+
+// InstrName returns the wsa name of the given instruction.
+func InstrName(instr Instr) string {
+	if instr == nil {
+		return "<nil>"
+	}
+	switch instr.(type) {
+	case *PushInstr:
+		return "push"
+	case *DupInstr:
+		return "dup"
+	case *CopyInstr:
+		return "copy"
+	case *SwapInstr:
+		return "swap"
+	case *DropInstr:
+		return "drop"
+	case *SlideInstr:
+		return "slide"
+	case *AddInstr:
+		return "add"
+	case *SubInstr:
+		return "sub"
+	case *MulInstr:
+		return "mul"
+	case *DivInstr:
+		return "div"
+	case *ModInstr:
+		return "mod"
+	case *StoreInstr:
+		return "store"
+	case *RetrieveInstr:
+		return "retrieve"
+	case *CallInstr:
+		return "call"
+	case *JmpInstr:
+		return "jmp"
+	case *JzInstr:
+		return "jz"
+	case *JnInstr:
+		return "jn"
+	case *RetInstr:
+		return "ret"
+	case *EndInstr:
+		return "end"
+	case *PrintcInstr:
+		return "printc"
+	case *PrintiInstr:
+		return "printi"
+	case *ReadcInstr:
+		return "readc"
+	case *ReadiInstr:
+		return "readi"
+	}
+	return "invalid"
+}
+
+func InstrString(instr Instr) string {
+	if instr == nil {
+		return "<nil>"
+	}
+	name := InstrName(instr)
+	switch instr.(type) {
+	case *PushInstr:
+		return fmt.Sprintf("%s %v", name, instr.(*PushInstr).val)
+	case *CopyInstr:
+		return fmt.Sprintf("%s %d", name, instr.(*CopyInstr).n)
+	case *SlideInstr:
+		return fmt.Sprintf("%s %d", name, instr.(*SlideInstr).n)
+	case *CallInstr:
+		return fmt.Sprintf("%s %d", name, instr.(*CallInstr).label)
+	case *JmpInstr:
+		return fmt.Sprintf("%s %d", name, instr.(*CallInstr).label)
+	case *JzInstr:
+		return fmt.Sprintf("%s %d", name, instr.(*JzInstr).label)
+	case *JnInstr:
+		return fmt.Sprintf("%s %d", name, instr.(*JnInstr).label)
+	default:
+		return name
+	}
+}

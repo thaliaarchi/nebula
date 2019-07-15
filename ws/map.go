@@ -75,6 +75,11 @@ func (m *Map) Entries() <-chan MapEntry {
 	return entryChan
 }
 
+// Clear removes all entries from the map.
+func (m *Map) Clear() {
+	m.m = make(map[int64][]MapEntry)
+}
+
 func (m Map) String() string {
 	var entries []MapEntry
 	for _, bucket := range m.m {

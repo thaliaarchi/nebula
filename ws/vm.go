@@ -38,10 +38,74 @@ func NewVM(tokens []Token) (*VM, error) {
 }
 
 func (vm *VM) Run() {
-	for vm.pc < len(vm.instrs) {
-		vm.pc++
-		vm.instrs[vm.pc-1].Exec(vm)
+	vm.pc = 0
+	vm.stack.Clear()
+	vm.heap.Clear()
+	vm.Continue()
+}
+
+func (vm *VM) Continue() {
+	for !vm.Done() {
+		vm.Step()
 	}
+}
+
+func (vm *VM) Step() {
+	vm.pc++
+	vm.instrs[vm.pc-1].Exec(vm)
+}
+
+func (vm *VM) Next() {
+	_, isCall := vm.instrs[vm.pc].(*CallInstr)
+	vm.Step()
+	if isCall {
+		for !vm.Done() {
+			_, isRet := vm.instrs[vm.pc].(*RetInstr)
+			vm.Step()
+			if isRet {
+				break
+			}
+		}
+	}
+}
+
+func (vm *VM) Done() bool {
+	return vm.pc >= len(vm.instrs)
+}
+
+func (vm *VM) Debug() {
+	for !vm.Done() {
+		fmt.Printf("%d:\t%s\n", vm.pc, InstrString(vm.instrs[vm.pc]))
+	prompt:
+		fmt.Print("ws> ")
+		input, err := vm.in.ReadString('\n')
+		if err != nil {
+			fmt.Println("ERROR:", err)
+			break
+		}
+		input = strings.TrimSuffix(input, "\n")
+		switch input {
+		case "r", "run":
+			vm.Run()
+			break
+		case "c", "continue":
+			vm.Continue()
+			break
+		case "s", "step":
+			vm.Step()
+		case "n", "next":
+			vm.Next()
+		case "i", "info":
+			vm.PrintInfo()
+			goto prompt
+		default:
+			goto prompt
+		}
+	}
+	vm.PrintInfo()
+}
+
+func (vm *VM) PrintInfo() {
 	fmt.Printf("\nStack: %s\n", &vm.stack)
 	fmt.Printf("Heap: %s\n", &vm.heap)
 }
@@ -248,60 +312,4 @@ func getLabel(label *big.Int, labels *Map, name string) (int, error) {
 		return 0, fmt.Errorf("label does not exist: %s %s", name, label)
 	}
 	return l.(int), nil
-}
-
-func (vm *VM) getInstrName() string {
-	instr := vm.instrs[vm.pc]
-	if instr == nil {
-		return "<nil>"
-	}
-	switch instr.(type) {
-	case *PushInstr:
-		return "push"
-	case *DupInstr:
-		return "dup"
-	case *CopyInstr:
-		return "copy"
-	case *SwapInstr:
-		return "swap"
-	case *DropInstr:
-		return "drop"
-	case *SlideInstr:
-		return "slide"
-	case *AddInstr:
-		return "add"
-	case *SubInstr:
-		return "sub"
-	case *MulInstr:
-		return "mul"
-	case *DivInstr:
-		return "div"
-	case *ModInstr:
-		return "mod"
-	case *StoreInstr:
-		return "store"
-	case *RetrieveInstr:
-		return "retrieve"
-	case *CallInstr:
-		return "call"
-	case *JmpInstr:
-		return "jmp"
-	case *JzInstr:
-		return "jz"
-	case *JnInstr:
-		return "jn"
-	case *RetInstr:
-		return "ret"
-	case *EndInstr:
-		return "end"
-	case *PrintcInstr:
-		return "printc"
-	case *PrintiInstr:
-		return "printi"
-	case *ReadcInstr:
-		return "readc"
-	case *ReadiInstr:
-		return "readi"
-	}
-	return "invalid"
 }

@@ -68,6 +68,11 @@ func (s *Stack) Slide(n int) {
 	s.len -= n
 }
 
+// Clear sets the length of the stack to zero.
+func (s *Stack) Clear() {
+	s.len = 0
+}
+
 func (s *Stack) String() string {
 	var b strings.Builder
 	b.WriteRune('[')
