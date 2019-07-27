@@ -97,9 +97,8 @@ func (typ TokenType) HasArg() bool {
 	switch typ {
 	case Push, Copy, Slide, Label, Call, Jmp, Jz, Jn:
 		return true
-	default:
-		return false
 	}
+	return false
 }
 
 func (typ TokenType) String() string {

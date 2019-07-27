@@ -12,7 +12,7 @@ type Lexer struct {
 	instrs chan Token
 }
 
-func Lex(l SpaceReader) chan Token {
+func Lex(l SpaceReader) <-chan Token {
 	p := &Lexer{
 		l:      l,
 		instrs: make(chan Token),

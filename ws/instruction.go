@@ -3,6 +3,8 @@ package ws
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/andrewarchi/wspace/bigint"
 )
 
 type Instr interface {
@@ -201,7 +203,7 @@ type ReadiAInstr instrAddr
 
 // Exec executes a printc instruction.
 func (printc *PrintcInstr) Exec(vm *VM) {
-	fmt.Printf("%c", bigIntRune(vm.stack.Pop()))
+	fmt.Printf("%c", bigint.ToRune(vm.stack.Pop()))
 }
 
 // Exec executes a printc instruction with a constant char.
@@ -300,21 +302,21 @@ func InstrString(instr Instr) string {
 		return "<nil>"
 	}
 	name := InstrName(instr)
-	switch instr.(type) {
+	switch i := instr.(type) {
 	case *PushInstr:
-		return fmt.Sprintf("%s %v", name, instr.(*PushInstr).val)
+		return fmt.Sprintf("%s %v", name, i.val)
 	case *CopyInstr:
-		return fmt.Sprintf("%s %d", name, instr.(*CopyInstr).n)
+		return fmt.Sprintf("%s %d", name, i.n)
 	case *SlideInstr:
-		return fmt.Sprintf("%s %d", name, instr.(*SlideInstr).n)
+		return fmt.Sprintf("%s %d", name, i.n)
 	case *CallInstr:
-		return fmt.Sprintf("%s %d", name, instr.(*CallInstr).label)
+		return fmt.Sprintf("%s %d", name, i.label)
 	case *JmpInstr:
-		return fmt.Sprintf("%s %d", name, instr.(*CallInstr).label)
+		return fmt.Sprintf("%s %d", name, i.label)
 	case *JzInstr:
-		return fmt.Sprintf("%s %d", name, instr.(*JzInstr).label)
+		return fmt.Sprintf("%s %d", name, i.label)
 	case *JnInstr:
-		return fmt.Sprintf("%s %d", name, instr.(*JnInstr).label)
+		return fmt.Sprintf("%s %d", name, i.label)
 	default:
 		return name
 	}

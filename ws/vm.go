@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math"
 	"math/big"
 	"os"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/andrewarchi/wspace/bigint"
 )
 
 const eofValue = 0
@@ -17,8 +17,8 @@ type VM struct {
 	instrs  []Instr
 	pc      int
 	callers []int
-	stack   Stack
-	heap    Map
+	stack   bigint.Stack
+	heap    bigint.Map
 	in      *bufio.Reader
 }
 
@@ -31,8 +31,8 @@ func NewVM(tokens []Token) (*VM, error) {
 		instrs:  instrs,
 		pc:      0,
 		callers: nil,
-		stack:   *NewStack(),
-		heap:    *NewMap(func() interface{} { return new(big.Int) }),
+		stack:   *bigint.NewStack(),
+		heap:    *bigint.NewMap(func() interface{} { return new(big.Int) }),
 		in:      bufio.NewReader(os.Stdin),
 	}, nil
 }
@@ -55,13 +55,28 @@ func (vm *VM) Step() {
 	vm.instrs[vm.pc-1].Exec(vm)
 }
 
+func (vm *VM) StepDebug() {
+	switch vm.instrs[vm.pc].(type) {
+	case *PrintcInstr, *PrintiInstr:
+		fmt.Print(">> ")
+		vm.Step()
+		fmt.Println()
+	case *ReadcInstr, *ReadiInstr:
+		fmt.Print("<< ")
+		vm.Step()
+		fmt.Println()
+	default:
+		vm.Step()
+	}
+}
+
 func (vm *VM) Next() {
 	_, isCall := vm.instrs[vm.pc].(*CallInstr)
-	vm.Step()
+	vm.StepDebug()
 	if isCall {
 		for !vm.Done() {
 			_, isRet := vm.instrs[vm.pc].(*RetInstr)
-			vm.Step()
+			vm.StepDebug()
 			if isRet {
 				break
 			}
@@ -77,7 +92,7 @@ func (vm *VM) Debug() {
 	for !vm.Done() {
 		fmt.Printf("%d:\t%s\n", vm.pc, InstrString(vm.instrs[vm.pc]))
 	prompt:
-		fmt.Print("ws> ")
+		fmt.Print("(ws) ")
 		input, err := vm.in.ReadString('\n')
 		if err != nil {
 			fmt.Println("ERROR:", err)
@@ -92,7 +107,7 @@ func (vm *VM) Debug() {
 			vm.Continue()
 			break
 		case "s", "step":
-			vm.Step()
+			vm.StepDebug()
 		case "n", "next":
 			vm.Next()
 		case "i", "info":
@@ -106,7 +121,8 @@ func (vm *VM) Debug() {
 }
 
 func (vm *VM) PrintInfo() {
-	fmt.Printf("\nStack: %s\n", &vm.stack)
+	fmt.Println("-----")
+	fmt.Printf("Stack: %s\n", &vm.stack)
 	fmt.Printf("Heap: %s\n", &vm.heap)
 }
 
@@ -174,18 +190,6 @@ func (vm *VM) readInt(x *big.Int) *big.Int {
 		panic("invalid number: " + line)
 	}
 	return x
-}
-
-func bigIntRune(x *big.Int) rune {
-	invalid := '\uFFFD' // � replacement character
-	if !x.IsInt64() {
-		return invalid
-	}
-	v := x.Int64()
-	if v >= math.MaxInt32 || !utf8.ValidRune(rune(v)) { // rune is int32
-		return invalid
-	}
-	return rune(v)
 }
 
 func tokensToInstrs(tokens []Token) ([]Instr, error) {
@@ -277,8 +281,8 @@ func tokensToInstrs(tokens []Token) ([]Instr, error) {
 	return instrs, nil
 }
 
-func getLabels(tokens []Token) (*Map, error) {
-	labels := NewMap(func() interface{} { return 0 })
+func getLabels(tokens []Token) (*bigint.Map, error) {
+	labels := bigint.NewMap(nil)
 	var i int
 	for _, token := range tokens {
 		if token.Type == Label {
@@ -293,20 +297,15 @@ func getLabels(tokens []Token) (*Map, error) {
 	return labels, nil
 }
 
-const maxInt int = int(^uint(0) >> 1)
-
 func getArg(arg *big.Int, name string) (int, error) {
-	if !arg.IsInt64() {
+	a, ok := bigint.ToInt(arg)
+	if !ok {
 		return 0, fmt.Errorf("argument overflow: %s %s", name, arg)
 	}
-	a := arg.Int64()
-	if a > int64(maxInt) {
-		return 0, fmt.Errorf("argument overflow: %s %s", name, arg)
-	}
-	return int(a), nil
+	return a, nil
 }
 
-func getLabel(label *big.Int, labels *Map, name string) (int, error) {
+func getLabel(label *big.Int, labels *bigint.Map, name string) (int, error) {
 	l, ok := labels.Get(label)
 	if !ok {
 		return 0, fmt.Errorf("label does not exist: %s %s", name, label)
