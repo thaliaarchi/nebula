@@ -1,11 +1,11 @@
-package graph
+package ws
 
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/andrewarchi/wspace/bigint"
-	"github.com/andrewarchi/wspace/ws"
 )
 
 // AST is a flow graph linking nodes by program flow.
@@ -13,14 +13,15 @@ import (
 type AST []*Node
 
 type Node struct {
-	ws.Token
-	Labels   []*big.Int
-	Callers  []*Node
-	Branches []*Node
-	Visited  bool
+	Token
+	Labels  []*big.Int
+	Next    *Node
+	Branch  *Node
+	Callers []*Node
+	Visited bool
 }
 
-func NewAST(tokens []ws.Token) (AST, error) {
+func NewAST(tokens []Token) (AST, error) {
 	nodes, labels, err := getNodes(tokens)
 	if err != nil {
 		return nil, err
@@ -33,15 +34,15 @@ func NewAST(tokens []ws.Token) (AST, error) {
 	return nodes, nil
 }
 
-func getNodes(tokens []ws.Token) ([]*Node, *bigint.Map, error) {
+func getNodes(tokens []Token) ([]*Node, *bigint.Map, error) {
 	nodes := make([]*Node, 0, len(tokens)+1)
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	var nodeLabels []*big.Int
 	for _, token := range tokens {
-		if token.Type == ws.Label {
+		if token.Type == Label {
 			nodeLabels = append(nodeLabels, token.Arg)
 			if labels.Put(token.Arg, len(nodes)) {
-				return nil, nil, fmt.Errorf("graph: label is not unique: %s", token.Arg)
+				return nil, nil, fmt.Errorf("ast: label is not unique: %s", token.Arg)
 			}
 			continue
 		}
@@ -49,7 +50,7 @@ func getNodes(tokens []ws.Token) ([]*Node, *bigint.Map, error) {
 		nodeLabels = nil
 	}
 	if needsImplicitEnd(nodes, nodeLabels) {
-		nodes = append(nodes, &Node{Token: ws.Token{Type: ws.End}, Labels: nodeLabels})
+		nodes = append(nodes, &Node{Token: Token{Type: End}, Labels: nodeLabels})
 	}
 	return nodes, labels, nil
 }
@@ -59,7 +60,7 @@ func needsImplicitEnd(nodes []*Node, endLabels []*big.Int) bool {
 		return true
 	}
 	switch nodes[len(nodes)-1].Type {
-	case ws.Call, ws.Jmp, ws.Ret, ws.End:
+	case Call, Jmp, Ret, End:
 	default:
 		return true
 	}
@@ -71,10 +72,10 @@ func getNodeCalls(nodes []*Node, labels *bigint.Map) (map[*Node][]*Node, map[*No
 	callees := make(map[*Node]*Node)
 	for _, node := range nodes {
 		switch node.Type {
-		case ws.Call, ws.Jmp, ws.Jz, ws.Jn:
+		case Call, Jmp, Jz, Jn:
 			label, ok := labels.Get(node.Arg)
 			if !ok {
-				return nil, nil, fmt.Errorf("graph: label does not exist: %s", node.Arg)
+				return nil, nil, fmt.Errorf("ast: label does not exist: %s", node.Arg)
 			}
 			callee := nodes[label.(int)]
 			callers[callee] = append(callers[callee], node)
@@ -88,13 +89,56 @@ func annotateNodes(nodes []*Node, callers map[*Node][]*Node, callees map[*Node]*
 	for i, node := range nodes {
 		node.Callers = callers[node]
 		switch node.Type {
-		case ws.Call, ws.Jmp:
-			node.Branches = []*Node{callees[node]}
-		case ws.Jz, ws.Jn:
-			node.Branches = []*Node{callees[node], nodes[i+1]}
-		case ws.Ret, ws.End:
-		default:
-			node.Branches = []*Node{nodes[i+1]}
+		case Call, Jmp:
+			node.Branch = callees[node]
+		case Jz, Jn:
+			node.Branch = callees[node]
+		}
+		if i < len(nodes)-1 {
+			node.Next = nodes[i+1]
 		}
 	}
+}
+
+func (ast AST) PruneUnreachable() AST {
+	if len(ast) == 0 {
+		return nil
+	}
+	ast.ClearVisited()
+	ast[0].Visit()
+	pruned := make(AST, 0, len(ast))
+	for _, node := range ast {
+		if node.Visited {
+			pruned = append(pruned, node)
+		}
+	}
+	pruned.ClearVisited()
+	return pruned
+}
+
+func (ast AST) ClearVisited() {
+	for _, node := range ast {
+		node.Visited = false
+	}
+}
+
+func (node *Node) Visit() {
+	if node == nil || node.Visited {
+		return
+	}
+	node.Visited = true
+	node.Next.Visit()
+	node.Branch.Visit()
+}
+
+func (node *Node) Display() string {
+	var b strings.Builder
+	for _, label := range node.Labels {
+		b.WriteString("label_")
+		b.WriteString(label.String())
+		b.WriteString(":\n")
+	}
+	b.WriteString("    ")
+	b.WriteString(node.Token.String())
+	return b.String()
 }
