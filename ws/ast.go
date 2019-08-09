@@ -8,20 +8,16 @@ import (
 	"github.com/andrewarchi/wspace/bigint"
 )
 
-// AST is a flow graph linking nodes by program flow.
-// The first node is the program entry point.
-type AST []*Node
-
+// Node is a node in an AST linked by program flow.
 type Node struct {
 	Token
 	Labels  []*big.Int
 	Next    *Node
 	Branch  *Node
 	Callers []*Node
-	Visited bool
 }
 
-func NewAST(tokens []Token) (AST, error) {
+func NewAST(tokens []Token) (*Node, error) {
 	nodes, labels, err := getNodes(tokens)
 	if err != nil {
 		return nil, err
@@ -31,7 +27,7 @@ func NewAST(tokens []Token) (AST, error) {
 		return nil, err
 	}
 	annotateNodes(nodes, callers, callees)
-	return nodes, nil
+	return nodes[0], nil
 }
 
 func getNodes(tokens []Token) ([]*Node, *bigint.Map, error) {
@@ -56,7 +52,7 @@ func getNodes(tokens []Token) ([]*Node, *bigint.Map, error) {
 }
 
 func needsImplicitEnd(nodes []*Node, endLabels []*big.Int) bool {
-	if len(nodes) == 0 || len(endLabels) != 0 {
+	if len(nodes) == 0 || len(endLabels) > 0 {
 		return true
 	}
 	switch nodes[len(nodes)-1].Type {
@@ -98,37 +94,6 @@ func annotateNodes(nodes []*Node, callers map[*Node][]*Node, callees map[*Node]*
 			node.Next = nodes[i+1]
 		}
 	}
-}
-
-func (ast AST) PruneUnreachable() AST {
-	if len(ast) == 0 {
-		return nil
-	}
-	ast.ClearVisited()
-	ast[0].Visit()
-	pruned := make(AST, 0, len(ast))
-	for _, node := range ast {
-		if node.Visited {
-			pruned = append(pruned, node)
-		}
-	}
-	pruned.ClearVisited()
-	return pruned
-}
-
-func (ast AST) ClearVisited() {
-	for _, node := range ast {
-		node.Visited = false
-	}
-}
-
-func (node *Node) Visit() {
-	if node == nil || node.Visited {
-		return
-	}
-	node.Visited = true
-	node.Next.Visit()
-	node.Branch.Visit()
 }
 
 func (node *Node) Display() string {
