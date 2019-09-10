@@ -1,54 +1,54 @@
     end
 
-# func pow(x, n int) int {
+# func exp(x, n int) int {
 #   if n <= 0 || x == 1 {
 #     return 1
 #   }
-#   return powHelper(x, n)
+#   return expHelper(x, n)
 # }
-# func powHelper(x, n int) int {
+# func expHelper(x, n int) int {
 #   if n == 1   { return x }
-#   if n%2 == 0 { return pow(x*x, n/2) }
-#   return x * pow(x*x, (n-1)/2)
+#   if n%2 == 0 { return exp(x*x, n/2) }
+#   return x * exp(x*x, (n-1)/2)
 # }
 
-# pow computes x to the nth power (x ** n) using exponentiation by squaring
+# exp computes x to the nth power (x ** n) using exponentiation by squaring
 # params: x, n
-pow:
-    dup; push 1; sub; jn .pow_one
-    copy 1; push 1; sub; jz .pow_one
-.pow:
-    dup; push 1; sub; jz .pow_x
-    dup; push 2; mod; jz .pow_even
+exp:
+    dup; push 1; sub; jn .exp_one
+    copy 1; push 1; sub; jz .exp_one
+.exp:
+    dup; push 1; sub; jz .exp_x
+    dup; push 2; mod; jz .exp_even
     # odd
     copy 1
     dup; mul
     swap
     push 1; sub
     push 2; div
-    call .pow
+    call .exp
     mul
     ret
-.pow_even:
+.exp_even:
     swap
     dup; mul
     swap
     push 2; div
-    jmp .pow
-.pow_one:
+    jmp .exp
+.exp_one:
     push 1
     slide 2
     ret
-.pow_x:
+.exp_x:
     drop
     ret
 
-# pow2 computes 2 to the nth power (2 ** n) using exponentiation by squaring
+# exp2 computes 2 to the nth power (2 ** n) using exponentiation by squaring
 # params: n
-pow2:
+exp2:
     push 2
     swap
-    jmp pow
+    jmp exp
 
 # func not(x int) int {
 #   result := 0
@@ -223,14 +223,14 @@ xor:
 # shl computes arithmetic left shift (x << n)
 # params: x, n
 shl:
-    call pow2
+    call exp2
     mul
     ret
 
 # shr computes arithmetic right shift (x >> n)
 # params: x, n
 shr:
-    call pow2
+    call exp2
     div
     ret
 
