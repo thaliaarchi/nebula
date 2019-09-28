@@ -1,3 +1,8 @@
 wspace
 wspace.exe
 *.exe
+*.processed.ws
+*.processed.wsa
+*.wsx
+.vscode
+.DS_Store
