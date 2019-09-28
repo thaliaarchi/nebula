@@ -14,7 +14,7 @@ import (
 const eofValue = 0
 
 type VM struct {
-	ast     AST
+	entry   *Node
 	inst    *Node
 	callers []*Node
 	stack   bigint.Stack
@@ -22,10 +22,10 @@ type VM struct {
 	in      *bufio.Reader
 }
 
-func NewVM(ast AST) (*VM, error) {
+func NewVM(entry *Node) (*VM, error) {
 	return &VM{
-		ast:     ast,
-		inst:    nil,
+		entry:   entry,
+		inst:    entry,
 		callers: nil,
 		stack:   *bigint.NewStack(),
 		heap:    *bigint.NewMap(func() interface{} { return new(big.Int) }),
@@ -86,10 +86,7 @@ func (vm *VM) Done() bool {
 }
 
 func (vm *VM) Reset() {
-	if len(vm.ast) == 0 {
-		return
-	}
-	vm.inst = vm.ast[0]
+	vm.inst = vm.entry
 	vm.stack.Clear()
 	vm.heap.Clear()
 }

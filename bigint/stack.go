@@ -17,7 +17,7 @@ func NewStack() *Stack {
 	return &Stack{nil, 0, 0}
 }
 
-// Push an item onto the stack. The item given is not modified.
+// Push pushes an item onto the stack. The item given is not modified.
 func (s *Stack) Push(x *big.Int) {
 	if s.len >= s.cap {
 		s.items = append(s.items, new(big.Int).Set(x))
@@ -28,7 +28,7 @@ func (s *Stack) Push(x *big.Int) {
 	s.len++
 }
 
-// Pop and get the top item on the stack.
+// Pop pops and gets the top item on the stack.
 func (s *Stack) Pop() *big.Int {
 	s.checkUnderflow(1)
 	s.len--
@@ -41,13 +41,13 @@ func (s *Stack) Top() *big.Int {
 	return s.items[s.len-1]
 }
 
-// Get the nth item on the stack. The top is at 0.
+// Get returns the nth item on the stack. The top is n == 0.
 func (s *Stack) Get(n int) *big.Int {
 	s.checkUnderflow(n + 1)
 	return s.items[s.len-n-1]
 }
 
-// Swap the top two items on the stack.
+// Swap swaps the top two items on the stack.
 func (s *Stack) Swap() {
 	s.checkUnderflow(2)
 	s.items[s.len-1], s.items[s.len-2] = s.items[s.len-2], s.items[s.len-1]
@@ -59,7 +59,7 @@ func (s *Stack) PopN(n int) {
 	s.len -= n
 }
 
-// Slide n items off the stack, keeping the top item.
+// Slide slides the top n items off the stack, keeping the top item.
 func (s *Stack) Slide(n int) {
 	s.checkUnderflow(n + 1)
 	i := s.len - 1

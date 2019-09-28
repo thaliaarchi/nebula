@@ -1,8 +1,8 @@
 # postfix.wsa evaluates postfix expressions
 
-    define TEMP 0
-    define SP 1
-    define SMIN 2
+    define SP   0  # stack pointer
+    define SMIN 2  # stack start address
+    define TEMP 1  # address for reading
 
 eval_expr:
     # initialize variable
@@ -17,17 +17,24 @@ eval_expr:
     push ' '; printc
 
 .read_token:
-    call read_char
+    call .read_char
     dup; push '0'; sub; jn .read_operator
     push '9'; copy 1; sub; jn .error_illegal_char
 
-    # operand
+    # positive operand
+    push 1
+    swap
+    jmp .read_operand
+
+# params: sign, char
+.read_operand:
     push '0'
     sub
-
 .read_operand_loop:
-    call read_char
-    dup; push '0'; sub; jn .read_operand_break
+    call .read_char
+    dup; push ' '; sub; jz .read_operand_break
+    dup; push '\n'; sub; jz .read_operand_print
+    dup; push '0'; sub; jn .error_illegal_char
     push '9'; copy 1; sub; jn .error_illegal_char
 
     push '0'
@@ -38,9 +45,14 @@ eval_expr:
     add
 
     jmp .read_operand_loop
-
 .read_operand_break:
-    swap
+    call .read_operand_store
+    jmp .read_token
+.read_operand_print:
+    call .read_operand_store
+    jmp .print_result
+.read_operand_store:
+    drop
 
     # store operand at SP
     push SP; retrieve
@@ -52,59 +64,77 @@ eval_expr:
     dup; retrieve; push 1; add
     store
 
-    # fallthrough
+    # multiply by sign
+    mul
+
+    ret
 
 .read_operator:
     dup; push '+'; sub; jz .eval_add
-    dup; push '-'; sub; jz .eval_sub
+    dup; push '-'; sub; jz .read_minus
     dup; push '*'; sub; jz .eval_mul
     dup; push '/'; sub; jz .eval_div
     dup; push '%'; sub; jz .eval_mod
     dup; push '\n'; sub; jz .print_result
-    dup; push ' '; sub; jz .read_space
+    dup; push ' '; sub; jz .ignore_char
     jmp .error_illegal_char
 
-.read_space:
+.read_minus:
+    drop
+    call .read_char
+    dup; push ' '; sub; jz .eval_sub
+    dup; push '0'; sub; jn .error_missing_operator_space
+    push '9'; copy 1; sub; jn .error_missing_operator_space
+
+    # negative operand
+    push '0'
+    sub
+    push -1
+    swap
+    jmp .read_operand
+
+.ignore_char:
     drop
     jmp .read_token
 
-read_char:
+.read_char:
     push TEMP
     dup; readc
     retrieve
     dup; jz .read_char_eof
     ret
-
 .read_char_eof:
     drop
     end
 
 .eval_add:
-    call eval_operator
+    call .eval_operator
     add
     jmp .eval_operator_done
 
 .eval_sub:
-    call eval_operator
+    call .eval_operator
     sub
-    jmp .eval_operator_done
+    store
+    store
+    jmp .read_token
 
 .eval_mul:
-    call eval_operator
+    call .eval_operator
     mul
     jmp .eval_operator_done
 
 .eval_div:
-    call eval_operator
+    call .eval_operator
     div
     jmp .eval_operator_done
 
 .eval_mod:
-    call eval_operator
+    call .eval_operator
     mod
     jmp .eval_operator_done
 
-eval_operator:
+.eval_operator:
     drop
 
     # check underflow
@@ -125,7 +155,11 @@ eval_operator:
 .eval_operator_done:
     store
     store
-    jmp .read_token
+
+    call .read_char
+    push ' '; sub; jz .read_token
+    push '\n'; sub; jz .print_result
+    jmp .error_missing_operator_space
 
 .print_result:
     drop
@@ -150,73 +184,114 @@ eval_operator:
 
 .consume_line:
     # consume remainder of line
-    call read_char
+    call .read_char
     push '\n'; sub; jz eval_expr
     jmp .consume_line
 
 .error_illegal_char:
-    call print_error_prefix
-    push 'i'; printc
-    push 'l'; printc
-    push 'l'; printc
-    push 'e'; printc
-    push 'g'; printc
-    push 'a'; printc
-    push 'l'; printc
-    push ' '; printc
-    push 'c'; printc
-    push 'h'; printc
-    push 'a'; printc
-    push 'r'; printc
-    push 'a'; printc
-    push 'c'; printc
-    push 't'; printc
-    push 'e'; printc
-    push 'r'; printc
-    push ':'; printc
-    push ' '; printc
-    printc
-    push '\n'; printc
+    push 0
+    swap
+    push ' '
+    push ':'
+    push 'r'
+    push 'e'
+    push 't'
+    push 'c'
+    push 'a'
+    push 'r'
+    push 'a'
+    push 'h'
+    push 'c'
+    push ' '
+    push 'l'
+    push 'a'
+    push 'g'
+    push 'e'
+    push 'l'
+    push 'l'
+    push 'i'
+    call .print_error
     jmp .consume_line
 
 .error_missing_operand:
-    call print_missing_opera
-    push 'n'; printc
-    push 'd'; printc
-    push '\n'; printc
+    push 0
+    call .string_operand
+    push ' '
+    call .string_missing
+    call .print_error
     jmp .consume_line
 
 .error_missing_operator:
-    call print_missing_opera
-    push 't'; printc
-    push 'o'; printc
-    push 'r'; printc
-    push '\n'; printc
+    push 0
+    call .string_operator
+    push ' '
+    call .string_missing
+    call .print_error
     jmp eval_expr
 
-print_missing_opera:
-    call print_error_prefix
-    push 'm'; printc
-    push 'i'; printc
-    push 's'; printc
-    push 's'; printc
-    push 'i'; printc
-    push 'n'; printc
-    push 'g'; printc
-    push ' '; printc
-    push 'o'; printc
-    push 'p'; printc
-    push 'e'; printc
-    push 'r'; printc
-    push 'a'; printc
+.error_missing_operator_space:
+    push 0
+    call .string_operator
+    push ' '
+    push 'r'
+    push 'e'
+    push 't'
+    push 'f'
+    push 'a'
+    push ' '
+    push 'e'
+    push 'c'
+    push 'a'
+    push 'p'
+    push 's'
+    push ' '
+    call .string_missing
+    call .print_error
+    jmp eval_expr
+
+.print_error:
+    push ' '
+    push ':'
+    push 'r'
+    push 'o'
+    push 'r'
+    push 'r'
+    push 'E'
+    jmp println
+
+.string_operand:
+    push 'd'
+    push 'n'
+    jmp .string_opera
+.string_operator:
+    push 'r'
+    push 'o'
+    push 't'
+    # fallthrough
+.string_opera:
+    push 'a'
+    push 'r'
+    push 'e'
+    push 'p'
+    push 'o'
+    ret
+.string_missing:
+    push 'g'
+    push 'n'
+    push 'i'
+    push 's'
+    push 's'
+    push 'i'
+    push 'm'
     ret
 
-print_error_prefix:
-    push 'E'; printc
-    push 'r'; printc
-    push 'r'; printc
-    push 'o'; printc
-    push 'r'; printc
-    push ':'; printc
-    push ' '; printc
+# println prints a string on the stack terminated with 0 and a LF
+# params: char..., 0
+println:
+    dup; jz .println_done
+    printc
+    jmp println
+.println_done:
+    drop
+    push '\n'; printc
     ret
