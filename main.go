@@ -17,7 +17,7 @@ func main() {
 	}
 	mode := os.Args[1]
 	if mode != "run" && mode != "debug" {
-		fmt.Println("unrecognized mode")
+		fmt.Printf("Unrecognized mode: %s\n", mode)
 		fmt.Println(usage)
 		return
 	}

@@ -36,6 +36,8 @@ start:
     # print factorial of n
     call factorial; printi
 
+    push '\n'; printc
+
     end
 
 # recursively compute factorial of n

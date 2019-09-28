@@ -12,6 +12,15 @@ import (
 )
 
 const eofValue = 0
+const debugHelp = `Commands:
+  run
+  continue
+  step
+  next
+  quit
+  info
+  help
+`
 
 type VM struct {
 	entry   *Node
@@ -20,6 +29,7 @@ type VM struct {
 	stack   bigint.Stack
 	heap    bigint.Map
 	in      *bufio.Reader
+	out     *bufio.Writer
 }
 
 func NewVM(entry *Node) (*VM, error) {
@@ -30,6 +40,7 @@ func NewVM(entry *Node) (*VM, error) {
 		stack:   *bigint.NewStack(),
 		heap:    *bigint.NewMap(func() interface{} { return new(big.Int) }),
 		in:      bufio.NewReader(os.Stdin),
+		out:     bufio.NewWriter(os.Stdout),
 	}, nil
 }
 
@@ -42,6 +53,7 @@ func (vm *VM) Continue() {
 	for !vm.Done() {
 		vm.Step()
 	}
+	vm.out.Flush()
 }
 
 func (vm *VM) Step() {
@@ -51,13 +63,13 @@ func (vm *VM) Step() {
 func (vm *VM) StepDebug() {
 	switch vm.inst.Type {
 	case Printc, Printi:
-		fmt.Print(">> ")
+		vm.out.WriteString(">> ")
 		vm.Step()
-		fmt.Println()
+		vm.out.WriteByte('\n')
 	case Readc, Readi:
-		fmt.Print("<< ")
+		vm.out.WriteString("<< ")
 		vm.Step()
-		fmt.Println()
+		vm.out.WriteByte('\n')
 	default:
 		vm.Step()
 	}
@@ -94,12 +106,16 @@ func (vm *VM) Reset() {
 func (vm *VM) Debug() {
 	vm.Reset()
 	for !vm.Done() {
-		fmt.Println(vm.inst.Display())
+		vm.out.WriteString(vm.inst.Display())
+		vm.out.WriteByte('\n')
 	prompt:
-		fmt.Print("(ws) ")
+		vm.out.WriteString("(ws) ")
+		vm.out.Flush()
 		input, err := vm.in.ReadString('\n')
 		if err != nil {
-			fmt.Println("ERROR:", err)
+			vm.out.WriteString("Error: ")
+			vm.out.WriteString(err.Error())
+			vm.out.WriteByte('\n')
 			break
 		}
 		input = strings.TrimSuffix(input, "\n")
@@ -117,23 +133,40 @@ func (vm *VM) Debug() {
 		case "i", "info":
 			vm.PrintInfo()
 			goto prompt
+		case "h", "help":
+			vm.Help()
+			goto prompt
+		case "":
+			goto prompt
 		default:
+			vm.out.WriteString("Unrecognized command: ")
+			vm.out.WriteString(input)
+			vm.out.WriteByte('\n')
 			goto prompt
 		}
 	}
-	fmt.Println("-----")
+	vm.out.WriteString("-----\n")
 	vm.PrintInfo()
+	vm.out.Flush()
 }
 
 func (vm *VM) PrintInfo() {
-	fmt.Printf("Stack: %s\n", &vm.stack)
-	fmt.Printf("Heap: %s\n", &vm.heap)
+	vm.out.WriteString("Stack: ")
+	vm.out.WriteString(vm.stack.String())
+	vm.out.WriteString("\nHeap: ")
+	vm.out.WriteString(vm.heap.String())
+	vm.out.WriteByte('\n')
 }
 
 func (vm *VM) PrintStackTrace() {
-	fmt.Println(vm.inst.Display())
-	fmt.Println("-----")
+	vm.out.WriteString(vm.inst.Display())
+	vm.out.WriteString("\n-----\n")
 	vm.PrintInfo()
+	vm.out.Flush()
+}
+
+func (vm *VM) Help() {
+	vm.out.WriteString(debugHelp)
 }
 
 func (vm *VM) Exec(inst *Node) {
@@ -195,11 +228,12 @@ func (vm *VM) Exec(inst *Node) {
 		vm.callers = vm.callers[:len(vm.callers)-1]
 	case End:
 		next = nil
+		vm.out.Flush()
 
 	case Printc:
-		fmt.Printf("%c", bigint.ToRune(vm.stack.Pop()))
+		vm.out.WriteRune(bigint.ToRune(vm.stack.Pop()))
 	case Printi:
-		fmt.Print(vm.stack.Pop().String())
+		vm.out.WriteString(vm.stack.Pop().String())
 	case Readc:
 		vm.readRune(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
 	case Readi:
@@ -228,6 +262,7 @@ func (vm *VM) jmpCmp(cmp int, inst *Node, val *big.Int) *Node {
 }
 
 func (vm *VM) readRune(x *big.Int) {
+	vm.out.Flush()
 	r, _, err := vm.in.ReadRune()
 	if err == io.EOF {
 		x.SetInt64(eofValue)
@@ -240,6 +275,7 @@ func (vm *VM) readRune(x *big.Int) {
 }
 
 func (vm *VM) readInt(x *big.Int) {
+	vm.out.Flush()
 	line, err := vm.in.ReadString('\n')
 	if err == io.EOF {
 		x.SetInt64(eofValue)
