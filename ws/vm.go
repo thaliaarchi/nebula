@@ -8,7 +8,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/andrewarchi/wspace/ast"
 	"github.com/andrewarchi/wspace/bigint"
+	"github.com/andrewarchi/wspace/token"
 )
 
 const eofValue = 0
@@ -23,16 +25,16 @@ const debugHelp = `Commands:
 `
 
 type VM struct {
-	entry   *Node
-	inst    *Node
-	callers []*Node
+	entry   *ast.Node
+	inst    *ast.Node
+	callers []*ast.Node
 	stack   bigint.Stack
 	heap    bigint.Map
 	in      *bufio.Reader
 	out     *bufio.Writer
 }
 
-func NewVM(entry *Node) (*VM, error) {
+func NewVM(entry *ast.Node) (*VM, error) {
 	return &VM{
 		entry:   entry,
 		inst:    entry,
@@ -62,11 +64,11 @@ func (vm *VM) Step() {
 
 func (vm *VM) StepDebug() {
 	switch vm.inst.Type {
-	case Printc, Printi:
+	case token.Printc, token.Printi:
 		vm.out.WriteString(">> ")
 		vm.Step()
 		vm.out.WriteByte('\n')
-	case Readc, Readi:
+	case token.Readc, token.Readi:
 		vm.out.WriteString("<< ")
 		vm.Step()
 		vm.out.WriteByte('\n')
@@ -76,11 +78,11 @@ func (vm *VM) StepDebug() {
 }
 
 func (vm *VM) Next() {
-	isCall := vm.inst.Type == Call
+	isCall := vm.inst.Type == token.Call
 	vm.StepDebug()
 	if isCall {
 		for !vm.Done() {
-			isRet := vm.inst.Type == Ret
+			isRet := vm.inst.Type == token.Ret
 			vm.StepDebug()
 			if isRet {
 				break
@@ -169,74 +171,74 @@ func (vm *VM) Help() {
 	vm.out.WriteString(debugHelp)
 }
 
-func (vm *VM) Exec(inst *Node) {
+func (vm *VM) Exec(inst *ast.Node) {
 	next := inst.Next
 	switch inst.Type {
-	case Push:
+	case token.Push:
 		vm.stack.Push(inst.Arg)
-	case Dup:
+	case token.Dup:
 		vm.stack.Push(vm.stack.Top())
-	case Copy:
+	case token.Copy:
 		n, ok := bigint.ToInt(inst.Arg)
 		if !ok {
 			panic(fmt.Sprintf("copy argument overflow: %s", inst.Arg))
 		}
 		vm.stack.Push(vm.stack.Get(n))
-	case Swap:
+	case token.Swap:
 		vm.stack.Swap()
-	case Drop:
+	case token.Drop:
 		vm.stack.Pop()
-	case Slide:
+	case token.Slide:
 		n, ok := bigint.ToInt(inst.Arg)
 		if !ok {
 			panic(fmt.Sprintf("slide argument overflow: %s", inst.Arg))
 		}
 		vm.stack.Slide(n)
 
-	case Add:
+	case token.Add:
 		vm.arith((*big.Int).Add)
-	case Sub:
+	case token.Sub:
 		vm.arith((*big.Int).Sub)
-	case Mul:
+	case token.Mul:
 		vm.arith((*big.Int).Mul)
-	case Div:
+	case token.Div:
 		vm.arith((*big.Int).Div)
-	case Mod:
+	case token.Mod:
 		vm.arith((*big.Int).Mod)
 
-	case Store:
+	case token.Store:
 		val, addr := vm.stack.Pop(), vm.stack.Pop()
 		vm.heap.Retrieve(addr).(*big.Int).Set(val)
-	case Retrieve:
+	case token.Retrieve:
 		top := vm.stack.Top()
 		top.Set(vm.heap.Retrieve(top).(*big.Int))
 
-	case Call:
+	case token.Call:
 		vm.callers = append(vm.callers, inst.Next)
 		next = inst.Branch
-	case Jmp:
+	case token.Jmp:
 		next = inst.Branch
-	case Jz:
+	case token.Jz:
 		next = vm.jmpSign(0, inst)
-	case Jn:
+	case token.Jn:
 		next = vm.jmpSign(-1, inst)
-	case Ret:
+	case token.Ret:
 		if len(vm.callers) == 0 {
 			panic("call stack underflow: ret")
 		}
 		next = vm.callers[len(vm.callers)-1]
 		vm.callers = vm.callers[:len(vm.callers)-1]
-	case End:
+	case token.End:
 		next = nil
 		vm.out.Flush()
 
-	case Printc:
+	case token.Printc:
 		vm.out.WriteRune(bigint.ToRune(vm.stack.Pop()))
-	case Printi:
+	case token.Printi:
 		vm.out.WriteString(vm.stack.Pop().String())
-	case Readc:
+	case token.Readc:
 		vm.readRune(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
-	case Readi:
+	case token.Readi:
 		vm.readInt(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
 	}
 	vm.inst = next
@@ -247,14 +249,14 @@ func (vm *VM) arith(op func(z, x, y *big.Int) *big.Int) {
 	op(x, x, y)
 }
 
-func (vm *VM) jmpSign(sign int, inst *Node) *Node {
+func (vm *VM) jmpSign(sign int, inst *ast.Node) *ast.Node {
 	if vm.stack.Pop().Sign() == sign {
 		return inst.Branch
 	}
 	return inst.Next
 }
 
-func (vm *VM) jmpCmp(cmp int, inst *Node, val *big.Int) *Node {
+func (vm *VM) jmpCmp(cmp int, inst *ast.Node, val *big.Int) *ast.Node {
 	if vm.stack.Pop().Cmp(val) == cmp {
 		return inst.Branch
 	}

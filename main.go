@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/andrewarchi/wspace/ast"
+	"github.com/andrewarchi/wspace/token"
 	"github.com/andrewarchi/wspace/ws"
 )
 
@@ -29,11 +31,11 @@ func main() {
 
 	r := ws.NewTextReader(f)
 	tokenChan := ws.Lex(r)
-	var tokens []ws.Token
+	var tokens []token.Token
 	for token := range tokenChan {
 		tokens = append(tokens, token)
 	}
-	ast, err := ws.NewAST(tokens)
+	ast, err := ast.NewAST(tokens)
 	if err != nil {
 		fmt.Println(err)
 		return

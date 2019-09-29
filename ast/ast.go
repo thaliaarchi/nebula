@@ -1,4 +1,4 @@
-package ws
+package ast
 
 import (
 	"fmt"
@@ -6,18 +6,19 @@ import (
 	"strings"
 
 	"github.com/andrewarchi/wspace/bigint"
+	"github.com/andrewarchi/wspace/token"
 )
 
 // Node is a node in an AST linked by program flow.
 type Node struct {
-	Token
+	token.Token
 	Labels  []*big.Int
 	Next    *Node
 	Branch  *Node
 	Callers []*Node
 }
 
-func NewAST(tokens []Token) (*Node, error) {
+func NewAST(tokens []token.Token) (*Node, error) {
 	nodes, labels, err := getNodes(tokens)
 	if err != nil {
 		return nil, err
@@ -30,23 +31,23 @@ func NewAST(tokens []Token) (*Node, error) {
 	return nodes[0], nil
 }
 
-func getNodes(tokens []Token) ([]*Node, *bigint.Map, error) {
+func getNodes(tokens []token.Token) ([]*Node, *bigint.Map, error) {
 	nodes := make([]*Node, 0, len(tokens)+1)
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	var nodeLabels []*big.Int
-	for _, token := range tokens {
-		if token.Type == Label {
-			nodeLabels = append(nodeLabels, token.Arg)
-			if labels.Put(token.Arg, len(nodes)) {
-				return nil, nil, fmt.Errorf("ast: label is not unique: %s", token.Arg)
+	for _, tok := range tokens {
+		if tok.Type == token.Label {
+			nodeLabels = append(nodeLabels, tok.Arg)
+			if labels.Put(tok.Arg, len(nodes)) {
+				return nil, nil, fmt.Errorf("ast: label is not unique: %s", tok.Arg)
 			}
 			continue
 		}
-		nodes = append(nodes, &Node{Token: token, Labels: nodeLabels})
+		nodes = append(nodes, &Node{Token: tok, Labels: nodeLabels})
 		nodeLabels = nil
 	}
 	if needsImplicitEnd(nodes, nodeLabels) {
-		nodes = append(nodes, &Node{Token: Token{Type: End}, Labels: nodeLabels})
+		nodes = append(nodes, &Node{Token: token.Token{Type: token.End}, Labels: nodeLabels})
 	}
 	return nodes, labels, nil
 }
@@ -56,7 +57,7 @@ func needsImplicitEnd(nodes []*Node, endLabels []*big.Int) bool {
 		return true
 	}
 	switch nodes[len(nodes)-1].Type {
-	case Call, Jmp, Ret, End:
+	case token.Call, token.Jmp, token.Ret, token.End:
 	default:
 		return true
 	}
@@ -68,7 +69,7 @@ func getNodeCalls(nodes []*Node, labels *bigint.Map) (map[*Node][]*Node, map[*No
 	callees := make(map[*Node]*Node)
 	for _, node := range nodes {
 		switch node.Type {
-		case Call, Jmp, Jz, Jn:
+		case token.Call, token.Jmp, token.Jz, token.Jn:
 			label, ok := labels.Get(node.Arg)
 			if !ok {
 				return nil, nil, fmt.Errorf("ast: label does not exist: %s", node.Arg)
@@ -85,9 +86,7 @@ func annotateNodes(nodes []*Node, callers map[*Node][]*Node, callees map[*Node]*
 	for i, node := range nodes {
 		node.Callers = callers[node]
 		switch node.Type {
-		case Call, Jmp:
-			node.Branch = callees[node]
-		case Jz, Jn:
+		case token.Call, token.Jmp, token.Jz, token.Jn:
 			node.Branch = callees[node]
 		}
 		if i < len(nodes)-1 {

@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"container/list"
 	"math/big"
 
 	"github.com/andrewarchi/wspace/ws"
@@ -9,10 +8,7 @@ import (
 
 type Node interface{}
 
-type NodeBlock struct {
-	Nodes   list.List
-	Callers []Node
-}
+type BasicBlock []Node
 
 type PhiExpr struct {
 	Exprs []Node
@@ -53,8 +49,6 @@ type JmpCondStmt struct {
 	False Node
 }
 
-type RetStmt struct {
-	Callers []Node
-}
+type RetStmt struct{}
 
 type EndStmt struct{}

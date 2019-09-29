@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+
+	"github.com/andrewarchi/wspace/token"
 )
 
 type Lexer struct {
 	l      SpaceReader
-	instrs chan Token
+	instrs chan token.Token
 }
 
-func Lex(l SpaceReader) <-chan Token {
+func Lex(l SpaceReader) <-chan token.Token {
 	p := &Lexer{
 		l:      l,
-		instrs: make(chan Token),
+		instrs: make(chan token.Token),
 	}
 	go p.run()
 	return p.instrs
@@ -65,31 +67,31 @@ func transition(s states) stateFn {
 	}
 }
 
-func emitInstr(typ TokenType) stateFn {
+func emitInstr(typ token.TokenType) stateFn {
 	return func(p *Lexer) (stateFn, error) {
-		p.instrs <- Token{typ, nil}
+		p.instrs <- token.Token{typ, nil}
 		return lexInstr, nil
 	}
 }
 
-func lexInstrNumber(typ TokenType) stateFn {
+func lexInstrNumber(typ token.TokenType) stateFn {
 	return func(p *Lexer) (stateFn, error) {
 		arg, err := lexSigned(p)
 		if err != nil {
 			return nil, err
 		}
-		p.instrs <- Token{typ, arg}
+		p.instrs <- token.Token{typ, arg}
 		return lexInstr, nil
 	}
 }
 
-func lexInstrLabel(typ TokenType) stateFn {
+func lexInstrLabel(typ token.TokenType) stateFn {
 	return func(p *Lexer) (stateFn, error) {
 		arg, err := lexUnsigned(p)
 		if err != nil {
 			return nil, err
 		}
-		p.instrs <- Token{typ, arg}
+		p.instrs <- token.Token{typ, arg}
 		return lexInstr, nil
 	}
 }
@@ -161,58 +163,58 @@ func init() {
 var lexInstr stateFn
 
 var lexStack = transition(states{
-	Space: lexInstrNumber(Push),
+	Space: lexInstrNumber(token.Push),
 	Tab: transition(states{
-		Space: lexInstrNumber(Copy),
-		LF:    lexInstrNumber(Slide),
+		Space: lexInstrNumber(token.Copy),
+		LF:    lexInstrNumber(token.Slide),
 	}),
 	LF: transition(states{
-		Space: emitInstr(Dup),
-		Tab:   emitInstr(Swap),
-		LF:    emitInstr(Drop),
+		Space: emitInstr(token.Dup),
+		Tab:   emitInstr(token.Swap),
+		LF:    emitInstr(token.Drop),
 	}),
 })
 
 var lexArith = transition(states{
 	Space: transition(states{
-		Space: emitInstr(Add),
-		Tab:   emitInstr(Sub),
-		LF:    emitInstr(Mul),
+		Space: emitInstr(token.Add),
+		Tab:   emitInstr(token.Sub),
+		LF:    emitInstr(token.Mul),
 	}),
 	Tab: transition(states{
-		Space: emitInstr(Div),
-		Tab:   emitInstr(Mod),
+		Space: emitInstr(token.Div),
+		Tab:   emitInstr(token.Mod),
 	}),
 })
 
 var lexHeap = transition(states{
-	Space: emitInstr(Store),
-	Tab:   emitInstr(Retrieve),
+	Space: emitInstr(token.Store),
+	Tab:   emitInstr(token.Retrieve),
 })
 
 var lexIO = transition(states{
 	Space: transition(states{
-		Space: emitInstr(Printc),
-		Tab:   emitInstr(Printi),
+		Space: emitInstr(token.Printc),
+		Tab:   emitInstr(token.Printi),
 	}),
 	Tab: transition(states{
-		Space: emitInstr(Readc),
-		Tab:   emitInstr(Readi),
+		Space: emitInstr(token.Readc),
+		Tab:   emitInstr(token.Readi),
 	}),
 })
 
 var lexFlow = transition(states{
 	Space: transition(states{
-		Space: lexInstrLabel(Label),
-		Tab:   lexInstrLabel(Call),
-		LF:    lexInstrLabel(Jmp),
+		Space: lexInstrLabel(token.Label),
+		Tab:   lexInstrLabel(token.Call),
+		LF:    lexInstrLabel(token.Jmp),
 	}),
 	Tab: transition(states{
-		Space: lexInstrLabel(Jz),
-		Tab:   lexInstrLabel(Jn),
-		LF:    emitInstr(Ret),
+		Space: lexInstrLabel(token.Jz),
+		Tab:   lexInstrLabel(token.Jn),
+		LF:    emitInstr(token.Ret),
 	}),
 	LF: transition(states{
-		LF: emitInstr(End),
+		LF: emitInstr(token.End),
 	}),
 })
