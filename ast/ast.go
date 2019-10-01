@@ -20,7 +20,7 @@ type BasicBlock struct {
 	Callers []*BasicBlock
 }
 
-// Val can be either StackVal, HeapVal, ConstVal, or AddrVal.
+// Val can be StackVal, HeapVal, ConstVal, or AddrVal.
 type Val interface{}
 
 // StackVal is a position on the stack.
@@ -60,8 +60,11 @@ type IOStmt struct {
 	Val  Val
 }
 
-// JmpStmt unconditionally jumps to a block. Valid instructions are call
-// and jmp.
+// FlowStmt can be JmpStmt, JmpCondStmt, RetStmt, EndStmt.
+type FlowStmt interface{}
+
+// JmpStmt unconditionally jumps to a block. Valid instructions are
+// call, jmp, and fallthrough.
 type JmpStmt struct {
 	Type  token.Type
 	Block *BasicBlock
