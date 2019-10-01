@@ -79,10 +79,10 @@ type JmpStmt struct {
 // JmpCondStmt conditionally jumps to a block based on a value. Valid
 // instructions are jz and jn.
 type JmpCondStmt struct {
-	Op    token.Type
-	Val   Val
-	True  *BasicBlock
-	False *BasicBlock
+	Op         token.Type
+	Val        Val
+	TrueBlock  *BasicBlock
+	FalseBlock *BasicBlock
 }
 
 // RetStmt represents a ret.
@@ -96,15 +96,13 @@ func Parse(tokens []token.Token) (AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
-	ast, labels, err := parseBlocks(tokens)
+	ast, branches, labels, err := parseBlocks(tokens)
 	if err != nil {
 		return nil, err
 	}
-	_ = labels
-	// TODO
-	// if err := annotateBlockCalls(ast, labels); err != nil {
-	// 	return nil, err
-	// }
+	if err := connectBlockEdges(ast, branches, labels); err != nil {
+		return nil, err
+	}
 	return ast, nil
 }
 
@@ -119,23 +117,25 @@ func needsImplicitEnd(tokens []token.Token) bool {
 	return true
 }
 
-func parseBlocks(tokens []token.Token) (AST, *bigint.Map, error) {
+func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
+	var ast AST
+	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
-	var blocks AST
 	for i := 0; i < len(tokens); i++ {
 		var block BasicBlock
 		for tokens[i].Type == token.Label {
 			label := tokens[i].Arg
-			if labels.Put(label, len(blocks)) {
-				return nil, nil, fmt.Errorf("ast: label is not unique: %s", label)
+			if labels.Put(label, len(ast)) {
+				return nil, nil, nil, fmt.Errorf("ast: label is not unique: %s", label)
 			}
 			block.Labels = append(block.Labels, label)
 			i++
 		}
 
+		var branch *big.Int
 		stack := NewStack()
 		for ; i < len(tokens); i++ {
-			block.Nodes, block.Edge = tokenToNode(block.Nodes, tokens[i], stack)
+			block.Nodes, block.Edge, branch = tokenToNode(block.Nodes, tokens[i], stack)
 			if block.Edge != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -144,47 +144,49 @@ func parseBlocks(tokens []token.Token) (AST, *bigint.Map, error) {
 			}
 		}
 
-		blocks = append(blocks, &block)
+		ast = append(ast, &block)
+		branches = append(branches, branch)
 	}
-	return blocks, labels, nil
+	return ast, branches, labels, nil
 }
 
-// TODO
-/*func annotateBlockCalls(blocks []*BasicBlock, labels *bigint.Map) error {
-	for i, block := range blocks {
-		switch block.Flow.Type {
-		case token.Fallthrough:
-			if i < len(blocks)-1 {
-				block.Branch = blocks[i+1]
-				block.Flow.Type = token.Jmp
-				blocks[i+1].Callers = append(blocks[i+1].Callers, block)
-			} else {
-				panic(fmt.Sprintf("ast: unexpected illegal instruction"))
-			}
-		case token.Call, token.Jmp, token.Jz, token.Jn:
-			label, ok := labels.Get(block.Flow.Arg)
+func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
+	for i, block := range ast {
+		branch := branches[i]
+		if branch != nil {
+			label, ok := labels.Get(branch)
 			if !ok {
-				return fmt.Errorf("ast: label does not exist: %s", block.Flow.Arg)
+				return fmt.Errorf("ast: block %s jumps to non-existant label: %v", block.Name(), branch)
 			}
-			callee := blocks[label.(int)]
+			callee := ast[label.(int)]
 			callee.Callers = append(callee.Callers, block)
-			block.Branch = callee
-			if i < len(blocks)-1 {
-				block.Next = blocks[i+1]
+
+			switch edge := block.Edge.(type) {
+			case *JmpStmt:
+				edge.Block = callee
+			case *JmpCondStmt:
+				if i >= len(ast) {
+					panic("ast: program ends with conditional jump")
+				}
+				edge.TrueBlock = callee
+				edge.FalseBlock = ast[i+1]
+			case *RetStmt, *EndStmt:
+			default:
+				panic(fmt.Sprintf("ast: invalid edge type: %T", block.Edge))
 			}
 		}
 	}
 	return nil
-}*/
+}
 
-func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt) {
+func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt, *big.Int) {
 	switch tok.Type {
 	case token.Push:
-		return append(nodes, UnaryExpr{
+		return append(nodes, &UnaryExpr{
 			Op:     token.Push,
 			Assign: stack.Push(),
-			Val:    ConstVal{tok.Arg},
-		}), nil
+			Val:    &ConstVal{tok.Arg},
+		}), nil, nil
 	case token.Dup:
 		stack.Dup()
 	case token.Copy:
@@ -206,55 +208,54 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt)
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
 		rhs, lhs, assign := stack.Pop(), stack.Pop(), stack.Push()
-		return append(nodes, BinaryExpr{
+		return append(nodes, &BinaryExpr{
 			Op:     tok.Type,
 			Assign: assign,
 			LHS:    lhs,
 			RHS:    rhs,
-		}), nil
+		}), nil, nil
 
 	case token.Store:
 		val, assign := stack.Pop(), stack.Pop()
-		return append(nodes, UnaryExpr{
+		return append(nodes, &UnaryExpr{
 			Op:     token.Store,
-			Assign: AddrVal{assign},
+			Assign: &AddrVal{assign},
 			Val:    val,
-		}), nil
+		}), nil, nil
 	case token.Retrieve:
 		val, assign := stack.Pop(), stack.Push()
-		return append(nodes, UnaryExpr{
+		return append(nodes, &UnaryExpr{
 			Op:     token.Retrieve,
 			Assign: assign,
 			Val:    val,
-		}), nil
+		}), nil, nil
 
-		// jump addresses are now lost because there is no lookup so far
 	case token.Label:
-		return nodes, JmpStmt{Op: token.Fallthrough}
+		return nodes, &JmpStmt{Op: token.Fallthrough}, tok.Arg
 	case token.Call, token.Jmp:
-		return nodes, JmpStmt{Op: tok.Type}
+		return nodes, &JmpStmt{Op: tok.Type}, tok.Arg
 	case token.Jz, token.Jn:
-		return nodes, JmpCondStmt{
+		return nodes, &JmpCondStmt{
 			Op:  tok.Type,
 			Val: stack.Pop(),
-		}
+		}, tok.Arg
 	case token.Ret:
-		return nodes, RetStmt{}
+		return nodes, &RetStmt{}, nil
 	case token.End:
-		return nodes, EndStmt{}
+		return nodes, &EndStmt{}, nil
 	case token.Fallthrough:
 		panic("ast: unexpected fallthrough")
 
 	case token.Printc, token.Printi, token.Readc, token.Readi:
-		return append(nodes, IOStmt{
+		return append(nodes, &IOStmt{
 			Op:  tok.Type,
 			Val: stack.Pop(),
-		}), nil
+		}), nil, nil
 
 	default:
 		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
 	}
-	return nodes, nil
+	return nodes, nil, nil
 }
 
 // Name returns the name of the basic block from either the first label
@@ -283,6 +284,9 @@ func (ast AST) String() string {
 
 func (block *BasicBlock) String() string {
 	var b strings.Builder
+	if len(block.Labels) == 0 {
+		fmt.Fprintf(&b, "%p:\n", block)
+	}
 	for _, label := range block.Labels {
 		b.WriteString("label_")
 		b.WriteString(label.String())
@@ -298,14 +302,18 @@ func (block *BasicBlock) String() string {
 	return b.String()
 }
 
-func (s StackVal) String() string    { return fmt.Sprintf("%%%d", s.Val) }
-func (h HeapVal) String() string     { return fmt.Sprintf("*%v", h.Val) }
-func (c ConstVal) String() string    { return fmt.Sprintf("%v", c.Val) }
-func (a AddrVal) String() string     { return fmt.Sprintf("*%v", a.Val) }
-func (b BinaryExpr) String() string  { return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS) }
-func (u UnaryExpr) String() string   { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
-func (i IOStmt) String() string      { return fmt.Sprintf("%v %v", i.Op, i.Val) }
-func (j JmpStmt) String() string     { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
-func (j JmpCondStmt) String() string { return fmt.Sprintf("%v %v %p %p", j.Op, j.Val, j.True, j.True) }
-func (RetStmt) String() string       { return "ret" }
-func (EndStmt) String() string       { return "end" }
+func (s *StackVal) String() string { return fmt.Sprintf("%%%d", s.Val) }
+func (h *HeapVal) String() string  { return fmt.Sprintf("*%v", h.Val) }
+func (c *ConstVal) String() string { return fmt.Sprintf("%v", c.Val) }
+func (a *AddrVal) String() string  { return fmt.Sprintf("*%v", a.Val) }
+func (b *BinaryExpr) String() string {
+	return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS)
+}
+func (u *UnaryExpr) String() string { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
+func (i *IOStmt) String() string    { return fmt.Sprintf("%v %v", i.Op, i.Val) }
+func (j *JmpStmt) String() string   { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
+func (j *JmpCondStmt) String() string {
+	return fmt.Sprintf("%v %v %s %s", j.Op, j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
+}
+func (*RetStmt) String() string { return "ret" }
+func (*EndStmt) String() string { return "end" }
