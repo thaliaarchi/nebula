@@ -18,31 +18,35 @@ const debugHelp = `Commands:
   run
   continue
   step
+  stepblock
   next
   quit
+  print
   info
   help
 `
 
 type VM struct {
-	entry   *ast.Node
-	inst    *ast.Node
-	callers []*ast.Node
-	stack   bigint.Stack
-	heap    bigint.Map
-	in      *bufio.Reader
-	out     *bufio.Writer
+	entry *ast.BasicBlock
+	block *ast.BasicBlock
+	inst  int
+	calls []*ast.BasicBlock
+	stack bigint.Stack
+	heap  bigint.Map
+	in    *bufio.Reader
+	out   *bufio.Writer
 }
 
-func NewVM(entry *ast.Node) (*VM, error) {
+func NewVM(entry *ast.BasicBlock) (*VM, error) {
 	return &VM{
-		entry:   entry,
-		inst:    entry,
-		callers: nil,
-		stack:   *bigint.NewStack(),
-		heap:    *bigint.NewMap(func() interface{} { return new(big.Int) }),
-		in:      bufio.NewReader(os.Stdin),
-		out:     bufio.NewWriter(os.Stdout),
+		entry: entry,
+		block: entry,
+		inst:  0,
+		calls: nil,
+		stack: *bigint.NewStack(),
+		heap:  *bigint.NewMap(func() interface{} { return new(big.Int) }),
+		in:    bufio.NewReader(os.Stdin),
+		out:   bufio.NewWriter(os.Stdout),
 	}, nil
 }
 
@@ -59,48 +63,63 @@ func (vm *VM) Continue() {
 }
 
 func (vm *VM) Step() {
-	vm.Exec(vm.inst)
+	if vm.inst < len(vm.block.Tokens) {
+		vm.Exec()
+	} else {
+		vm.ExecFlow()
+	}
+}
+
+func (vm *VM) StepBlock() {
+	for vm.inst < len(vm.block.Tokens) {
+		vm.StepDebug()
+	}
+	vm.StepDebug()
 }
 
 func (vm *VM) StepDebug() {
-	switch vm.inst.Type {
-	case token.Printc, token.Printi:
-		vm.out.WriteString(">> ")
-		vm.Step()
-		vm.out.WriteByte('\n')
-	case token.Readc, token.Readi:
-		vm.out.WriteString("<< ")
-		vm.Step()
-		vm.out.WriteByte('\n')
-	default:
-		vm.Step()
+	if vm.inst < len(vm.block.Tokens) {
+		switch vm.block.Tokens[vm.inst].Type {
+		case token.Printc, token.Printi:
+			vm.out.WriteString(">> ")
+			vm.Exec()
+			vm.out.WriteByte('\n')
+		case token.Readc, token.Readi:
+			vm.out.WriteString("<< ")
+			vm.Exec()
+			vm.out.WriteByte('\n')
+		default:
+			vm.Exec()
+		}
+	} else {
+		vm.ExecFlow()
 	}
 }
 
 func (vm *VM) Next() {
-	isCall := vm.inst.Type == token.Call
-	vm.StepDebug()
-	if isCall {
-		for !vm.Done() {
-			isRet := vm.inst.Type == token.Ret
-			vm.StepDebug()
-			if isRet {
-				break
-			}
+	if vm.inst >= len(vm.block.Tokens) && vm.block.Flow.Type == token.Call {
+		l := len(vm.calls)
+		vm.StepBlock()
+		for len(vm.calls) > l {
+			vm.StepBlock()
 		}
+	} else {
+		vm.StepDebug()
 	}
 }
 
 func (vm *VM) Exit() {
-	vm.inst = nil
+	vm.block = nil
 }
 
 func (vm *VM) Done() bool {
-	return vm.inst == nil
+	return vm.block == nil
 }
 
 func (vm *VM) Reset() {
-	vm.inst = vm.entry
+	vm.block = vm.entry
+	vm.inst = 0
+	vm.calls = nil
 	vm.stack.Clear()
 	vm.heap.Clear()
 }
@@ -108,7 +127,11 @@ func (vm *VM) Reset() {
 func (vm *VM) Debug() {
 	vm.Reset()
 	for !vm.Done() {
-		vm.out.WriteString(vm.inst.Display())
+		if vm.inst < len(vm.block.Tokens) {
+			vm.out.WriteString(vm.block.Tokens[vm.inst].String())
+		} else {
+			vm.out.WriteString(vm.block.Flow.String())
+		}
 		vm.out.WriteByte('\n')
 	prompt:
 		vm.out.WriteString("(ws) ")
@@ -128,10 +151,15 @@ func (vm *VM) Debug() {
 			vm.Continue()
 		case "s", "step":
 			vm.StepDebug()
+		case "sb", "stepblock":
+			vm.StepBlock()
 		case "n", "next":
 			vm.Next()
 		case "q", "quit":
 			vm.Exit()
+		case "p", "print":
+			vm.PrintBlock()
+			goto prompt
 		case "i", "info":
 			vm.PrintInfo()
 			goto prompt
@@ -152,6 +180,11 @@ func (vm *VM) Debug() {
 	vm.out.Flush()
 }
 
+func (vm *VM) PrintBlock() {
+	vm.out.WriteString(vm.block.Display())
+	vm.out.WriteByte('\n')
+}
+
 func (vm *VM) PrintInfo() {
 	vm.out.WriteString("Stack: ")
 	vm.out.WriteString(vm.stack.String())
@@ -161,7 +194,7 @@ func (vm *VM) PrintInfo() {
 }
 
 func (vm *VM) PrintStackTrace() {
-	vm.out.WriteString(vm.inst.Display())
+	vm.out.WriteString(vm.block.Display())
 	vm.out.WriteString("\n-----\n")
 	vm.PrintInfo()
 	vm.out.Flush()
@@ -171,8 +204,8 @@ func (vm *VM) Help() {
 	vm.out.WriteString(debugHelp)
 }
 
-func (vm *VM) Exec(inst *ast.Node) {
-	next := inst.Next
+func (vm *VM) Exec() {
+	inst := vm.block.Tokens[vm.inst]
 	switch inst.Type {
 	case token.Push:
 		vm.stack.Push(inst.Arg)
@@ -213,25 +246,6 @@ func (vm *VM) Exec(inst *ast.Node) {
 		top := vm.stack.Top()
 		top.Set(vm.heap.Retrieve(top).(*big.Int))
 
-	case token.Call:
-		vm.callers = append(vm.callers, inst.Next)
-		next = inst.Branch
-	case token.Jmp:
-		next = inst.Branch
-	case token.Jz:
-		next = vm.jmpSign(0, inst)
-	case token.Jn:
-		next = vm.jmpSign(-1, inst)
-	case token.Ret:
-		if len(vm.callers) == 0 {
-			panic("call stack underflow: ret")
-		}
-		next = vm.callers[len(vm.callers)-1]
-		vm.callers = vm.callers[:len(vm.callers)-1]
-	case token.End:
-		next = nil
-		vm.out.Flush()
-
 	case token.Printc:
 		vm.out.WriteRune(bigint.ToRune(vm.stack.Pop()))
 	case token.Printi:
@@ -240,8 +254,35 @@ func (vm *VM) Exec(inst *ast.Node) {
 		vm.readRune(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
 	case token.Readi:
 		vm.readInt(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
+
+	default:
+		panic(fmt.Sprintf("unexpected instruction: %v", inst))
 	}
-	vm.inst = next
+	vm.inst++
+}
+
+func (vm *VM) ExecFlow() {
+	switch vm.block.Flow.Type {
+	case token.Call:
+		vm.calls = append(vm.calls, vm.block.Next)
+		vm.block = vm.block.Branch
+	case token.Jmp:
+		vm.block = vm.block.Branch
+	case token.Jz:
+		vm.block = vm.jmpSign(0)
+	case token.Jn:
+		vm.block = vm.jmpSign(-1)
+	case token.Ret:
+		if len(vm.calls) == 0 {
+			panic("call stack underflow: ret")
+		}
+		vm.block = vm.calls[len(vm.calls)-1]
+		vm.calls = vm.calls[:len(vm.calls)-1]
+	case token.End:
+		vm.block = nil
+		vm.out.Flush()
+	}
+	vm.inst = 0
 }
 
 func (vm *VM) arith(op func(z, x, y *big.Int) *big.Int) {
@@ -249,18 +290,18 @@ func (vm *VM) arith(op func(z, x, y *big.Int) *big.Int) {
 	op(x, x, y)
 }
 
-func (vm *VM) jmpSign(sign int, inst *ast.Node) *ast.Node {
+func (vm *VM) jmpSign(sign int) *ast.BasicBlock {
 	if vm.stack.Pop().Sign() == sign {
-		return inst.Branch
+		return vm.block.Branch
 	}
-	return inst.Next
+	return vm.block.Next
 }
 
-func (vm *VM) jmpCmp(cmp int, inst *ast.Node, val *big.Int) *ast.Node {
+func (vm *VM) jmpCmp(cmp int, val *big.Int) *ast.BasicBlock {
 	if vm.stack.Pop().Cmp(val) == cmp {
-		return inst.Branch
+		return vm.block.Branch
 	}
-	return inst.Next
+	return vm.block.Next
 }
 
 func (vm *VM) readRune(x *big.Int) {

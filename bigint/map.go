@@ -96,7 +96,7 @@ func (m Map) String() string {
 		if i != 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(fmt.Sprintf("%s:%s", entry.K, entry.V))
+		b.WriteString(fmt.Sprintf("%s:%v", entry.K, entry.V))
 	}
 	b.WriteRune('}')
 	return b.String()
