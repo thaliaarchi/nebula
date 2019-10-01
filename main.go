@@ -35,12 +35,12 @@ func main() {
 	for token := range tokenChan {
 		tokens = append(tokens, token)
 	}
-	ast, err := ast.NewAST(tokens)
+	ast, err := ast.Parse(tokens)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	_ = ast
+	fmt.Println(ast.String())
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {
 	// 	fmt.Println(err)

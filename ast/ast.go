@@ -9,6 +9,9 @@ import (
 	"github.com/andrewarchi/wspace/token"
 )
 
+// AST is a set of interconnected basic blocks.
+type AST []*BasicBlock
+
 // BasicBlock is a list of consecutive non-branching instructions in a
 // program followed by a branch.
 type BasicBlock struct {
@@ -88,36 +91,21 @@ type RetStmt struct{}
 // EndStmt represents an end.
 type EndStmt struct{}
 
-func (s StackVal) String() string    { return fmt.Sprintf("%%%d", s.Val) }
-func (h HeapVal) String() string     { return fmt.Sprintf("*%v", h.Val) }
-func (c ConstVal) String() string    { return fmt.Sprintf("%v", c.Val) }
-func (a AddrVal) String() string     { return fmt.Sprintf("*%v", a.Val) }
-func (b BinaryExpr) String() string  { return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS) }
-func (u UnaryExpr) String() string   { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
-func (i IOStmt) String() string      { return fmt.Sprintf("%v %v", i.Op, i.Val) }
-func (j JmpStmt) String() string     { return fmt.Sprintf("%v %p", j.Op, j.Block) }
-func (j JmpCondStmt) String() string { return fmt.Sprintf("%v %v %p %p", j.Op, j.Val, j.True, j.True) }
-func (RetStmt) String() string       { return "ret" }
-func (EndStmt) String() string       { return "end" }
-
-func NewAST(tokens []token.Token) (*BasicBlock, error) {
+// Parse parses tokens into an AST of basic blocks.
+func Parse(tokens []token.Token) (AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
-	blocks, labels, err := getBlocks(tokens)
+	ast, labels, err := parseBlocks(tokens)
 	if err != nil {
 		return nil, err
 	}
-	for _, block := range blocks {
-		fmt.Println(block)
-		fmt.Println("----")
-	}
 	_ = labels
 	// TODO
-	// if err := annotateBlockCalls(blocks, labels); err != nil {
+	// if err := annotateBlockCalls(ast, labels); err != nil {
 	// 	return nil, err
 	// }
-	return blocks[0], nil
+	return ast, nil
 }
 
 func needsImplicitEnd(tokens []token.Token) bool {
@@ -131,9 +119,9 @@ func needsImplicitEnd(tokens []token.Token) bool {
 	return true
 }
 
-func getBlocks(tokens []token.Token) ([]*BasicBlock, *bigint.Map, error) {
+func parseBlocks(tokens []token.Token) (AST, *bigint.Map, error) {
 	labels := bigint.NewMap(nil) // map[*big.Int]int
-	var blocks []*BasicBlock
+	var blocks AST
 	for i := 0; i < len(tokens); i++ {
 		var block BasicBlock
 		for tokens[i].Type == token.Label {
@@ -269,6 +257,30 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt)
 	return nodes, nil
 }
 
+// Name returns the name of the basic block from either the first label
+// or the block address.
+func (block *BasicBlock) Name() string {
+	if block == nil {
+		return "<nil>"
+	}
+	if len(block.Labels) != 0 {
+		return fmt.Sprintf("label_%v", block.Labels[0])
+	}
+	return fmt.Sprintf("%p", block)
+}
+
+func (ast AST) String() string {
+	var b strings.Builder
+	for i, block := range ast {
+		if i != 0 {
+			b.WriteString("----\n")
+		}
+		b.WriteString(block.String())
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
 func (block *BasicBlock) String() string {
 	var b strings.Builder
 	for _, label := range block.Labels {
@@ -285,3 +297,15 @@ func (block *BasicBlock) String() string {
 	b.WriteString(block.Edge.String())
 	return b.String()
 }
+
+func (s StackVal) String() string    { return fmt.Sprintf("%%%d", s.Val) }
+func (h HeapVal) String() string     { return fmt.Sprintf("*%v", h.Val) }
+func (c ConstVal) String() string    { return fmt.Sprintf("%v", c.Val) }
+func (a AddrVal) String() string     { return fmt.Sprintf("*%v", a.Val) }
+func (b BinaryExpr) String() string  { return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS) }
+func (u UnaryExpr) String() string   { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
+func (i IOStmt) String() string      { return fmt.Sprintf("%v %v", i.Op, i.Val) }
+func (j JmpStmt) String() string     { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
+func (j JmpCondStmt) String() string { return fmt.Sprintf("%v %v %p %p", j.Op, j.Val, j.True, j.True) }
+func (RetStmt) String() string       { return "ret" }
+func (EndStmt) String() string       { return "end" }
