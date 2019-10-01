@@ -13,28 +13,31 @@ import (
 // program followed by a branch.
 type BasicBlock struct {
 	Labels  []*big.Int
-	Tokens  []token.Token
-	Flow    token.Token
-	Branch  *BasicBlock
-	Next    *BasicBlock
+	Nodes   []Node
+	Edge    FlowStmt
 	Callers []*BasicBlock
 }
 
+// Node can be any val, expr, or stmt type.
+type Node interface {
+	String() string
+}
+
 // Val can be StackVal, HeapVal, ConstVal, or AddrVal.
-type Val interface{}
+type Val Node
 
 // StackVal is a position on the stack.
-type StackVal int
+type StackVal struct{ Val int }
 
 // HeapVal is an address in the heap such as from store or retrieve.
-type HeapVal *big.Int
+type HeapVal struct{ Val *big.Int }
 
 // ConstVal is a constant value such as from push or an expression with
 // constant operands.
-type ConstVal *big.Int
+type ConstVal struct{ Val *big.Int }
 
 // AddrVal marks a value as being a pointer to a value.
-type AddrVal Val
+type AddrVal struct{ Val Val }
 
 // BinaryExpr evalutates a binary operation and assigns the result to an
 // address. Valid operations are add, sub, mul, div, or mod.
@@ -56,24 +59,24 @@ type UnaryExpr struct {
 // IOStmt prints a value or reads a value to an address. Valid
 // operations are printc, printi, readc, or readi.
 type IOStmt struct {
-	Type token.Type
-	Val  Val
+	Op  token.Type
+	Val Val
 }
 
 // FlowStmt can be JmpStmt, JmpCondStmt, RetStmt, EndStmt.
-type FlowStmt interface{}
+type FlowStmt Node
 
 // JmpStmt unconditionally jumps to a block. Valid instructions are
 // call, jmp, and fallthrough.
 type JmpStmt struct {
-	Type  token.Type
+	Op    token.Type
 	Block *BasicBlock
 }
 
 // JmpCondStmt conditionally jumps to a block based on a value. Valid
 // instructions are jz and jn.
 type JmpCondStmt struct {
-	Type  token.Type
+	Op    token.Type
 	Val   Val
 	True  *BasicBlock
 	False *BasicBlock
@@ -85,6 +88,18 @@ type RetStmt struct{}
 // EndStmt represents an end.
 type EndStmt struct{}
 
+func (s StackVal) String() string    { return fmt.Sprintf("%%%d", s.Val) }
+func (h HeapVal) String() string     { return fmt.Sprintf("#%v", h.Val) }
+func (c ConstVal) String() string    { return fmt.Sprintf("%v", c.Val) }
+func (a AddrVal) String() string     { return fmt.Sprintf("*%v", a.Val) }
+func (b BinaryExpr) String() string  { return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS) }
+func (u UnaryExpr) String() string   { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
+func (i IOStmt) String() string      { return fmt.Sprintf("%v %v", i.Op, i.Val) }
+func (j JmpStmt) String() string     { return fmt.Sprintf("%v %p", j.Op, j.Block) }
+func (j JmpCondStmt) String() string { return fmt.Sprintf("%v %v %p %p", j.Op, j.Val, j.True, j.True) }
+func (RetStmt) String() string       { return "ret" }
+func (EndStmt) String() string       { return "end" }
+
 func NewAST(tokens []token.Token) (*BasicBlock, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
@@ -93,9 +108,15 @@ func NewAST(tokens []token.Token) (*BasicBlock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := annotateBlockCalls(blocks, labels); err != nil {
-		return nil, err
+	for _, block := range blocks {
+		fmt.Println(block)
+		fmt.Println("----")
 	}
+	_ = labels
+	// TODO
+	// if err := annotateBlockCalls(blocks, labels); err != nil {
+	// 	return nil, err
+	// }
 	return blocks[0], nil
 }
 
@@ -114,7 +135,7 @@ func getBlocks(tokens []token.Token) ([]*BasicBlock, *bigint.Map, error) {
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	var blocks []*BasicBlock
 	for i := 0; i < len(tokens); i++ {
-		block := &BasicBlock{}
+		var block BasicBlock
 		for tokens[i].Type == token.Label {
 			label := tokens[i].Arg
 			if labels.Put(label, len(blocks)) {
@@ -123,25 +144,25 @@ func getBlocks(tokens []token.Token) ([]*BasicBlock, *bigint.Map, error) {
 			block.Labels = append(block.Labels, label)
 			i++
 		}
-		for j := i; j < len(tokens); j++ {
-			if tokens[j].Type.IsFlow() {
-				block.Tokens = tokens[i:j]
-				if tokens[j].Type == token.Label {
-					block.Flow = token.Token{Type: token.Fallthrough}
-					j--
-				} else {
-					block.Flow = tokens[j]
+
+		stack := NewStack()
+		for ; i < len(tokens); i++ {
+			block.Nodes, block.Edge = tokenToNode(block.Nodes, tokens[i], stack)
+			if block.Edge != nil {
+				if tokens[i].Type == token.Label {
+					i--
 				}
-				blocks = append(blocks, block)
-				i = j
 				break
 			}
 		}
+
+		blocks = append(blocks, &block)
 	}
 	return blocks, labels, nil
 }
 
-func annotateBlockCalls(blocks []*BasicBlock, labels *bigint.Map) error {
+// TODO
+/*func annotateBlockCalls(blocks []*BasicBlock, labels *bigint.Map) error {
 	for i, block := range blocks {
 		switch block.Flow.Type {
 		case token.Fallthrough:
@@ -166,22 +187,94 @@ func annotateBlockCalls(blocks []*BasicBlock, labels *bigint.Map) error {
 		}
 	}
 	return nil
+}*/
+
+func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt) {
+	switch tok.Type {
+	case token.Push:
+		return append(nodes, UnaryExpr{
+			Op:     token.Push,
+			Assign: stack.Push(),
+			Val:    ConstVal{Val: tok.Arg},
+		}), nil
+	case token.Dup:
+		stack.Dup()
+	case token.Copy:
+		n, ok := bigint.ToInt(tok.Arg)
+		if !ok {
+			panic(fmt.Sprintf("ast: copy argument out of range: %v", tok.Arg))
+		}
+		stack.Copy(n)
+	case token.Swap:
+		stack.Swap()
+	case token.Drop:
+		stack.Pop()
+	case token.Slide:
+		n, ok := bigint.ToInt(tok.Arg)
+		if !ok {
+			panic(fmt.Sprintf("ast: slide argument out of range: %v", tok.Arg))
+		}
+		stack.Slide(n)
+
+	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
+		rhs, lhs, assign := stack.Pop(), stack.Pop(), stack.Push()
+		return append(nodes, BinaryExpr{
+			Op:     tok.Type,
+			Assign: assign,
+			LHS:    lhs,
+			RHS:    rhs,
+		}), nil
+
+	case token.Store, token.Retrieve:
+		val, assign := stack.Top(), stack.Push()
+		return append(nodes, UnaryExpr{
+			Op:     tok.Type,
+			Assign: assign,
+			Val:    val,
+		}), nil
+
+		// jump addresses are now lost because there is no lookup so far
+	case token.Label:
+		return nodes, JmpStmt{Op: token.Fallthrough}
+	case token.Call, token.Jmp:
+		return nodes, JmpStmt{Op: tok.Type}
+	case token.Jz, token.Jn:
+		return nodes, JmpCondStmt{
+			Op:  tok.Type,
+			Val: stack.Pop(),
+		}
+	case token.Ret:
+		return nodes, RetStmt{}
+	case token.End:
+		return nodes, EndStmt{}
+	case token.Fallthrough:
+		panic("ast: unexpected fallthrough")
+
+	case token.Printc, token.Printi, token.Readc, token.Readi:
+		return append(nodes, IOStmt{
+			Op:  tok.Type,
+			Val: stack.Pop(),
+		}), nil
+
+	default:
+		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
+	}
+	return nodes, nil
 }
 
-// Display formats a basic block as assembly.
-func (block *BasicBlock) Display() string {
+func (block *BasicBlock) String() string {
 	var b strings.Builder
 	for _, label := range block.Labels {
 		b.WriteString("label_")
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
-	for _, tok := range block.Tokens {
+	for _, node := range block.Nodes {
 		b.WriteString("    ")
-		b.WriteString(tok.String())
+		b.WriteString(node.String())
 		b.WriteByte('\n')
 	}
 	b.WriteString("    ")
-	b.WriteString(block.Flow.String())
+	b.WriteString(block.Edge.String())
 	return b.String()
 }

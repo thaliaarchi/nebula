@@ -1,5 +1,6 @@
 package ws
 
+/*
 import (
 	"bufio"
 	"fmt"
@@ -333,3 +334,4 @@ func (vm *VM) readInt(x *big.Int) {
 		panic(fmt.Sprintf("invalid number: %v", line))
 	}
 }
+*/

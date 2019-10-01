@@ -40,23 +40,24 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	vm, err := ws.NewVM(ast)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	_ = ast
+	// vm, err := ws.NewVM(ast)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Error: %v\n", r)
-			vm.PrintStackTrace()
-			os.Exit(1)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		fmt.Printf("Error: %v\n", r)
+	// 		vm.PrintStackTrace()
+	// 		os.Exit(1)
+	// 	}
+	// }()
 
-	if mode == "run" {
-		vm.Run()
-	} else {
-		vm.Debug()
-	}
+	// if mode == "run" {
+	// 	vm.Run()
+	// } else {
+	// 	vm.Debug()
+	// }
 }
