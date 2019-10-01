@@ -146,6 +146,8 @@ func (typ Type) String() string {
 		return "ret"
 	case End:
 		return "end"
+	case Fallthrough:
+		return "fallthrough"
 	case Printc:
 		return "printc"
 	case Printi:

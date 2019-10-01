@@ -84,6 +84,7 @@ func TestInstrTypeString(t *testing.T) {
 		{Jn, "jn"},
 		{Ret, "ret"},
 		{End, "end"},
+		{Fallthrough, "fallthrough"},
 		{Printc, "printc"},
 		{Printi, "printi"},
 		{Readc, "readc"},

@@ -89,7 +89,7 @@ type RetStmt struct{}
 type EndStmt struct{}
 
 func (s StackVal) String() string    { return fmt.Sprintf("%%%d", s.Val) }
-func (h HeapVal) String() string     { return fmt.Sprintf("#%v", h.Val) }
+func (h HeapVal) String() string     { return fmt.Sprintf("*%v", h.Val) }
 func (c ConstVal) String() string    { return fmt.Sprintf("%v", c.Val) }
 func (a AddrVal) String() string     { return fmt.Sprintf("*%v", a.Val) }
 func (b BinaryExpr) String() string  { return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS) }
@@ -195,7 +195,7 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt)
 		return append(nodes, UnaryExpr{
 			Op:     token.Push,
 			Assign: stack.Push(),
-			Val:    ConstVal{Val: tok.Arg},
+			Val:    ConstVal{tok.Arg},
 		}), nil
 	case token.Dup:
 		stack.Dup()
@@ -225,10 +225,17 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt)
 			RHS:    rhs,
 		}), nil
 
-	case token.Store, token.Retrieve:
-		val, assign := stack.Top(), stack.Push()
+	case token.Store:
+		val, assign := stack.Pop(), stack.Pop()
 		return append(nodes, UnaryExpr{
-			Op:     tok.Type,
+			Op:     token.Store,
+			Assign: AddrVal{assign},
+			Val:    val,
+		}), nil
+	case token.Retrieve:
+		val, assign := stack.Pop(), stack.Push()
+		return append(nodes, UnaryExpr{
+			Op:     token.Retrieve,
 			Assign: assign,
 			Val:    val,
 		}), nil
