@@ -75,16 +75,20 @@ func (s *Stack) Swap() {
 
 // Slide slides n items off the stack, leaving the top item.
 func (s *Stack) Slide(n int) {
+	l := len(s.Vals)
 	switch {
 	case n < 0:
 		panic(fmt.Sprintf("ast: slide count must be positive: %d", n))
 	case n == 0:
 		return
-	case n < len(s.Vals):
-		s.Vals = append(s.Vals[:len(s.Vals)-n-1], s.Vals[len(s.Vals)-1])
+	case l == 0:
+		s.Vals = append(s.Vals, s.Low)
+		s.Low -= n
+	case n < l:
+		s.Vals = append(s.Vals[:l-n-1], s.Vals[l-1])
 	default:
-		s.Vals = append(s.Vals[:0], s.Vals[len(s.Vals)-1])
-		s.Low -= n - len(s.Vals)
+		s.Vals = append(s.Vals[:0], s.Vals[l-1])
+		s.Low -= n - l
 	}
 }
 
