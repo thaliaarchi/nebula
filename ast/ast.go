@@ -20,6 +20,68 @@ type BasicBlock struct {
 	Callers []*BasicBlock
 }
 
+// Val can be either StackVal, HeapVal, ConstVal, or AddrVal.
+type Val interface{}
+
+// StackVal is a position on the stack.
+type StackVal int
+
+// HeapVal is an address in the heap such as from store or retrieve.
+type HeapVal *big.Int
+
+// ConstVal is a constant value such as from push or an expression with
+// constant operands.
+type ConstVal *big.Int
+
+// AddrVal marks a value as being a pointer to a value.
+type AddrVal Val
+
+// BinaryExpr evalutates a binary operation and assigns the result to an
+// address. Valid operations are add, sub, mul, div, or mod.
+type BinaryExpr struct {
+	Op     token.Type
+	Assign Val
+	LHS    Val
+	RHS    Val
+}
+
+// UnaryExpr evaluates a unary operation and assigns the result to an
+// address. Valid operations are push, store, retrieve.
+type UnaryExpr struct {
+	Op     token.Type
+	Assign Val
+	Val    Val
+}
+
+// IOStmt prints a value or reads a value to an address. Valid
+// operations are printc, printi, readc, or readi.
+type IOStmt struct {
+	Type token.Type
+	Val  Val
+}
+
+// JmpStmt unconditionally jumps to a block. Valid instructions are call
+// and jmp.
+type JmpStmt struct {
+	Type  token.Type
+	Block *BasicBlock
+}
+
+// JmpCondStmt conditionally jumps to a block based on a value. Valid
+// instructions are jz and jn.
+type JmpCondStmt struct {
+	Type  token.Type
+	Val   Val
+	True  *BasicBlock
+	False *BasicBlock
+}
+
+// RetStmt represents a ret.
+type RetStmt struct{}
+
+// EndStmt represents an end.
+type EndStmt struct{}
+
 func NewAST(tokens []token.Token) (*BasicBlock, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
@@ -62,7 +124,7 @@ func getBlocks(tokens []token.Token) ([]*BasicBlock, *bigint.Map, error) {
 			if tokens[j].Type.IsFlow() {
 				block.Tokens = tokens[i:j]
 				if tokens[j].Type == token.Label {
-					block.Flow = token.Token{Type: token.Illegal}
+					block.Flow = token.Token{Type: token.Fallthrough}
 					j--
 				} else {
 					block.Flow = tokens[j]
@@ -79,7 +141,7 @@ func getBlocks(tokens []token.Token) ([]*BasicBlock, *bigint.Map, error) {
 func annotateBlockCalls(blocks []*BasicBlock, labels *bigint.Map) error {
 	for i, block := range blocks {
 		switch block.Flow.Type {
-		case token.Illegal: // implicit fallthrough jump
+		case token.Fallthrough:
 			if i < len(blocks)-1 {
 				block.Branch = blocks[i+1]
 				block.Flow.Type = token.Jmp
@@ -103,6 +165,7 @@ func annotateBlockCalls(blocks []*BasicBlock, labels *bigint.Map) error {
 	return nil
 }
 
+// Display formats a basic block as assembly.
 func (block *BasicBlock) Display() string {
 	var b strings.Builder
 	for _, label := range block.Labels {

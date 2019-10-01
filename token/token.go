@@ -68,6 +68,7 @@ const (
 	Jn
 	Ret
 	End
+	Fallthrough // Pseudo instruction to connect non-jumping blocks
 	flowEnd
 
 	ioBeg
