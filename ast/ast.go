@@ -274,7 +274,7 @@ func (ast AST) String() string {
 	var b strings.Builder
 	for i, block := range ast {
 		if i != 0 {
-			b.WriteString("----\n")
+			b.WriteByte('\n')
 		}
 		b.WriteString(block.String())
 		b.WriteByte('\n')
