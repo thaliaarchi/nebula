@@ -5,8 +5,9 @@ import (
 	"math/big"
 )
 
+// Token is a lexical token in the Whitespace language.
 type Token struct {
-	Type TokenType
+	Type Type
 	Arg  *big.Int
 }
 
@@ -27,10 +28,11 @@ func (tok *Token) String() string {
 	}
 }
 
-type TokenType uint8
+// Type is the instruction type of a token.
+type Type uint8
 
 const (
-	Illegal TokenType = iota
+	Illegal Type = iota
 
 	stackBeg
 	// Stack manipulation instructions
@@ -78,22 +80,22 @@ const (
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
-func (typ TokenType) IsStack() bool { return stackBeg < typ && typ < stackEnd }
+func (typ Type) IsStack() bool { return stackBeg < typ && typ < stackEnd }
 
 // IsArith returns true for tokens corresponding to arithmetic instructions.
-func (typ TokenType) IsArith() bool { return arithBeg < typ && typ < arithEnd }
+func (typ Type) IsArith() bool { return arithBeg < typ && typ < arithEnd }
 
 // IsHeap returns true for tokens corresponding to heap access instructions.
-func (typ TokenType) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
+func (typ Type) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
 
 // IsFlow returns true for tokens corresponding to flow control instructions.
-func (typ TokenType) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
+func (typ Type) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
 
 // IsIO returns true for tokens corresponding to i/o instructions.
-func (typ TokenType) IsIO() bool { return ioBeg < typ && typ < ioEnd }
+func (typ Type) IsIO() bool { return ioBeg < typ && typ < ioEnd }
 
 // HasArg returns true for instructions that require an argument.
-func (typ TokenType) HasArg() bool {
+func (typ Type) HasArg() bool {
 	switch typ {
 	case Push, Copy, Slide, Label, Call, Jmp, Jz, Jn:
 		return true
@@ -101,7 +103,7 @@ func (typ TokenType) HasArg() bool {
 	return false
 }
 
-func (typ TokenType) String() string {
+func (typ Type) String() string {
 	switch typ {
 	case Push:
 		return "push"

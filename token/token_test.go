@@ -26,20 +26,20 @@ func TestTokenString(t *testing.T) {
 	}
 }
 
-func TestTokenTypeGroups(t *testing.T) {
+func TestTypeGroups(t *testing.T) {
 	tests := []struct {
 		IsStack, IsArith, IsHeap, IsFlow, IsIO bool
-		TokenTypes                             []TokenType
+		Types                                  []Type
 	}{
-		{true, false, false, false, false, []TokenType{Push, Dup, Copy, Swap, Drop, Slide}},
-		{false, true, false, false, false, []TokenType{Add, Sub, Mul, Div, Mod}},
-		{false, false, true, false, false, []TokenType{Store, Retrieve}},
-		{false, false, false, true, false, []TokenType{Label, Call, Jmp, Jz, Jn, Ret, End}},
-		{false, false, false, false, true, []TokenType{Printc, Printi, Readc, Readi}},
+		{true, false, false, false, false, []Type{Push, Dup, Copy, Swap, Drop, Slide}},
+		{false, true, false, false, false, []Type{Add, Sub, Mul, Div, Mod}},
+		{false, false, true, false, false, []Type{Store, Retrieve}},
+		{false, false, false, true, false, []Type{Label, Call, Jmp, Jz, Jn, Ret, End}},
+		{false, false, false, false, true, []Type{Printc, Printi, Readc, Readi}},
 	}
 
 	for _, test := range tests {
-		for _, typ := range test.TokenTypes {
+		for _, typ := range test.Types {
 			if typ.IsStack() != test.IsStack {
 				t.Errorf("(%s).IsStack() = %t, want %t", typ, typ.IsStack(), test.IsStack)
 			}
@@ -61,8 +61,8 @@ func TestTokenTypeGroups(t *testing.T) {
 
 func TestInstrTypeString(t *testing.T) {
 	tests := []struct {
-		TokenType TokenType
-		String    string
+		Type   Type
+		String string
 	}{
 		{Push, "push"},
 		{Dup, "dup"},
@@ -102,7 +102,7 @@ func TestInstrTypeString(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		if str := test.TokenType.String(); str != test.String {
+		if str := test.Type.String(); str != test.String {
 			t.Errorf("test %d: String() = %q, want %q", i+1, str, test.String)
 		}
 	}

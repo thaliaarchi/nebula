@@ -3,7 +3,7 @@ package ssa
 import (
 	"math/big"
 
-	"github.com/andrewarchi/wspace/ws"
+	"github.com/andrewarchi/wspace/token"
 )
 
 type Node interface{}
@@ -19,7 +19,7 @@ type Literal struct {
 }
 
 type BinaryExpr struct {
-	Type ws.TokenType
+	Type token.Type
 	LHS  Node
 	RHS  Node
 }
@@ -34,17 +34,17 @@ type StoreStmt struct {
 }
 
 type IOStmt struct {
-	Type ws.TokenType
+	Type token.Type
 	Arg  Node
 }
 
 type JmpStmt struct {
-	Type    ws.TokenType
+	Type    token.Type
 	Address Node
 }
 
 type JmpCondStmt struct {
-	Type  ws.TokenType
+	Type  token.Type
 	True  Node
 	False Node
 }

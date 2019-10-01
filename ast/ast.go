@@ -19,6 +19,9 @@ type Node struct {
 }
 
 func NewAST(tokens []token.Token) (*Node, error) {
+	if needsImplicitEnd(tokens) {
+		tokens = append(tokens, token.Token{Type: token.End})
+	}
 	nodes, labels, err := getNodes(tokens)
 	if err != nil {
 		return nil, err
@@ -31,8 +34,19 @@ func NewAST(tokens []token.Token) (*Node, error) {
 	return nodes[0], nil
 }
 
+func needsImplicitEnd(tokens []token.Token) bool {
+	if len(tokens) == 0 {
+		return true
+	}
+	switch tokens[len(tokens)-1].Type {
+	case token.Call, token.Jmp, token.Ret, token.End:
+		return false
+	}
+	return true
+}
+
 func getNodes(tokens []token.Token) ([]*Node, *bigint.Map, error) {
-	nodes := make([]*Node, 0, len(tokens)+1)
+	nodes := make([]*Node, 0, len(tokens))
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	var nodeLabels []*big.Int
 	for _, tok := range tokens {
@@ -46,22 +60,7 @@ func getNodes(tokens []token.Token) ([]*Node, *bigint.Map, error) {
 		nodes = append(nodes, &Node{Token: tok, Labels: nodeLabels})
 		nodeLabels = nil
 	}
-	if needsImplicitEnd(nodes, nodeLabels) {
-		nodes = append(nodes, &Node{Token: token.Token{Type: token.End}, Labels: nodeLabels})
-	}
 	return nodes, labels, nil
-}
-
-func needsImplicitEnd(nodes []*Node, endLabels []*big.Int) bool {
-	if len(nodes) == 0 || len(endLabels) > 0 {
-		return true
-	}
-	switch nodes[len(nodes)-1].Type {
-	case token.Call, token.Jmp, token.Ret, token.End:
-	default:
-		return true
-	}
-	return false
 }
 
 func getNodeCalls(nodes []*Node, labels *bigint.Map) (map[*Node][]*Node, map[*Node]*Node, error) {

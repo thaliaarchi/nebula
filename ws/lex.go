@@ -67,14 +67,14 @@ func transition(s states) stateFn {
 	}
 }
 
-func emitInstr(typ token.TokenType) stateFn {
+func emitInstr(typ token.Type) stateFn {
 	return func(p *Lexer) (stateFn, error) {
 		p.instrs <- token.Token{typ, nil}
 		return lexInstr, nil
 	}
 }
 
-func lexInstrNumber(typ token.TokenType) stateFn {
+func lexInstrNumber(typ token.Type) stateFn {
 	return func(p *Lexer) (stateFn, error) {
 		arg, err := lexSigned(p)
 		if err != nil {
@@ -85,7 +85,7 @@ func lexInstrNumber(typ token.TokenType) stateFn {
 	}
 }
 
-func lexInstrLabel(typ token.TokenType) stateFn {
+func lexInstrLabel(typ token.Type) stateFn {
 	return func(p *Lexer) (stateFn, error) {
 		arg, err := lexUnsigned(p)
 		if err != nil {
