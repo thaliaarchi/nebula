@@ -21,13 +21,13 @@ type BasicBlock struct {
 	Callers []*BasicBlock
 }
 
-// Node can be any val, expr, or stmt type.
+// Node can be any expr or stmt type.
 type Node interface {
 	String() string
 }
 
 // Val can be StackVal, HeapVal, ConstVal, or AddrVal.
-type Val Node
+type Val = Node
 
 // StackVal is a position on the stack.
 type StackVal struct{ Val int }
@@ -42,6 +42,14 @@ type ConstVal struct{ Val *big.Int }
 // AddrVal marks a value as being a pointer to a value.
 type AddrVal struct{ Val Val }
 
+// UnaryExpr evaluates a unary operation and assigns the result to an
+// address. Valid operations are push, store, retrieve.
+type UnaryExpr struct {
+	Op     token.Type
+	Assign Val
+	Val    Val
+}
+
 // BinaryExpr evalutates a binary operation and assigns the result to an
 // address. Valid operations are add, sub, mul, div, or mod.
 type BinaryExpr struct {
@@ -49,14 +57,6 @@ type BinaryExpr struct {
 	Assign Val
 	LHS    Val
 	RHS    Val
-}
-
-// UnaryExpr evaluates a unary operation and assigns the result to an
-// address. Valid operations are push, store, retrieve.
-type UnaryExpr struct {
-	Op     token.Type
-	Assign Val
-	Val    Val
 }
 
 // IOStmt prints a value or reads a value to an address. Valid
@@ -67,7 +67,7 @@ type IOStmt struct {
 }
 
 // FlowStmt can be JmpStmt, JmpCondStmt, RetStmt, EndStmt.
-type FlowStmt Node
+type FlowStmt = Node
 
 // JmpStmt unconditionally jumps to a block. Valid instructions are
 // call, jmp, and fallthrough.
@@ -302,16 +302,16 @@ func (block *BasicBlock) String() string {
 	return b.String()
 }
 
-func (s *StackVal) String() string { return fmt.Sprintf("%%%d", s.Val) }
-func (h *HeapVal) String() string  { return fmt.Sprintf("*%v", h.Val) }
-func (c *ConstVal) String() string { return fmt.Sprintf("%v", c.Val) }
-func (a *AddrVal) String() string  { return fmt.Sprintf("*%v", a.Val) }
+func (s *StackVal) String() string  { return fmt.Sprintf("%%%d", s.Val) }
+func (h *HeapVal) String() string   { return fmt.Sprintf("*%v", h.Val) }
+func (c *ConstVal) String() string  { return fmt.Sprintf("%v", c.Val) }
+func (a *AddrVal) String() string   { return fmt.Sprintf("*%v", a.Val) }
+func (u *UnaryExpr) String() string { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
 func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS)
 }
-func (u *UnaryExpr) String() string { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
-func (i *IOStmt) String() string    { return fmt.Sprintf("%v %v", i.Op, i.Val) }
-func (j *JmpStmt) String() string   { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
+func (i *IOStmt) String() string  { return fmt.Sprintf("%v %v", i.Op, i.Val) }
+func (j *JmpStmt) String() string { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", j.Op, j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
 }

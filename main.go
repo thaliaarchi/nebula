@@ -40,6 +40,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	ast.PropagateStackConstants()
 	fmt.Println(ast.String())
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {
