@@ -142,8 +142,9 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 			i++
 		}
 
+		var branch *big.Int
 		for ; i < len(tokens); i++ {
-			block.appendToken(tokens[i])
+			branch = block.appendToken(tokens[i])
 			if block.Edge != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -153,12 +154,12 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 		}
 
 		ast = append(ast, &block)
-		branches = append(branches, tokens[i].Arg)
+		branches = append(branches, branch)
 	}
 	return ast, branches, labels, nil
 }
 
-func (block *BasicBlock) appendToken(tok token.Token) {
+func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
 		block.Nodes = append(block.Nodes, &UnaryExpr{
@@ -211,13 +212,16 @@ func (block *BasicBlock) appendToken(tok token.Token) {
 
 	case token.Label:
 		block.Edge = &JmpStmt{Op: token.Fallthrough}
+		return tok.Arg
 	case token.Call, token.Jmp:
 		block.Edge = &JmpStmt{Op: tok.Type}
+		return tok.Arg
 	case token.Jz, token.Jn:
 		block.Edge = &JmpCondStmt{
 			Op:  tok.Type,
 			Val: &StackVal{block.Stack.Pop()},
 		}
+		return tok.Arg
 	case token.Ret:
 		block.Edge = &RetStmt{}
 	case token.End:
@@ -239,6 +243,7 @@ func (block *BasicBlock) appendToken(tok token.Token) {
 	default:
 		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
 	}
+	return nil
 }
 
 func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
@@ -304,6 +309,14 @@ func (block *BasicBlock) String() string {
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
+	b.WriteString("    ; stack [")
+	for i, val := range block.Stack.Vals {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		fmt.Fprintf(&b, "%d", val)
+	}
+	fmt.Fprintf(&b, "], pop %d, access %d\n", -block.Stack.Low, -block.Stack.Min)
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
 		b.WriteString(node.String())
