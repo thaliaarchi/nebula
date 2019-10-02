@@ -42,6 +42,7 @@ func main() {
 	}
 	ast.InlineStackConstants()
 	ast.ConcatStrings()
+	ast.ConstArith()
 	fmt.Println(ast.String())
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {

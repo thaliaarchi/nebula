@@ -79,6 +79,7 @@ const (
 	ioEnd
 
 	// Extended instructions
+	Neg
 	Fallthrough
 	Prints
 )
@@ -157,6 +158,8 @@ func (typ Type) String() string {
 		return "readc"
 	case Readi:
 		return "readi"
+	case Neg:
+		return "neg"
 	case Fallthrough:
 		return "fallthrough"
 	case Prints:
