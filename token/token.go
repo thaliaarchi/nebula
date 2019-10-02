@@ -80,6 +80,7 @@ const (
 
 	// Extended instructions
 	Neg
+	Storea
 	Fallthrough
 	Prints
 )
@@ -160,6 +161,8 @@ func (typ Type) String() string {
 		return "readi"
 	case Neg:
 		return "neg"
+	case Storea:
+		return "storea"
 	case Fallthrough:
 		return "fallthrough"
 	case Prints:

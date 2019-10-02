@@ -3,6 +3,7 @@ package bigint
 import (
 	"math"
 	"math/big"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -51,4 +52,18 @@ func ToRune(x *big.Int) rune {
 		return '\uFFFD'
 	}
 	return i32
+}
+
+// FormatSlice formats a slice of *big.Int to a space separated string.
+func FormatSlice(s []*big.Int) string {
+	var b strings.Builder
+	b.WriteByte('[')
+	for i, x := range s {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(x.String())
+	}
+	b.WriteByte(']')
+	return b.String()
 }

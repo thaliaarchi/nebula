@@ -53,39 +53,53 @@ func inlineConstants(node *Node, constants map[int]*big.Int) {
 	}
 }
 
+func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
+	k := 0
+	for i := 0; i < len(block.Nodes); i++ {
+		if acc, ok := fn(nil, block.Nodes[i], i); ok {
+			i++
+			concat := false
+			for ; i < len(block.Nodes); i++ {
+				if next, ok := fn(acc, block.Nodes[i], i); ok {
+					acc = next
+					concat = true
+				} else {
+					break
+				}
+			}
+
+			if concat {
+				block.Nodes[k] = acc
+				k++
+				continue
+			}
+		}
+
+		if i < len(block.Nodes) {
+			block.Nodes[k] = block.Nodes[i]
+			k++
+		}
+	}
+	block.Nodes = block.Nodes[:k]
+}
+
 // ConcatStrings joins consecutive constant print expressions.
 func (ast AST) ConcatStrings() {
 	for _, block := range ast {
-		k := 0
-		for i := 0; i < len(block.Nodes); i++ {
-			if str, ok := checkPrint(block.Nodes[i]); ok {
-				i++
-				concat := false
-				for ; i < len(block.Nodes); i++ {
-					if s, ok := checkPrint(block.Nodes[i]); ok {
-						str += s
-						concat = true
-					} else {
-						break
-					}
-				}
-
-				if concat {
-					block.Nodes[k] = &PrintStmt{
+		block.Reduce(func(acc, curr Node, i int) (Node, bool) {
+			if str, ok := checkPrint(curr); ok {
+				if acc == nil {
+					return &PrintStmt{
 						Op:  token.Prints,
 						Val: &StringVal{str},
-					}
-					k++
-					continue
+					}, true
 				}
+				val := acc.(*PrintStmt).Val.(*StringVal)
+				val.Val += str
+				return acc, true
 			}
-
-			if i < len(block.Nodes) {
-				block.Nodes[k] = block.Nodes[i]
-				k++
-			}
-		}
-		block.Nodes = block.Nodes[:k]
+			return nil, false
+		})
 	}
 }
 
@@ -106,6 +120,37 @@ func checkPrint(node Node) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func (ast AST) ConcatStoreArrays() {
+	for _, block := range ast {
+		block.Reduce(func(acc, curr Node, i int) (Node, bool) {
+			if node, ok := curr.(*UnaryExpr); ok && node.Op == token.Store {
+				if val, ok := node.Val.(*ConstVal); ok {
+					if assign, ok := node.Assign.(*AddrVal); ok {
+						if addr, ok := assign.Val.(*ConstVal); ok {
+							if acc == nil {
+								return &UnaryExpr{
+									Op:     token.Storea,
+									Assign: node.Assign,
+									Val:    &ArrayVal{[]*big.Int{val.Val}},
+								}, true
+							}
+							prev := block.Nodes[i-1].(*UnaryExpr)
+							prevAddr := prev.Assign.(*AddrVal).Val.(*ConstVal)
+							diff := new(big.Int).Sub(addr.Val, prevAddr.Val)
+							if diff.Cmp(bigOne) == 0 {
+								arr := acc.(*UnaryExpr).Val.(*ArrayVal)
+								arr.Val = append(arr.Val, val.Val)
+								return acc, true
+							}
+						}
+					}
+				}
+			}
+			return nil, false
+		})
+	}
 }
 
 func (ast AST) ConstArith() {

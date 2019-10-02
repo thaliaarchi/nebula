@@ -41,8 +41,9 @@ func main() {
 		return
 	}
 	ast.InlineStackConstants()
-	ast.ConcatStrings()
 	ast.ConstArith()
+	ast.ConcatStrings()
+	ast.ConcatStoreArrays()
 	fmt.Println(ast.String())
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {

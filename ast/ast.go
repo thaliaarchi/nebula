@@ -39,6 +39,9 @@ type ConstVal struct{ Val *big.Int }
 // StringVal is a sequence of characters.
 type StringVal struct{ Val string }
 
+// ArrayVal is a sequence of integers.
+type ArrayVal struct{ Val []*big.Int }
+
 // AddrVal marks a value as being a pointer to a value.
 type AddrVal struct{ Val Val }
 
@@ -316,6 +319,7 @@ func (block *BasicBlock) String() string {
 func (s *StackVal) String() string  { return fmt.Sprintf("%%%d", s.Val) }
 func (c *ConstVal) String() string  { return fmt.Sprintf("%v", c.Val) }
 func (s *StringVal) String() string { return fmt.Sprintf("%q", s.Val) }
+func (a *ArrayVal) String() string  { return bigint.FormatSlice(a.Val) }
 func (a *AddrVal) String() string   { return fmt.Sprintf("*%v", a.Val) }
 func (u *UnaryExpr) String() string { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
 func (b *BinaryExpr) String() string {
