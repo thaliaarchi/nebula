@@ -42,8 +42,10 @@ func inlineConstants(node *Node, constants map[int]*big.Int) {
 		inlineConstants(&n.Assign, constants)
 		inlineConstants(&n.LHS, constants)
 		inlineConstants(&n.RHS, constants)
-	case *IOStmt:
+	case *PrintStmt:
 		inlineConstants(&n.Val, constants)
+	case *ReadExpr:
+		inlineConstants(&n.Assign, constants)
 	case *JmpCondStmt:
 		inlineConstants(&n.Val, constants)
 	}

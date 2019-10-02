@@ -32,9 +32,6 @@ type Val = Node
 // StackVal is a position on the stack.
 type StackVal struct{ Val int }
 
-// HeapVal is an address in the heap such as from store or retrieve.
-type HeapVal struct{ Val *big.Int }
-
 // ConstVal is a constant value such as from push or an expression with
 // constant operands.
 type ConstVal struct{ Val *big.Int }
@@ -43,7 +40,7 @@ type ConstVal struct{ Val *big.Int }
 type AddrVal struct{ Val Val }
 
 // UnaryExpr evaluates a unary operation and assigns the result to an
-// address. Valid operations are push, store, retrieve.
+// address. Valid operations are push, store, and retrieve.
 type UnaryExpr struct {
 	Op     token.Type
 	Assign Val
@@ -51,7 +48,7 @@ type UnaryExpr struct {
 }
 
 // BinaryExpr evalutates a binary operation and assigns the result to an
-// address. Valid operations are add, sub, mul, div, or mod.
+// address. Valid operations are add, sub, mul, div, and mod.
 type BinaryExpr struct {
 	Op     token.Type
 	Assign Val
@@ -59,11 +56,17 @@ type BinaryExpr struct {
 	RHS    Val
 }
 
-// IOStmt prints a value or reads a value to an address. Valid
-// operations are printc, printi, readc, or readi.
-type IOStmt struct {
+// PrintStmt prints a value. Valid operations are printc and printi.
+type PrintStmt struct {
 	Op  token.Type
 	Val Val
+}
+
+// ReadExpr reads a value to an address. Valid operations are readc and
+// readi.
+type ReadExpr struct {
+	Op     token.Type
+	Assign Val
 }
 
 // FlowStmt can be JmpStmt, JmpCondStmt, RetStmt, EndStmt.
@@ -246,10 +249,15 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt,
 	case token.Fallthrough:
 		panic("ast: unexpected fallthrough")
 
-	case token.Printc, token.Printi, token.Readc, token.Readi:
-		return append(nodes, &IOStmt{
+	case token.Printc, token.Printi:
+		return append(nodes, &PrintStmt{
 			Op:  tok.Type,
 			Val: stack.Pop(),
+		}), nil, nil
+	case token.Readc, token.Readi:
+		return append(nodes, &ReadExpr{
+			Op:     tok.Type,
+			Assign: &AddrVal{stack.Pop()},
 		}), nil, nil
 
 	default:
@@ -303,15 +311,15 @@ func (block *BasicBlock) String() string {
 }
 
 func (s *StackVal) String() string  { return fmt.Sprintf("%%%d", s.Val) }
-func (h *HeapVal) String() string   { return fmt.Sprintf("*%v", h.Val) }
 func (c *ConstVal) String() string  { return fmt.Sprintf("%v", c.Val) }
 func (a *AddrVal) String() string   { return fmt.Sprintf("*%v", a.Val) }
 func (u *UnaryExpr) String() string { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
 func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS)
 }
-func (i *IOStmt) String() string  { return fmt.Sprintf("%v %v", i.Op, i.Val) }
-func (j *JmpStmt) String() string { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
+func (p *PrintStmt) String() string { return fmt.Sprintf("%v %v", p.Op, p.Val) }
+func (r *ReadExpr) String() string  { return fmt.Sprintf("%v = %v", r.Assign, r.Op) }
+func (j *JmpStmt) String() string   { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", j.Op, j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
 }
