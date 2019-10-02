@@ -142,9 +142,9 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 		}
 
 		var branch *big.Int
-		stack := NewStack()
+		stack := &Stack{}
 		for ; i < len(tokens); i++ {
-			block.Nodes, block.Edge, branch = tokenToNode(block.Nodes, tokens[i], stack)
+			block.Nodes, block.Edge, branch = tokensToNodes(block.Nodes, tokens[i], stack)
 			if block.Edge != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -188,12 +188,12 @@ func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
 	return nil
 }
 
-func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt, *big.Int) {
+func tokensToNodes(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt, *big.Int) {
 	switch tok.Type {
 	case token.Push:
 		return append(nodes, &UnaryExpr{
 			Op:     token.Push,
-			Assign: stack.Push(),
+			Assign: &StackVal{stack.Push()},
 			Val:    &ConstVal{tok.Arg},
 		}), nil, nil
 	case token.Dup:
@@ -219,24 +219,24 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt,
 		rhs, lhs, assign := stack.Pop(), stack.Pop(), stack.Push()
 		return append(nodes, &BinaryExpr{
 			Op:     tok.Type,
-			Assign: assign,
-			LHS:    lhs,
-			RHS:    rhs,
+			Assign: &StackVal{assign},
+			LHS:    &StackVal{lhs},
+			RHS:    &StackVal{rhs},
 		}), nil, nil
 
 	case token.Store:
 		val, assign := stack.Pop(), stack.Pop()
 		return append(nodes, &UnaryExpr{
 			Op:     token.Store,
-			Assign: &AddrVal{assign},
-			Val:    val,
+			Assign: &AddrVal{&StackVal{assign}},
+			Val:    &StackVal{val},
 		}), nil, nil
 	case token.Retrieve:
 		val, assign := stack.Pop(), stack.Push()
 		return append(nodes, &UnaryExpr{
 			Op:     token.Retrieve,
-			Assign: assign,
-			Val:    val,
+			Assign: &StackVal{assign},
+			Val:    &StackVal{val},
 		}), nil, nil
 
 	case token.Label:
@@ -246,7 +246,7 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt,
 	case token.Jz, token.Jn:
 		return nodes, &JmpCondStmt{
 			Op:  tok.Type,
-			Val: stack.Pop(),
+			Val: &StackVal{stack.Pop()},
 		}, tok.Arg
 	case token.Ret:
 		return nodes, &RetStmt{}, nil
@@ -258,12 +258,12 @@ func tokenToNode(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt,
 	case token.Printc, token.Printi:
 		return append(nodes, &PrintStmt{
 			Op:  tok.Type,
-			Val: stack.Pop(),
+			Val: &StackVal{stack.Pop()},
 		}), nil, nil
 	case token.Readc, token.Readi:
 		return append(nodes, &ReadExpr{
 			Op:     tok.Type,
-			Assign: &AddrVal{stack.Pop()},
+			Assign: &AddrVal{&StackVal{stack.Pop()}},
 		}), nil, nil
 
 	default:

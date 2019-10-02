@@ -2,59 +2,80 @@ package ast
 
 import "fmt"
 
-// Stack represents the Whitespace stack for registerization. Values
-// from outside the current basic block are represented as negative
-// numbers with the upper bound of Low.
+// Stack represents the Whitespace stack for registerization. Every
+// value is given a unique id. Values from outside the current basic
+// block are represented as negative numbers. Operations are expressed
+// in terms of push and pop.
 type Stack struct {
 	Vals []int
-	Next int
-	Low  int
-}
-
-// NewStack constructs a stack.
-func NewStack() *Stack {
-	return &Stack{nil, 0, -1}
+	Next int // Next id to push
+	Low  int // Lowest value popped below stack
+	Min  int // Lowest value accessed below stack
 }
 
 // Push pushes an item to the stack and returns the id of the inserted
 // item.
-func (s *Stack) Push() *StackVal {
+func (s *Stack) Push() int {
 	n := s.Next
 	s.Vals = append(s.Vals, s.Next)
 	s.Next++
-	return &StackVal{n}
+	return n
 }
 
 // Pop pops an item from the stack and returns the id of the removed
 // item.
-func (s *Stack) Pop() *StackVal {
+func (s *Stack) Pop() int {
 	var val int
 	if len(s.Vals) == 0 {
-		val = s.Low
 		s.Low--
+		val = s.Low
+		if s.Low < s.Min {
+			s.Min = s.Low
+		}
 	} else {
 		val = s.Vals[len(s.Vals)-1]
 		s.Vals = s.Vals[:len(s.Vals)-1]
 	}
-	return &StackVal{val}
+	return val
+}
+
+// PopN pops n items from the stack.
+func (s *Stack) PopN(n int) {
+	l := len(s.Vals)
+	switch {
+	case n < 0:
+		panic(fmt.Sprintf("stack: pop count must be positive: %d", n))
+	case n == 0:
+		return
+	case l == 0:
+		s.Low -= n
+	case n >= l:
+		s.Vals = s.Vals[:0]
+		s.Low -= n - l
+	default:
+		s.Vals = s.Vals[:l-n]
+	}
+	if s.Low < s.Min {
+		s.Min = s.Low
+	}
 }
 
 // Dup pushes a copy of the top item to the stack without creating an
 // id.
-func (s *Stack) Dup() *StackVal {
-	val := s.Top()
-	s.Vals = append(s.Vals, val.Val)
-	return val
+func (s *Stack) Dup() int {
+	top := s.Top()
+	s.Vals = append(s.Vals, top)
+	return top
 }
 
 // Copy pushes a copy of the nth item to the stack without creating an
 // id.
-func (s *Stack) Copy(n int) *StackVal {
+func (s *Stack) Copy(n int) int {
 	if n < 0 {
-		panic(fmt.Sprintf("ast: copy index must be positive: %d", n))
+		panic(fmt.Sprintf("stack: copy index must be positive: %d", n))
 	}
 	val := s.Nth(n)
-	s.Vals = append(s.Vals, val.Val)
+	s.Vals = append(s.Vals, val)
 	return val
 }
 
@@ -63,47 +84,63 @@ func (s *Stack) Swap() {
 	l := len(s.Vals)
 	switch l {
 	case 0:
-		s.Vals = append(s.Vals, s.Low, s.Low-1)
-		s.Low--
+		s.Vals = append(s.Vals, s.Low-1, s.Low-2)
+		s.Low -= 2
 	case 1:
-		s.Vals = append(s.Vals, s.Low)
+		s.Vals = append(s.Vals, s.Low-1)
 		s.Low--
 	default:
 		s.Vals[l-2], s.Vals[l-1] = s.Vals[l-1], s.Vals[l-2]
 	}
+	if s.Low < s.Min {
+		s.Min = s.Low
+	}
+	s.simplify()
 }
 
 // Slide slides n items off the stack, leaving the top item.
 func (s *Stack) Slide(n int) {
-	l := len(s.Vals)
-	switch {
-	case n < 0:
-		panic(fmt.Sprintf("ast: slide count must be positive: %d", n))
-	case n == 0:
+	if n == 0 {
 		return
-	case l == 0:
-		s.Vals = append(s.Vals, s.Low)
-		s.Low -= n
-	case n < l:
-		s.Vals = append(s.Vals[:l-n-1], s.Vals[l-1])
-	default:
-		s.Vals = append(s.Vals[:0], s.Vals[l-1])
-		s.Low -= n - l
 	}
+	top := s.Top()
+	s.PopN(n + 1)
+	s.Vals = append(s.Vals, top)
+	s.simplify()
 }
 
 // Top returns the id of the top item on the stack.
-func (s *Stack) Top() *StackVal {
+func (s *Stack) Top() int {
 	if len(s.Vals) != 0 {
-		return &StackVal{s.Vals[len(s.Vals)-1]}
+		return s.Vals[len(s.Vals)-1]
 	}
-	return &StackVal{s.Low}
+	top := s.Low - 1
+	if top < s.Min {
+		s.Min = top
+	}
+	return top
 }
 
 // Nth returns the id of the nth item on the stack.
-func (s *Stack) Nth(n int) *StackVal {
+func (s *Stack) Nth(n int) int {
 	if n < len(s.Vals) {
-		return &StackVal{s.Vals[len(s.Vals)-n-1]}
+		return s.Vals[len(s.Vals)-n-1]
 	}
-	return &StackVal{s.Low - n + len(s.Vals)}
+	val := s.Low - n + len(s.Vals)
+	if val < s.Min {
+		s.Min = val
+	}
+	return val
+}
+
+// simplify cleans up low elements.
+func (s *Stack) simplify() {
+	i := 0
+	for ; i < len(s.Vals); i++ {
+		if s.Low >= 0 || s.Vals[i] != s.Low {
+			break
+		}
+		s.Low++
+	}
+	s.Vals = s.Vals[i:]
 }

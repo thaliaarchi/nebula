@@ -53,6 +53,8 @@ func inlineConstants(node *Node, constants map[int]*big.Int) {
 	}
 }
 
+// Reduce accumulates sequences of nodes and replaces the starting node
+// with the accumulation. A sequence of one node is not replaced.
 func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
 	k := 0
 	for i := 0; i < len(block.Nodes); i++ {
@@ -64,6 +66,7 @@ func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
 					acc = next
 					concat = true
 				} else {
+					i--
 					break
 				}
 			}
