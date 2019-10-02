@@ -19,6 +19,7 @@ type BasicBlock struct {
 	Nodes   []Node
 	Edge    FlowStmt
 	Callers []*BasicBlock
+	Stack   Stack
 }
 
 // Node can be any expr or stmt type.
@@ -141,10 +142,8 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 			i++
 		}
 
-		var branch *big.Int
-		stack := &Stack{}
 		for ; i < len(tokens); i++ {
-			block.Nodes, block.Edge, branch = tokensToNodes(block.Nodes, tokens[i], stack)
+			block.appendToken(tokens[i])
 			if block.Edge != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -154,9 +153,92 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 		}
 
 		ast = append(ast, &block)
-		branches = append(branches, branch)
+		branches = append(branches, tokens[i].Arg)
 	}
 	return ast, branches, labels, nil
+}
+
+func (block *BasicBlock) appendToken(tok token.Token) {
+	switch tok.Type {
+	case token.Push:
+		block.Nodes = append(block.Nodes, &UnaryExpr{
+			Op:     token.Push,
+			Assign: &StackVal{block.Stack.Push()},
+			Val:    &ConstVal{tok.Arg},
+		})
+	case token.Dup:
+		block.Stack.Dup()
+	case token.Copy:
+		n, ok := bigint.ToInt(tok.Arg)
+		if !ok {
+			panic(fmt.Sprintf("ast: copy argument out of range: %v", tok.Arg))
+		}
+		block.Stack.Copy(n)
+	case token.Swap:
+		block.Stack.Swap()
+	case token.Drop:
+		block.Stack.Pop()
+	case token.Slide:
+		n, ok := bigint.ToInt(tok.Arg)
+		if !ok {
+			panic(fmt.Sprintf("ast: slide argument out of range: %v", tok.Arg))
+		}
+		block.Stack.Slide(n)
+
+	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
+		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), block.Stack.Push()
+		block.Nodes = append(block.Nodes, &BinaryExpr{
+			Op:     tok.Type,
+			Assign: &StackVal{assign},
+			LHS:    &StackVal{lhs},
+			RHS:    &StackVal{rhs},
+		})
+
+	case token.Store:
+		val, assign := block.Stack.Pop(), block.Stack.Pop()
+		block.Nodes = append(block.Nodes, &UnaryExpr{
+			Op:     token.Store,
+			Assign: &AddrVal{&StackVal{assign}},
+			Val:    &StackVal{val},
+		})
+	case token.Retrieve:
+		val, assign := block.Stack.Pop(), block.Stack.Push()
+		block.Nodes = append(block.Nodes, &UnaryExpr{
+			Op:     token.Retrieve,
+			Assign: &StackVal{assign},
+			Val:    &StackVal{val},
+		})
+
+	case token.Label:
+		block.Edge = &JmpStmt{Op: token.Fallthrough}
+	case token.Call, token.Jmp:
+		block.Edge = &JmpStmt{Op: tok.Type}
+	case token.Jz, token.Jn:
+		block.Edge = &JmpCondStmt{
+			Op:  tok.Type,
+			Val: &StackVal{block.Stack.Pop()},
+		}
+	case token.Ret:
+		block.Edge = &RetStmt{}
+	case token.End:
+		block.Edge = &EndStmt{}
+	case token.Fallthrough:
+		panic("ast: unexpected fallthrough")
+
+	case token.Printc, token.Printi:
+		block.Nodes = append(block.Nodes, &PrintStmt{
+			Op:  tok.Type,
+			Val: &StackVal{block.Stack.Pop()},
+		})
+	case token.Readc, token.Readi:
+		block.Nodes = append(block.Nodes, &ReadExpr{
+			Op:     tok.Type,
+			Assign: &AddrVal{&StackVal{block.Stack.Pop()}},
+		})
+
+	default:
+		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
+	}
 }
 
 func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
@@ -186,90 +268,6 @@ func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
 		}
 	}
 	return nil
-}
-
-func tokensToNodes(nodes []Node, tok token.Token, stack *Stack) ([]Node, FlowStmt, *big.Int) {
-	switch tok.Type {
-	case token.Push:
-		return append(nodes, &UnaryExpr{
-			Op:     token.Push,
-			Assign: &StackVal{stack.Push()},
-			Val:    &ConstVal{tok.Arg},
-		}), nil, nil
-	case token.Dup:
-		stack.Dup()
-	case token.Copy:
-		n, ok := bigint.ToInt(tok.Arg)
-		if !ok {
-			panic(fmt.Sprintf("ast: copy argument out of range: %v", tok.Arg))
-		}
-		stack.Copy(n)
-	case token.Swap:
-		stack.Swap()
-	case token.Drop:
-		stack.Pop()
-	case token.Slide:
-		n, ok := bigint.ToInt(tok.Arg)
-		if !ok {
-			panic(fmt.Sprintf("ast: slide argument out of range: %v", tok.Arg))
-		}
-		stack.Slide(n)
-
-	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
-		rhs, lhs, assign := stack.Pop(), stack.Pop(), stack.Push()
-		return append(nodes, &BinaryExpr{
-			Op:     tok.Type,
-			Assign: &StackVal{assign},
-			LHS:    &StackVal{lhs},
-			RHS:    &StackVal{rhs},
-		}), nil, nil
-
-	case token.Store:
-		val, assign := stack.Pop(), stack.Pop()
-		return append(nodes, &UnaryExpr{
-			Op:     token.Store,
-			Assign: &AddrVal{&StackVal{assign}},
-			Val:    &StackVal{val},
-		}), nil, nil
-	case token.Retrieve:
-		val, assign := stack.Pop(), stack.Push()
-		return append(nodes, &UnaryExpr{
-			Op:     token.Retrieve,
-			Assign: &StackVal{assign},
-			Val:    &StackVal{val},
-		}), nil, nil
-
-	case token.Label:
-		return nodes, &JmpStmt{Op: token.Fallthrough}, tok.Arg
-	case token.Call, token.Jmp:
-		return nodes, &JmpStmt{Op: tok.Type}, tok.Arg
-	case token.Jz, token.Jn:
-		return nodes, &JmpCondStmt{
-			Op:  tok.Type,
-			Val: &StackVal{stack.Pop()},
-		}, tok.Arg
-	case token.Ret:
-		return nodes, &RetStmt{}, nil
-	case token.End:
-		return nodes, &EndStmt{}, nil
-	case token.Fallthrough:
-		panic("ast: unexpected fallthrough")
-
-	case token.Printc, token.Printi:
-		return append(nodes, &PrintStmt{
-			Op:  tok.Type,
-			Val: &StackVal{stack.Pop()},
-		}), nil, nil
-	case token.Readc, token.Readi:
-		return append(nodes, &ReadExpr{
-			Op:     tok.Type,
-			Assign: &AddrVal{&StackVal{stack.Pop()}},
-		}), nil, nil
-
-	default:
-		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
-	}
-	return nodes, nil, nil
 }
 
 // Name returns the name of the basic block from either the first label
