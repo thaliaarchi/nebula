@@ -68,7 +68,6 @@ const (
 	Jn
 	Ret
 	End
-	Fallthrough // Pseudo instruction to connect non-jumping blocks
 	flowEnd
 
 	ioBeg
@@ -78,6 +77,10 @@ const (
 	Readc
 	Readi
 	ioEnd
+
+	// Extended instructions
+	Fallthrough
+	Prints
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
@@ -146,8 +149,6 @@ func (typ Type) String() string {
 		return "ret"
 	case End:
 		return "end"
-	case Fallthrough:
-		return "fallthrough"
 	case Printc:
 		return "printc"
 	case Printi:
@@ -156,6 +157,10 @@ func (typ Type) String() string {
 		return "readc"
 	case Readi:
 		return "readi"
+	case Fallthrough:
+		return "fallthrough"
+	case Prints:
+		return "prints"
 	}
 	return "illegal"
 }
