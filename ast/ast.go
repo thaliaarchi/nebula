@@ -344,3 +344,41 @@ func (j *JmpCondStmt) String() string {
 }
 func (*RetStmt) String() string { return "ret" }
 func (*EndStmt) String() string { return "end" }
+
+// Assign returns the value the node assigns to.
+func Assign(node Node) Val {
+	switch expr := node.(type) {
+	case *UnaryExpr:
+		return expr.Assign
+	case *BinaryExpr:
+		return expr.Assign
+	case *ReadExpr:
+		return expr.Assign
+	default:
+		return nil
+	}
+}
+
+// Op returns the op of the node.
+func Op(node Node) token.Type {
+	switch expr := node.(type) {
+	case *UnaryExpr:
+		return expr.Op
+	case *BinaryExpr:
+		return expr.Op
+	case *PrintStmt:
+		return expr.Op
+	case *ReadExpr:
+		return expr.Op
+	case *JmpStmt:
+		return expr.Op
+	case *JmpCondStmt:
+		return expr.Op
+	case *RetStmt:
+		return token.Ret
+	case *EndStmt:
+		return token.End
+	default:
+		return token.Illegal
+	}
+}
