@@ -13,12 +13,12 @@ func TestTextReaderNext(t *testing.T) {
 	l := NewTextReader(r)
 	var tokens []SpaceToken
 	for {
-		token, err := l.Next()
+		tok, err := l.Next()
 		if err != nil {
 			t.Fatal(err)
 		}
-		tokens = append(tokens, token)
-		if token == EOF {
+		tokens = append(tokens, tok)
+		if tok == EOF {
 			break
 		}
 	}
@@ -34,12 +34,12 @@ func TestBitReaderNext(t *testing.T) {
 	l := NewBitReader(r)
 	var tokens []SpaceToken
 	for {
-		token, err := l.Next()
+		tok, err := l.Next()
 		if err != nil {
 			t.Fatal(err)
 		}
-		tokens = append(tokens, token)
-		if token == EOF {
+		tokens = append(tokens, tok)
+		if tok == EOF {
 			break
 		}
 	}
@@ -53,11 +53,11 @@ func TestBitReaderNext(t *testing.T) {
 func tokensString(tokens []SpaceToken) string {
 	var str strings.Builder
 	str.WriteRune('[')
-	for i, token := range tokens {
+	for i, tok := range tokens {
 		if i != 0 {
 			str.WriteRune(' ')
 		}
-		switch token {
+		switch tok {
 		case EOF:
 			str.WriteString("EOF")
 		case Space:
@@ -67,7 +67,7 @@ func tokensString(tokens []SpaceToken) string {
 		case LF:
 			str.WriteString("LF")
 		default:
-			str.WriteString(strconv.Itoa(int(token)))
+			str.WriteString(strconv.Itoa(int(tok)))
 		}
 	}
 	str.WriteRune(']')

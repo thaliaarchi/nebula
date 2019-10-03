@@ -7,6 +7,39 @@ import (
 	"github.com/andrewarchi/wspace/token"
 )
 
+// Reduce accumulates sequences of nodes and replaces the starting node
+// with the accumulation. A sequence of one node is not replaced.
+func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
+	k := 0
+	for i := 0; i < len(block.Nodes); i++ {
+		if acc, ok := fn(nil, block.Nodes[i], i); ok {
+			i++
+			concat := false
+			for ; i < len(block.Nodes); i++ {
+				if next, ok := fn(acc, block.Nodes[i], i); ok {
+					acc = next
+					concat = true
+				} else {
+					i--
+					break
+				}
+			}
+
+			if concat {
+				block.Nodes[k] = acc
+				k++
+				continue
+			}
+		}
+
+		if i < len(block.Nodes) {
+			block.Nodes[k] = block.Nodes[i]
+			k++
+		}
+	}
+	block.Nodes = block.Nodes[:k]
+}
+
 // InlineStackConstants eliminates push instructions and inlines
 // constants.
 func (ast AST) InlineStackConstants() {
@@ -53,37 +86,35 @@ func inlineConstants(node *Node, constants map[int]*big.Int) {
 	}
 }
 
-// Reduce accumulates sequences of nodes and replaces the starting node
-// with the accumulation. A sequence of one node is not replaced.
-func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
-	k := 0
-	for i := 0; i < len(block.Nodes); i++ {
-		if acc, ok := fn(nil, block.Nodes[i], i); ok {
-			i++
-			concat := false
-			for ; i < len(block.Nodes); i++ {
-				if next, ok := fn(acc, block.Nodes[i], i); ok {
-					acc = next
-					concat = true
-				} else {
-					i--
-					break
-				}
-			}
+// func (ast AST) JoinSafeCalls() {
+// 	safe := make(map[*BasicBlock]bool)
+// 	for _, block := range ast {
+// 		if jmp, ok := block.Edge.(*JmpStmt); ok && jmp.Op == token.Call {
+// 			if checkStackSafe(jmp.Block, safe) {
+// 				// join blocks
+// 			}
+// 		}
+// 	}
+// }
 
-			if concat {
-				block.Nodes[k] = acc
-				k++
-				continue
-			}
-		}
-
-		if i < len(block.Nodes) {
-			block.Nodes[k] = block.Nodes[i]
-			k++
-		}
+func checkStackSafe(block *BasicBlock, safe map[*BasicBlock]bool) bool {
+	if len(block.Stack.Vals) != 0 || block.Stack.Low != 0 || block.Stack.Min != 0 {
+		safe[block] = false
+		return false
 	}
-	block.Nodes = block.Nodes[:k]
+	if safe[block] {
+		return true
+	}
+	switch edge := block.Edge.(type) {
+	case *CallStmt:
+		return checkStackSafe(edge.Call, safe) && checkStackSafe(edge.Next, safe)
+	case *JmpStmt:
+		return checkStackSafe(edge.Block, safe)
+	case *JmpCondStmt:
+		return checkStackSafe(edge.TrueBlock, safe) && checkStackSafe(edge.FalseBlock, safe)
+	case *RetStmt, *EndStmt:
+	}
+	return true
 }
 
 // ConcatStrings joins consecutive constant print expressions.

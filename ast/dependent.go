@@ -1,6 +1,47 @@
 package ast
 
-import "github.com/andrewarchi/wspace/token"
+import (
+	"github.com/andrewarchi/graph"
+	"github.com/andrewarchi/wspace/token"
+)
+
+// FlowDependenceGraph creates a directed graph with edges representing
+// the connections between basic blocks.
+func (ast AST) FlowDependenceGraph() graph.Graph {
+	ids := make(map[*BasicBlock]uint)
+	for i, block := range ast {
+		ids[block] = uint(i)
+	}
+	g := graph.NewGraph(uint(len(ast)))
+	for i, block := range ast {
+		switch edge := block.Edge.(type) {
+		case *CallStmt:
+			g.Add(uint(i), ids[edge.Call])
+			g.Add(uint(i), ids[edge.Next])
+		case *JmpStmt:
+			g.Add(uint(i), ids[edge.Block])
+		case *JmpCondStmt:
+			g.Add(uint(i), ids[edge.TrueBlock])
+			g.Add(uint(i), ids[edge.FalseBlock])
+		case *RetStmt, *EndStmt:
+		}
+	}
+	return g
+}
+
+// DependenceGraph creates an undirected graph with edges representing
+// dependencies between nodes.
+func (block *BasicBlock) DependenceGraph() graph.Graph {
+	g := graph.NewGraph(uint(len(block.Nodes)))
+	for i := range block.Nodes {
+		for j := i + 1; j < len(block.Nodes); j++ {
+			if Dependent(block.Nodes[i], block.Nodes[j]) {
+				g.AddUndirected(uint(i), uint(j))
+			}
+		}
+	}
+	return g
+}
 
 // Dependent returns whether two non-branching nodes are dependent. True
 // is returned when node B is dependent on node A. Nodes are dependent

@@ -15,6 +15,7 @@ type AST []*BasicBlock
 // BasicBlock is a list of consecutive non-branching instructions in a
 // program followed by a branch.
 type BasicBlock struct {
+	ID      int
 	Labels  []*big.Int
 	Nodes   []Node
 	Edge    FlowStmt
@@ -76,11 +77,17 @@ type ReadExpr struct {
 	Assign Val
 }
 
-// FlowStmt can be JmpStmt, JmpCondStmt, RetStmt, EndStmt.
+// FlowStmt can be CallStmt, JmpStmt, JmpCondStmt, RetStmt, EndStmt.
 type FlowStmt = Node
 
-// JmpStmt unconditionally jumps to a block. Valid instructions are
-// call, jmp, and fallthrough.
+// CallStmt represents a call.
+type CallStmt struct {
+	Call *BasicBlock
+	Next *BasicBlock
+}
+
+// JmpStmt unconditionally jumps to a block. Valid instructions are jmp
+// and fallthrough.
 type JmpStmt struct {
 	Op    token.Type
 	Block *BasicBlock
@@ -153,6 +160,7 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 			}
 		}
 
+		block.ID = len(ast)
 		ast = append(ast, &block)
 		branches = append(branches, branch)
 	}
@@ -213,7 +221,10 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Label:
 		block.Edge = &JmpStmt{Op: token.Fallthrough}
 		return tok.Arg
-	case token.Call, token.Jmp:
+	case token.Call:
+		block.Edge = &CallStmt{}
+		return tok.Arg
+	case token.Jmp:
 		block.Edge = &JmpStmt{Op: tok.Type}
 		return tok.Arg
 	case token.Jz, token.Jn:
@@ -258,6 +269,12 @@ func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
 			callee.Callers = append(callee.Callers, block)
 
 			switch edge := block.Edge.(type) {
+			case *CallStmt:
+				if i >= len(ast) {
+					panic("ast: program ends with call")
+				}
+				edge.Call = callee
+				edge.Next = ast[i+1]
 			case *JmpStmt:
 				edge.Block = callee
 			case *JmpCondStmt:
@@ -284,17 +301,16 @@ func (block *BasicBlock) Name() string {
 	if len(block.Labels) != 0 {
 		return fmt.Sprintf("label_%v", block.Labels[0])
 	}
-	return fmt.Sprintf("%p", block)
+	return fmt.Sprintf("block_%d", block.ID)
 }
 
 func (ast AST) String() string {
 	var b strings.Builder
 	for i, block := range ast {
 		if i != 0 {
-			b.WriteByte('\n')
+			b.WriteString("\n\n")
 		}
 		b.WriteString(block.String())
-		b.WriteByte('\n')
 	}
 	return b.String()
 }
@@ -302,7 +318,7 @@ func (ast AST) String() string {
 func (block *BasicBlock) String() string {
 	var b strings.Builder
 	if len(block.Labels) == 0 {
-		fmt.Fprintf(&b, "%p:\n", block)
+		fmt.Fprintf(&b, "block_%d:\n", block.ID)
 	}
 	for _, label := range block.Labels {
 		b.WriteString("label_")
@@ -338,6 +354,7 @@ func (b *BinaryExpr) String() string {
 }
 func (p *PrintStmt) String() string { return fmt.Sprintf("%v %v", p.Op, p.Val) }
 func (r *ReadExpr) String() string  { return fmt.Sprintf("%v = %v", r.Assign, r.Op) }
+func (c *CallStmt) String() string  { return fmt.Sprintf("call %s %s", c.Call.Name(), c.Next.Name()) }
 func (j *JmpStmt) String() string   { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", j.Op, j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
@@ -370,6 +387,8 @@ func Op(node Node) token.Type {
 		return expr.Op
 	case *ReadExpr:
 		return expr.Op
+	case *CallStmt:
+		return token.Call
 	case *JmpStmt:
 		return expr.Op
 	case *JmpCondStmt:

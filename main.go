@@ -32,8 +32,8 @@ func main() {
 	r := ws.NewTextReader(f)
 	tokenChan := ws.Lex(r)
 	var tokens []token.Token
-	for token := range tokenChan {
-		tokens = append(tokens, token)
+	for tok := range tokenChan {
+		tokens = append(tokens, tok)
 	}
 	ast, err := ast.Parse(tokens)
 	if err != nil {
