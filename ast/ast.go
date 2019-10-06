@@ -358,16 +358,16 @@ func (s *StackVal) String() string   { return fmt.Sprintf("%%%d", s.Val) }
 func (c *ConstVal) String() string   { return c.Val.String() }
 func (s *StringVal) String() string  { return fmt.Sprintf("%q", s.Val) }
 func (a *ArrayVal) String() string   { return bigint.FormatSlice(a.Val) }
-func (a *AddrVal) String() string    { return fmt.Sprintf("*%v", a.Val) }
-func (a *AssignStmt) String() string { return fmt.Sprintf("%v = %v", a.Assign, a.Expr) }
-func (b *ArithExpr) String() string  { return fmt.Sprintf("%v %v %v", b.Op, b.LHS, b.RHS) }
-func (u *HeapExpr) String() string   { return fmt.Sprintf("%v %v", u.Op, u.Val) }
-func (p *PrintStmt) String() string  { return fmt.Sprintf("%v %v", p.Op, p.Val) }
+func (a *AddrVal) String() string    { return fmt.Sprintf("*%v", *a.Val) }
+func (a *AssignStmt) String() string { return fmt.Sprintf("%v = %v", *a.Assign, a.Expr) }
+func (b *ArithExpr) String() string  { return fmt.Sprintf("%v %v %v", b.Op, *b.LHS, *b.RHS) }
+func (u *HeapExpr) String() string   { return fmt.Sprintf("%v %v", u.Op, *u.Val) }
+func (p *PrintStmt) String() string  { return fmt.Sprintf("%v %v", p.Op, *p.Val) }
 func (r *ReadExpr) String() string   { return r.Op.String() }
 func (c *CallStmt) String() string   { return fmt.Sprintf("call %s %s", c.Call.Name(), c.Next.Name()) }
 func (j *JmpStmt) String() string    { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
-	return fmt.Sprintf("%v %v %s %s", j.Op, j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
+	return fmt.Sprintf("%v %v %s %s", j.Op, *j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
 }
 func (*RetStmt) String() string { return "ret" }
 func (*EndStmt) String() string { return "end" }
