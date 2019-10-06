@@ -340,7 +340,17 @@ func (block *BasicBlock) String() string {
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
-	fmt.Fprintf(&b, "    ; stack %v, pop %d, access %d\n", &block.Stack, -block.Stack.Low, -block.Stack.Min)
+	b.WriteString("    ; callers:")
+	if len(block.Callers) == 0 {
+		b.WriteString(" -")
+	} else {
+		for _, caller := range block.Callers {
+			b.WriteByte(' ')
+			b.WriteString(caller.Name())
+		}
+	}
+	b.WriteByte('\n')
+	fmt.Fprintf(&b, "    ; stack %v, pop %d, access %d\n", &block.Stack, block.Stack.Pops, block.Stack.Access)
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
 		b.WriteString(node.String())

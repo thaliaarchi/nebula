@@ -34,21 +34,21 @@ func TestTransforms(t *testing.T) {
 		{Type: token.Push, Arg: big.NewInt(3)},   // 1
 		{Type: token.Push, Arg: big.NewInt(10)},  // 2
 		{Type: token.Push, Arg: big.NewInt(2)},   // 3
-		{Type: token.Mul, Arg: nil},              // 4
-		{Type: token.Add, Arg: nil},              // 5
-		{Type: token.Swap, Arg: nil},             // 6
+		{Type: token.Mul},                        // 4
+		{Type: token.Add},                        // 5
+		{Type: token.Swap},                       // 6
 		{Type: token.Push, Arg: big.NewInt('C')}, // 7
-		{Type: token.Dup, Arg: nil},              // 8
+		{Type: token.Dup},                        // 8
 		{Type: token.Copy, Arg: big.NewInt(2)},   // 9
-		{Type: token.Sub, Arg: nil},              // 10
+		{Type: token.Sub},                        // 10
 		{Type: token.Push, Arg: big.NewInt(-32)}, // 11
 		{Type: token.Push, Arg: big.NewInt('a')}, // 12
-		{Type: token.Add, Arg: nil},              // 13
-		{Type: token.Printc, Arg: nil},           // 14
-		{Type: token.Printc, Arg: nil},           // 15
-		{Type: token.Printc, Arg: nil},           // 16
-		{Type: token.Printi, Arg: nil},           // 17
-		{Type: token.Printi, Arg: nil},           // 18
+		{Type: token.Add},                        // 13
+		{Type: token.Printc},                     // 14
+		{Type: token.Printc},                     // 15
+		{Type: token.Printc},                     // 16
+		{Type: token.Printi},                     // 17
+		{Type: token.Printi},                     // 18
 	}
 
 	var stack Stack
@@ -80,7 +80,7 @@ func TestTransforms(t *testing.T) {
 	stack.Pop()                             // 17
 	stack.Pop()                             // 18
 
-	if len(stack.Vals) != 0 || stack.Low != 0 || stack.Min != 0 {
+	if len(stack.Vals) != 0 || stack.Pops != 0 || stack.Access != 0 {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 

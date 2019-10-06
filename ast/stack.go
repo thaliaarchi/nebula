@@ -11,10 +11,10 @@ import (
 // block are represented as negative numbers. Operations are expressed
 // in terms of push and pop.
 type Stack struct {
-	Vals []*Val
-	Next int // Next id to push
-	Low  int // Lowest value popped below stack
-	Min  int // Lowest value accessed below stack
+	Vals   []*Val
+	Next   int // Next id to push
+	Pops   int // Number of items popped below stack
+	Access int // Number of items accessed below stack
 }
 
 // Push pushes an item to the stack and returns a val with a unique id.
@@ -37,11 +37,11 @@ func (s *Stack) PushConst(c *big.Int) *Val {
 func (s *Stack) Pop() *Val {
 	var val *Val
 	if len(s.Vals) == 0 {
-		s.Low--
-		v := Val(&StackVal{s.Low})
+		s.Pops++
+		v := Val(&StackVal{-s.Pops})
 		val = &v
-		if s.Low < s.Min {
-			s.Min = s.Low
+		if s.Pops > s.Access {
+			s.Access = s.Pops
 		}
 	} else {
 		val = s.Vals[len(s.Vals)-1]
@@ -59,15 +59,15 @@ func (s *Stack) PopN(n int) {
 	case n == 0:
 		return
 	case l == 0:
-		s.Low -= n
+		s.Pops += n
 	case n >= l:
 		s.Vals = s.Vals[:0]
-		s.Low -= n - l
+		s.Pops += n - l
 	default:
 		s.Vals = s.Vals[:l-n]
 	}
-	if s.Low < s.Min {
-		s.Min = s.Low
+	if s.Pops > s.Access {
+		s.Access = s.Pops
 	}
 }
 
@@ -95,18 +95,18 @@ func (s *Stack) Swap() {
 	l := len(s.Vals)
 	switch l {
 	case 0:
-		v1, v2 := Val(&StackVal{s.Low - 1}), Val(&StackVal{s.Low - 2})
+		v1, v2 := Val(&StackVal{-s.Pops - 1}), Val(&StackVal{-s.Pops - 2})
 		s.Vals = append(s.Vals, &v1, &v2)
-		s.Low -= 2
+		s.Pops += 2
 	case 1:
-		v := Val(&StackVal{s.Low - 1})
+		v := Val(&StackVal{-s.Pops - 1})
 		s.Vals = append(s.Vals, &v)
-		s.Low--
+		s.Pops++
 	default:
 		s.Vals[l-2], s.Vals[l-1] = s.Vals[l-1], s.Vals[l-2]
 	}
-	if s.Low < s.Min {
-		s.Min = s.Low
+	if s.Pops > s.Access {
+		s.Access = s.Pops
 	}
 	s.simplify()
 }
@@ -127,11 +127,11 @@ func (s *Stack) Top() *Val {
 	if len(s.Vals) != 0 {
 		return s.Vals[len(s.Vals)-1]
 	}
-	top := s.Low - 1
-	if top < s.Min {
-		s.Min = top
+	top := s.Pops + 1
+	if top > s.Access {
+		s.Access = top
 	}
-	val := Val(&StackVal{top})
+	val := Val(&StackVal{-top})
 	return &val
 }
 
@@ -140,11 +140,11 @@ func (s *Stack) Nth(n int) *Val {
 	if n < len(s.Vals) {
 		return s.Vals[len(s.Vals)-n-1]
 	}
-	val := s.Low - n + len(s.Vals)
-	if val < s.Min {
-		s.Min = val
+	val := s.Pops + n + 1 - len(s.Vals)
+	if val > s.Access {
+		s.Access = val
 	}
-	v := Val(&StackVal{val})
+	v := Val(&StackVal{-val})
 	return &v
 }
 
@@ -152,13 +152,13 @@ func (s *Stack) Nth(n int) *Val {
 func (s *Stack) simplify() {
 	i := 0
 	for ; i < len(s.Vals); i++ {
-		if s.Low >= 0 {
+		if s.Pops <= 0 {
 			break
 		}
-		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Val != s.Low {
+		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Val != -s.Pops {
 			break
 		}
-		s.Low++
+		s.Pops--
 	}
 	s.Vals = s.Vals[i:]
 }
