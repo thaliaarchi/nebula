@@ -2,6 +2,7 @@ package ast
 
 // MergeSimpleCalls merges blocks that are only called once with their
 // predecessor and removes uncalled blocks.
+// TODO: this is flawed because Callers does not contain all in-edges.
 func (ast *AST) MergeSimpleCalls() {
 	j := 0
 	for i, block := range ast.Blocks {

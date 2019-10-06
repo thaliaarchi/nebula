@@ -40,7 +40,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	ast.MergeSimpleCalls()
+	// ast.MergeSimpleCalls()
 	ast.FoldConstArith()
 	ast.ConcatStrings()
 	fmt.Println(ast.String())

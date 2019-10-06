@@ -16,7 +16,7 @@ func (ast *AST) FlowDependenceGraph() graph.Graph {
 	for i, block := range ast.Blocks {
 		switch edge := block.Edge.(type) {
 		case *CallStmt:
-			g.Add(uint(i), ids[edge.Call])
+			g.Add(uint(i), ids[edge.Callee])
 			g.Add(uint(i), ids[edge.Next])
 		case *JmpStmt:
 			g.Add(uint(i), ids[edge.Block])

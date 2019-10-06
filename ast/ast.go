@@ -83,13 +83,16 @@ type ReadExpr struct {
 }
 
 // FlowStmt is any flow control statement. Valid types are CallStmt,
-// JmpStmt, JmpCondStmt, RetStmt, EndStmt.
-type FlowStmt = Node
+// JmpStmt, JmpCondStmt, RetStmt, and EndStmt.
+type FlowStmt interface {
+	Node
+	Edges() []*BasicBlock
+}
 
 // CallStmt represents a call.
 type CallStmt struct {
-	Call *BasicBlock
-	Next *BasicBlock
+	Callee *BasicBlock
+	Next   *BasicBlock
 }
 
 // JmpStmt unconditionally jumps to a block. Valid instructions are jmp
@@ -109,7 +112,9 @@ type JmpCondStmt struct {
 }
 
 // RetStmt represents a ret.
-type RetStmt struct{}
+type RetStmt struct {
+	Callers []*BasicBlock
+}
 
 // EndStmt represents an end.
 type EndStmt struct{}
@@ -124,6 +129,9 @@ func Parse(tokens []token.Token) (*AST, error) {
 		return nil, err
 	}
 	if err := ast.connectBlockEdges(branches, labels); err != nil {
+		return nil, err
+	}
+	if err := ast.connectRetEdges(); err != nil {
 		return nil, err
 	}
 	return ast, nil
@@ -280,23 +288,49 @@ func (ast *AST) connectBlockEdges(branches []*big.Int, labels *bigint.Map) error
 
 			switch edge := block.Edge.(type) {
 			case *CallStmt:
-				if i >= len(ast.Blocks) {
-					panic("ast: program ends with call")
-				}
-				edge.Call = callee
+				edge.Callee = callee
 				edge.Next = ast.Blocks[i+1]
 			case *JmpStmt:
 				edge.Block = callee
 			case *JmpCondStmt:
-				if i >= len(ast.Blocks) {
-					panic("ast: program ends with conditional jump")
-				}
 				edge.TrueBlock = callee
 				edge.FalseBlock = ast.Blocks[i+1]
 			case *RetStmt, *EndStmt:
-			default:
-				panic(fmt.Sprintf("ast: invalid edge type: %T", block.Edge))
 			}
+		}
+	}
+	return nil
+}
+
+func (ast *AST) connectRetEdges() error {
+	for _, block := range ast.Blocks {
+		if ret, ok := block.Edge.(*RetStmt); ok {
+			visited := make(map[*BasicBlock]bool)
+			for _, caller := range block.Callers {
+				if err := backtrackCalls(ret, block, caller, caller, visited); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func backtrackCalls(ret *RetStmt, retBlock, base, block *BasicBlock, visited map[*BasicBlock]bool) error {
+	if visited[block] {
+		return nil
+	}
+	if _, ok := block.Edge.(*CallStmt); ok {
+		ret.Callers = append(ret.Callers, block)
+		visited[block] = true
+		return nil
+	}
+	if block.ID == 0 {
+		return fmt.Errorf("ast: block %s cannot return when called by %s", retBlock.Name(), base.Name())
+	}
+	for _, caller := range block.Callers {
+		if err := backtrackCalls(ret, retBlock, base, caller, visited); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -340,16 +374,11 @@ func (block *BasicBlock) String() string {
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
-	b.WriteString("    ; callers:")
-	if len(block.Callers) == 0 {
-		b.WriteString(" -")
-	} else {
-		for _, caller := range block.Callers {
-			b.WriteByte(' ')
-			b.WriteString(caller.Name())
-		}
+	callers := "-"
+	if len(block.Callers) != 0 {
+		callers = formatBlockList(block.Callers)
 	}
-	b.WriteByte('\n')
+	fmt.Fprintf(&b, "    ; callers: %s\n", callers)
 	fmt.Fprintf(&b, "    ; stack %v, pop %d, access %d\n", &block.Stack, block.Stack.Pops, block.Stack.Access)
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
@@ -371,13 +400,28 @@ func (b *ArithExpr) String() string  { return fmt.Sprintf("%v %v %v", b.Op, *b.L
 func (u *HeapExpr) String() string   { return fmt.Sprintf("%v %v", u.Op, *u.Val) }
 func (p *PrintStmt) String() string  { return fmt.Sprintf("%v %v", p.Op, *p.Val) }
 func (r *ReadExpr) String() string   { return r.Op.String() }
-func (c *CallStmt) String() string   { return fmt.Sprintf("call %s %s", c.Call.Name(), c.Next.Name()) }
+func (c *CallStmt) String() string   { return fmt.Sprintf("call %s %s", c.Callee.Name(), c.Next.Name()) }
 func (j *JmpStmt) String() string    { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", j.Op, *j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
 }
-func (*RetStmt) String() string { return "ret" }
-func (*EndStmt) String() string { return "end" }
+func (r *RetStmt) String() string { return fmt.Sprintf("ret {%s}", formatBlockList(r.Callers)) }
+func (*EndStmt) String() string   { return "end" }
+
+// Edges returns the blocks reachable by the call.
+func (c *CallStmt) Edges() []*BasicBlock { return []*BasicBlock{c.Callee, c.Next} }
+
+// Edges returns the blocks reachable by the jump.
+func (j *JmpStmt) Edges() []*BasicBlock { return []*BasicBlock{j.Block} }
+
+// Edges returns the blocks reachable by the conditional jump.
+func (j *JmpCondStmt) Edges() []*BasicBlock { return []*BasicBlock{j.TrueBlock, j.FalseBlock} }
+
+// Edges returns the blocks reachable by the return.
+func (r *RetStmt) Edges() []*BasicBlock { return r.Callers }
+
+// Edges returns the blocks reachable by the end.
+func (*EndStmt) Edges() []*BasicBlock { return nil }
 
 // Op returns the op of the node.
 func Op(node Node) token.Type {
@@ -405,4 +449,15 @@ func Op(node Node) token.Type {
 	default:
 		return token.Illegal
 	}
+}
+
+func formatBlockList(blocks []*BasicBlock) string {
+	var b strings.Builder
+	for i, block := range blocks {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(block.Name())
+	}
+	return b.String()
 }
