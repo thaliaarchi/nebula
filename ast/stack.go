@@ -1,34 +1,43 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+	"math/big"
+)
 
 // Stack represents the Whitespace stack for registerization. Every
 // value is given a unique id. Values from outside the current basic
 // block are represented as negative numbers. Operations are expressed
 // in terms of push and pop.
 type Stack struct {
-	Vals []int
+	Vals []Val
 	Next int // Next id to push
 	Low  int // Lowest value popped below stack
 	Min  int // Lowest value accessed below stack
 }
 
-// Push pushes an item to the stack and returns the id of the inserted
-// item.
-func (s *Stack) Push() int {
-	n := s.Next
-	s.Vals = append(s.Vals, s.Next)
+// Push pushes an item to the stack and returns a val with a unique id.
+func (s *Stack) Push() Val {
+	val := &StackVal{s.Next}
+	s.Vals = append(s.Vals, val)
 	s.Next++
-	return n
+	return val
+}
+
+// PushConst pushes a constant value to the stack and returns its val.
+func (s *Stack) PushConst(c *big.Int) Val {
+	val := &ConstVal{c}
+	s.Vals = append(s.Vals, val)
+	return val
 }
 
 // Pop pops an item from the stack and returns the id of the removed
 // item.
-func (s *Stack) Pop() int {
-	var val int
+func (s *Stack) Pop() Val {
+	var val Val
 	if len(s.Vals) == 0 {
 		s.Low--
-		val = s.Low
+		val = &StackVal{s.Low}
 		if s.Low < s.Min {
 			s.Min = s.Low
 		}
@@ -62,7 +71,7 @@ func (s *Stack) PopN(n int) {
 
 // Dup pushes a copy of the top item to the stack without creating an
 // id.
-func (s *Stack) Dup() int {
+func (s *Stack) Dup() Val {
 	top := s.Top()
 	s.Vals = append(s.Vals, top)
 	return top
@@ -70,7 +79,7 @@ func (s *Stack) Dup() int {
 
 // Copy pushes a copy of the nth item to the stack without creating an
 // id.
-func (s *Stack) Copy(n int) int {
+func (s *Stack) Copy(n int) Val {
 	if n < 0 {
 		panic(fmt.Sprintf("stack: copy index must be positive: %d", n))
 	}
@@ -84,10 +93,10 @@ func (s *Stack) Swap() {
 	l := len(s.Vals)
 	switch l {
 	case 0:
-		s.Vals = append(s.Vals, s.Low-1, s.Low-2)
+		s.Vals = append(s.Vals, &StackVal{s.Low - 1}, &StackVal{s.Low - 2})
 		s.Low -= 2
 	case 1:
-		s.Vals = append(s.Vals, s.Low-1)
+		s.Vals = append(s.Vals, &StackVal{s.Low - 1})
 		s.Low--
 	default:
 		s.Vals[l-2], s.Vals[l-1] = s.Vals[l-1], s.Vals[l-2]
@@ -110,7 +119,7 @@ func (s *Stack) Slide(n int) {
 }
 
 // Top returns the id of the top item on the stack.
-func (s *Stack) Top() int {
+func (s *Stack) Top() Val {
 	if len(s.Vals) != 0 {
 		return s.Vals[len(s.Vals)-1]
 	}
@@ -118,11 +127,11 @@ func (s *Stack) Top() int {
 	if top < s.Min {
 		s.Min = top
 	}
-	return top
+	return &StackVal{top}
 }
 
 // Nth returns the id of the nth item on the stack.
-func (s *Stack) Nth(n int) int {
+func (s *Stack) Nth(n int) Val {
 	if n < len(s.Vals) {
 		return s.Vals[len(s.Vals)-n-1]
 	}
@@ -130,14 +139,17 @@ func (s *Stack) Nth(n int) int {
 	if val < s.Min {
 		s.Min = val
 	}
-	return val
+	return &StackVal{val}
 }
 
 // simplify cleans up low elements.
 func (s *Stack) simplify() {
 	i := 0
 	for ; i < len(s.Vals); i++ {
-		if s.Low >= 0 || s.Vals[i] != s.Low {
+		if s.Low >= 0 {
+			break
+		}
+		if val, ok := s.Vals[i].(*StackVal); !ok || val.Val != s.Low {
 			break
 		}
 		s.Low++

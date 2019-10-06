@@ -40,10 +40,8 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	ast.InlineStackConstants()
-	ast.ConstArith()
+	ast.FoldConstArith()
 	ast.ConcatStrings()
-	ast.ConcatStoreArrays()
 	fmt.Println(ast.String())
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {

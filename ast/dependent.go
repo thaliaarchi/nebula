@@ -66,9 +66,9 @@ func isIO(node Node) bool {
 // canThrow returns whether the node is a division with a non-constant
 // RHS.
 func canThrow(node Node) bool {
-	if n, ok := node.(*BinaryExpr); ok && n.Op == token.Div {
+	if n, ok := node.(*ArithExpr); ok && n.Op == token.Div {
 		_, ok := n.RHS.(*ConstVal)
-		return ok
+		return !ok
 	}
 	return false
 }
@@ -76,16 +76,23 @@ func canThrow(node Node) bool {
 // references returns whether node B references the assignment of
 // node A.
 func references(a, b Node) bool {
-	assign := Assign(a)
-	switch expr := b.(type) {
-	case *UnaryExpr:
-		return expr.Assign == assign || expr.Val == assign
-	case *BinaryExpr:
-		return expr.Assign == assign || expr.LHS == assign || expr.RHS == assign
-	case *PrintStmt:
-		return expr.Val == assign
-	case *ReadExpr:
-		return expr.Assign == assign
+	if assignA, ok := a.(*AssignStmt); ok {
+		assign := assignA.Assign
+		if assignB, ok := b.(*AssignStmt); ok {
+			if assignB.Assign == assign {
+				return false
+			}
+			b = assignB.Expr
+		}
+		switch expr := b.(type) {
+		case *ArithExpr:
+			return expr.LHS == assign || expr.RHS == assign
+		case *HeapExpr:
+			return expr.Val == assign
+		case *PrintStmt:
+			return expr.Val == assign
+		case *ReadExpr:
+		}
 	}
 	return false
 }

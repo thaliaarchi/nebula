@@ -47,21 +47,25 @@ type ArrayVal struct{ Val []*big.Int }
 // AddrVal marks a value as being a pointer to a value.
 type AddrVal struct{ Val Val }
 
-// UnaryExpr evaluates a unary operation and assigns the result to an
-// address. Valid operations are push, store, and retrieve.
-type UnaryExpr struct {
-	Op     token.Type
+// AssignStmt assigns the value of an expression to the stack or heap.
+type AssignStmt struct {
 	Assign Val
-	Val    Val
+	Expr   Node
 }
 
-// BinaryExpr evalutates a binary operation and assigns the result to an
-// address. Valid operations are add, sub, mul, div, and mod.
-type BinaryExpr struct {
-	Op     token.Type
-	Assign Val
-	LHS    Val
-	RHS    Val
+// ArithExpr evalutates a binary arithmetic operation. Valid operations
+// are add, sub, mul, div, and mod.
+type ArithExpr struct {
+	Op  token.Type
+	LHS Val
+	RHS Val
+}
+
+// HeapExpr evaluates a heap access operation. Valid operations are
+// store and retrieve.
+type HeapExpr struct {
+	Op  token.Type
+	Val Val
 }
 
 // PrintStmt prints a value. Valid operations are printc and printi.
@@ -70,14 +74,14 @@ type PrintStmt struct {
 	Val Val
 }
 
-// ReadExpr reads a value to an address. Valid operations are readc and
+// ReadExpr reads a value from stdin. Valid operations are readc and
 // readi.
 type ReadExpr struct {
-	Op     token.Type
-	Assign Val
+	Op token.Type
 }
 
-// FlowStmt can be CallStmt, JmpStmt, JmpCondStmt, RetStmt, EndStmt.
+// FlowStmt is any flow control statement. Valid types are CallStmt,
+// JmpStmt, JmpCondStmt, RetStmt, EndStmt.
 type FlowStmt = Node
 
 // CallStmt represents a call.
@@ -140,6 +144,8 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	for i := 0; i < len(tokens); i++ {
 		var block BasicBlock
+		block.ID = len(ast)
+
 		for tokens[i].Type == token.Label {
 			label := tokens[i].Arg
 			if labels.Put(label, len(ast)) {
@@ -160,7 +166,6 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 			}
 		}
 
-		block.ID = len(ast)
 		ast = append(ast, &block)
 		branches = append(branches, branch)
 	}
@@ -170,11 +175,7 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
-		block.Nodes = append(block.Nodes, &UnaryExpr{
-			Op:     token.Push,
-			Assign: &StackVal{block.Stack.Push()},
-			Val:    &ConstVal{tok.Arg},
-		})
+		block.Stack.PushConst(tok.Arg)
 	case token.Dup:
 		block.Stack.Dup()
 	case token.Copy:
@@ -196,26 +197,23 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
 		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), block.Stack.Push()
-		block.Nodes = append(block.Nodes, &BinaryExpr{
-			Op:     tok.Type,
-			Assign: &StackVal{assign},
-			LHS:    &StackVal{lhs},
-			RHS:    &StackVal{rhs},
+		block.assign(assign, &ArithExpr{
+			Op:  tok.Type,
+			LHS: lhs,
+			RHS: rhs,
 		})
 
 	case token.Store:
 		val, assign := block.Stack.Pop(), block.Stack.Pop()
-		block.Nodes = append(block.Nodes, &UnaryExpr{
-			Op:     token.Store,
-			Assign: &AddrVal{&StackVal{assign}},
-			Val:    &StackVal{val},
+		block.assign(&AddrVal{assign}, &HeapExpr{
+			Op:  token.Store,
+			Val: val,
 		})
 	case token.Retrieve:
 		val, assign := block.Stack.Pop(), block.Stack.Push()
-		block.Nodes = append(block.Nodes, &UnaryExpr{
-			Op:     token.Retrieve,
-			Assign: &StackVal{assign},
-			Val:    &StackVal{val},
+		block.assign(assign, &HeapExpr{
+			Op:  token.Retrieve,
+			Val: val,
 		})
 
 	case token.Label:
@@ -230,7 +228,7 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Jz, token.Jn:
 		block.Edge = &JmpCondStmt{
 			Op:  tok.Type,
-			Val: &StackVal{block.Stack.Pop()},
+			Val: block.Stack.Pop(),
 		}
 		return tok.Arg
 	case token.Ret:
@@ -243,18 +241,24 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Printc, token.Printi:
 		block.Nodes = append(block.Nodes, &PrintStmt{
 			Op:  tok.Type,
-			Val: &StackVal{block.Stack.Pop()},
+			Val: block.Stack.Pop(),
 		})
 	case token.Readc, token.Readi:
-		block.Nodes = append(block.Nodes, &ReadExpr{
-			Op:     tok.Type,
-			Assign: &AddrVal{&StackVal{block.Stack.Pop()}},
+		block.assign(&AddrVal{block.Stack.Pop()}, &ReadExpr{
+			Op: tok.Type,
 		})
 
 	default:
 		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
 	}
 	return nil
+}
+
+func (block *BasicBlock) assign(assign Val, expr Val) {
+	block.Nodes = append(block.Nodes, &AssignStmt{
+		Assign: assign,
+		Expr:   expr,
+	})
 }
 
 func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
@@ -298,6 +302,9 @@ func (block *BasicBlock) Name() string {
 	if block == nil {
 		return "<nil>"
 	}
+	if block.ID == 0 {
+		return "entry"
+	}
 	if len(block.Labels) != 0 {
 		return fmt.Sprintf("label_%v", block.Labels[0])
 	}
@@ -317,7 +324,9 @@ func (ast AST) String() string {
 
 func (block *BasicBlock) String() string {
 	var b strings.Builder
-	if len(block.Labels) == 0 {
+	if block.ID == 0 {
+		b.WriteString("entry:\n")
+	} else if len(block.Labels) == 0 {
 		fmt.Fprintf(&b, "block_%d:\n", block.ID)
 	}
 	for _, label := range block.Labels {
@@ -330,7 +339,7 @@ func (block *BasicBlock) String() string {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
-		fmt.Fprintf(&b, "%d", val)
+		fmt.Fprintf(&b, "%v", val)
 	}
 	fmt.Fprintf(&b, "], pop %d, access %d\n", -block.Stack.Low, -block.Stack.Min)
 	for _, node := range block.Nodes {
@@ -343,45 +352,32 @@ func (block *BasicBlock) String() string {
 	return b.String()
 }
 
-func (s *StackVal) String() string  { return fmt.Sprintf("%%%d", s.Val) }
-func (c *ConstVal) String() string  { return fmt.Sprintf("%v", c.Val) }
-func (s *StringVal) String() string { return fmt.Sprintf("%q", s.Val) }
-func (a *ArrayVal) String() string  { return bigint.FormatSlice(a.Val) }
-func (a *AddrVal) String() string   { return fmt.Sprintf("*%v", a.Val) }
-func (u *UnaryExpr) String() string { return fmt.Sprintf("%v = %v %v", u.Assign, u.Op, u.Val) }
-func (b *BinaryExpr) String() string {
-	return fmt.Sprintf("%v = %v %v %v", b.Assign, b.Op, b.LHS, b.RHS)
-}
-func (p *PrintStmt) String() string { return fmt.Sprintf("%v %v", p.Op, p.Val) }
-func (r *ReadExpr) String() string  { return fmt.Sprintf("%v = %v", r.Assign, r.Op) }
-func (c *CallStmt) String() string  { return fmt.Sprintf("call %s %s", c.Call.Name(), c.Next.Name()) }
-func (j *JmpStmt) String() string   { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
+func (s *StackVal) String() string   { return fmt.Sprintf("%%%d", s.Val) }
+func (c *ConstVal) String() string   { return c.Val.String() }
+func (s *StringVal) String() string  { return fmt.Sprintf("%q", s.Val) }
+func (a *ArrayVal) String() string   { return bigint.FormatSlice(a.Val) }
+func (a *AddrVal) String() string    { return fmt.Sprintf("*%v", a.Val) }
+func (a *AssignStmt) String() string { return fmt.Sprintf("%v = %v", a.Assign, a.Expr) }
+func (b *ArithExpr) String() string  { return fmt.Sprintf("%v %v %v", b.Op, b.LHS, b.RHS) }
+func (u *HeapExpr) String() string   { return fmt.Sprintf("%v %v", u.Op, u.Val) }
+func (p *PrintStmt) String() string  { return fmt.Sprintf("%v %v", p.Op, p.Val) }
+func (r *ReadExpr) String() string   { return r.Op.String() }
+func (c *CallStmt) String() string   { return fmt.Sprintf("call %s %s", c.Call.Name(), c.Next.Name()) }
+func (j *JmpStmt) String() string    { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", j.Op, j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
 }
 func (*RetStmt) String() string { return "ret" }
 func (*EndStmt) String() string { return "end" }
 
-// Assign returns the value the node assigns to.
-func Assign(node Node) Val {
-	switch expr := node.(type) {
-	case *UnaryExpr:
-		return expr.Assign
-	case *BinaryExpr:
-		return expr.Assign
-	case *ReadExpr:
-		return expr.Assign
-	default:
-		return nil
-	}
-}
-
 // Op returns the op of the node.
 func Op(node Node) token.Type {
 	switch expr := node.(type) {
-	case *UnaryExpr:
+	case *AssignStmt:
+		return Op(expr.Expr)
+	case *ArithExpr:
 		return expr.Op
-	case *BinaryExpr:
+	case *HeapExpr:
 		return expr.Op
 	case *PrintStmt:
 		return expr.Op

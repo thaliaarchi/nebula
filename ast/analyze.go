@@ -40,52 +40,6 @@ func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
 	block.Nodes = block.Nodes[:k]
 }
 
-// InlineStackConstants eliminates push instructions and inlines
-// constants.
-func (ast AST) InlineStackConstants() {
-	for _, block := range ast {
-		constants := make(map[int]*big.Int)
-		j := 0
-		for i := range block.Nodes {
-			if node, ok := block.Nodes[i].(*UnaryExpr); ok && node.Op == token.Push {
-				assign := node.Assign.(*StackVal).Val
-				val := node.Val.(*ConstVal).Val
-				constants[assign] = val
-			} else {
-				inlineConstants(&block.Nodes[i], constants)
-				block.Nodes[j] = block.Nodes[i]
-				j++
-			}
-		}
-		block.Nodes = block.Nodes[:j]
-		inlineConstants(&block.Edge, constants)
-	}
-}
-
-func inlineConstants(node *Node, constants map[int]*big.Int) {
-	switch n := (*node).(type) {
-	case *StackVal:
-		if c, ok := constants[n.Val]; ok {
-			*node = &ConstVal{c}
-		}
-	case *AddrVal:
-		inlineConstants(&n.Val, constants)
-	case *UnaryExpr:
-		inlineConstants(&n.Assign, constants)
-		inlineConstants(&n.Val, constants)
-	case *BinaryExpr:
-		inlineConstants(&n.Assign, constants)
-		inlineConstants(&n.LHS, constants)
-		inlineConstants(&n.RHS, constants)
-	case *PrintStmt:
-		inlineConstants(&n.Val, constants)
-	case *ReadExpr:
-		inlineConstants(&n.Assign, constants)
-	case *JmpCondStmt:
-		inlineConstants(&n.Val, constants)
-	}
-}
-
 // func (ast AST) JoinSafeCalls() {
 // 	safe := make(map[*BasicBlock]bool)
 // 	for _, block := range ast {
@@ -156,55 +110,13 @@ func checkPrint(node Node) (string, bool) {
 	return "", false
 }
 
-func (ast AST) ConcatStoreArrays() {
+func (ast AST) FoldConstArith() {
 	for _, block := range ast {
-		block.Reduce(func(acc, curr Node, i int) (Node, bool) {
-			if node, ok := curr.(*UnaryExpr); ok && node.Op == token.Store {
-				if val, ok := node.Val.(*ConstVal); ok {
-					if assign, ok := node.Assign.(*AddrVal); ok {
-						if addr, ok := assign.Val.(*ConstVal); ok {
-							if acc == nil {
-								return &UnaryExpr{
-									Op:     token.Storea,
-									Assign: node.Assign,
-									Val:    &ArrayVal{[]*big.Int{val.Val}},
-								}, true
-							}
-							prev := block.Nodes[i-1].(*UnaryExpr)
-							prevAddr := prev.Assign.(*AddrVal).Val.(*ConstVal)
-							diff := new(big.Int).Sub(addr.Val, prevAddr.Val)
-							if diff.Cmp(bigOne) == 0 {
-								arr := acc.(*UnaryExpr).Val.(*ArrayVal)
-								arr.Val = append(arr.Val, val.Val)
-								return acc, true
-							}
-						}
-					}
-				}
-			}
-			return nil, false
-		})
-	}
-}
-
-func (ast AST) ConstArith() {
-	for _, block := range ast {
-		for i, node := range block.Nodes {
-			if bin, ok := node.(*BinaryExpr); ok {
-				if !bin.Op.IsArith() {
-					continue
-				}
-				if lhs, ok := bin.LHS.(*ConstVal); ok {
-					if rhs, ok := bin.RHS.(*ConstVal); ok {
-						block.Nodes[i] = constArith(bin, lhs.Val, rhs.Val)
-					} else {
-						if n := constArithLHS(bin, lhs.Val, bin.RHS); n != nil {
-							block.Nodes[i] = n
-						}
-					}
-				} else if rhs, ok := bin.RHS.(*ConstVal); ok {
-					if n := constArithRHS(bin, lhs, rhs.Val); n != nil {
-						block.Nodes[i] = n
+		for _, node := range block.Nodes {
+			if assign, ok := node.(*AssignStmt); ok {
+				if expr, ok := assign.Expr.(*ArithExpr); ok {
+					if val, ok := expr.FoldConst(); ok {
+						assign.Expr = val
 					}
 				}
 			}
@@ -212,9 +124,22 @@ func (ast AST) ConstArith() {
 	}
 }
 
-func constArith(node *BinaryExpr, lhs, rhs *big.Int) Node {
+// FoldConst reduces constant arithmetic expressions or identities.
+func (expr *ArithExpr) FoldConst() (Val, bool) {
+	if lhs, ok := expr.LHS.(*ConstVal); ok {
+		if rhs, ok := expr.RHS.(*ConstVal); ok {
+			return expr.foldConstLR(lhs.Val, rhs.Val)
+		}
+		return expr.foldConstL(lhs.Val)
+	} else if rhs, ok := expr.RHS.(*ConstVal); ok {
+		return expr.foldConstR(rhs.Val)
+	}
+	return nil, false
+}
+
+func (expr *ArithExpr) foldConstLR(lhs, rhs *big.Int) (Val, bool) {
 	result := new(big.Int)
-	switch node.Op {
+	switch expr.Op {
 	case token.Add:
 		result.Add(lhs, rhs)
 	case token.Sub:
@@ -226,69 +151,47 @@ func constArith(node *BinaryExpr, lhs, rhs *big.Int) Node {
 	case token.Mod:
 		result.Mod(lhs, rhs)
 	}
-	return &UnaryExpr{
-		Op:     token.Push,
-		Assign: node.Assign,
-		Val:    &ConstVal{result},
-	}
+	return &ConstVal{result}, true
 }
 
-var bigOne = new(big.Int).SetInt64(1)
+var bigOne = big.NewInt(1)
 
-func constArithRHS(node *BinaryExpr, lhs Val, rhs *big.Int) Node {
-	var val Val
+func (expr *ArithExpr) foldConstL(lhs *big.Int) (Val, bool) {
+	if lhs.Sign() == 0 {
+		switch expr.Op {
+		case token.Add:
+			return expr.RHS, true
+		case token.Sub:
+			// negation
+		case token.Mul, token.Div, token.Mod:
+			return expr.LHS, true
+		}
+	} else if lhs.Cmp(bigOne) == 0 {
+		switch expr.Op {
+		case token.Mul, token.Div:
+			return expr.RHS, true
+		}
+	}
+	return nil, false
+}
+
+func (expr *ArithExpr) foldConstR(rhs *big.Int) (Val, bool) {
 	if rhs.Sign() == 0 {
-		switch node.Op {
+		switch expr.Op {
 		case token.Add, token.Sub:
-			val = lhs
+			return expr.LHS, true
 		case token.Mul:
-			val = &ConstVal{new(big.Int).SetInt64(0)}
-		case token.Div:
+			return expr.RHS, true
+		case token.Div, token.Mod:
 			panic("ast: division by zero")
 		}
 	} else if rhs.Cmp(bigOne) == 0 {
-		switch node.Op {
+		switch expr.Op {
 		case token.Mul, token.Div:
-			val = lhs
+			return expr.LHS, true
+		case token.Mod:
+			return &ConstVal{big.NewInt(0)}, true
 		}
 	}
-	if val == nil {
-		return nil
-	}
-	return &UnaryExpr{
-		Op:     token.Push,
-		Assign: node.Assign,
-		Val:    val,
-	}
-}
-
-func constArithLHS(node *BinaryExpr, lhs *big.Int, rhs Val) Node {
-	var val Val
-	if lhs.Sign() == 0 {
-		switch node.Op {
-		case token.Add:
-			val = rhs
-		case token.Sub:
-			return &UnaryExpr{
-				Op:     token.Neg,
-				Assign: node.Assign,
-				Val:    rhs,
-			}
-		case token.Mul, token.Div:
-			val = &ConstVal{new(big.Int).SetInt64(0)}
-		}
-	} else if lhs.Cmp(bigOne) == 0 {
-		switch node.Op {
-		case token.Mul, token.Div:
-			val = rhs
-		}
-	}
-	if val == nil {
-		return nil
-	}
-	return &UnaryExpr{
-		Op:     token.Push,
-		Assign: node.Assign,
-		Val:    val,
-	}
+	return nil, false
 }
