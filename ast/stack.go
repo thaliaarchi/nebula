@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 // Stack represents the Whitespace stack for registerization. Every
@@ -160,4 +161,17 @@ func (s *Stack) simplify() {
 		s.Low++
 	}
 	s.Vals = s.Vals[i:]
+}
+
+func (s *Stack) String() string {
+	var b strings.Builder
+	b.WriteByte('[')
+	for i, val := range s.Vals {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString((*val).String())
+	}
+	b.WriteByte(']')
+	return b.String()
 }

@@ -140,7 +140,7 @@ func (expr *ArithExpr) FoldConst() (Val, bool) {
 	} else if rhs, ok := (*expr.RHS).(*ConstVal); ok {
 		return expr.foldConstR(rhs.Val)
 	}
-	return nil, false
+	return expr.foldConst()
 }
 
 func (expr *ArithExpr) foldConstLR(lhs, rhs *big.Int) (Val, bool) {
@@ -197,6 +197,18 @@ func (expr *ArithExpr) foldConstR(rhs *big.Int) (Val, bool) {
 			return *expr.LHS, true
 		case token.Mod:
 			return &ConstVal{big.NewInt(0)}, true
+		}
+	}
+	return nil, false
+}
+
+func (expr *ArithExpr) foldConst() (Val, bool) {
+	if expr.LHS == expr.RHS {
+		switch expr.Op {
+		case token.Sub, token.Mod:
+			return &ConstVal{big.NewInt(0)}, true
+		case token.Div:
+			return &ConstVal{big.NewInt(1)}, true
 		}
 	}
 	return nil, false

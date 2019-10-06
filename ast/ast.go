@@ -181,7 +181,9 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Copy:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ast: copy argument out of range: %v", tok.Arg))
+			panic(fmt.Sprintf("ast: copy argument overflows size: %v", tok.Arg))
+		} else if n < 0 {
+			panic(fmt.Sprintf("ast: copy argument negative: %v", tok.Arg))
 		}
 		block.Stack.Copy(n)
 	case token.Swap:
@@ -191,7 +193,9 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Slide:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ast: slide argument out of range: %v", tok.Arg))
+			panic(fmt.Sprintf("ast: slide argument overflows size: %v", tok.Arg))
+		} else if n < 0 {
+			panic(fmt.Sprintf("ast: slide argument negative: %v", tok.Arg))
 		}
 		block.Stack.Slide(n)
 
@@ -236,8 +240,6 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 		block.Edge = &RetStmt{}
 	case token.End:
 		block.Edge = &EndStmt{}
-	case token.Fallthrough:
-		panic("ast: unexpected fallthrough")
 
 	case token.Printc, token.Printi:
 		block.Nodes = append(block.Nodes, &PrintStmt{
@@ -336,14 +338,7 @@ func (block *BasicBlock) String() string {
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
-	b.WriteString("    ; stack [")
-	for i, val := range block.Stack.Vals {
-		if i != 0 {
-			b.WriteByte(' ')
-		}
-		fmt.Fprintf(&b, "%v", val)
-	}
-	fmt.Fprintf(&b, "], pop %d, access %d\n", -block.Stack.Low, -block.Stack.Min)
+	fmt.Fprintf(&b, "    ; stack %v, pop %d, access %d\n", &block.Stack, -block.Stack.Low, -block.Stack.Min)
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
 		b.WriteString(node.String())
