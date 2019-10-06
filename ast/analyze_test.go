@@ -108,16 +108,16 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", ast, astStart)
 	}
 
-	vA := &ConstVal{big.NewInt('A')}
-	vB := &ConstVal{big.NewInt('B')}
-	v23 := &ConstVal{big.NewInt(23)}
+	vA := Val(&ConstVal{big.NewInt('A')})
+	vB := Val(&ConstVal{big.NewInt('B')})
+	v23 := Val(&ConstVal{big.NewInt(23)})
 	astConst := AST{&BasicBlock{
 		Nodes: []Node{
-			&PrintStmt{Op: token.Printc, Val: vA},
-			&PrintStmt{Op: token.Printc, Val: vB},
+			&PrintStmt{Op: token.Printc, Val: &vA},
+			&PrintStmt{Op: token.Printc, Val: &vB},
 			&PrintStmt{Op: token.Printc, Val: s7},
 			&PrintStmt{Op: token.Printi, Val: s0},
-			&PrintStmt{Op: token.Printi, Val: v23},
+			&PrintStmt{Op: token.Printi, Val: &v23},
 		},
 		Edge:  &EndStmt{},
 		Stack: stack,
@@ -128,9 +128,10 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", ast, astConst)
 	}
 
+	vStr := Val(&StringVal{"ABC123"})
 	astStr := AST{&BasicBlock{
 		Nodes: []Node{
-			&PrintStmt{Op: token.Prints, Val: &StringVal{"ABC123"}},
+			&PrintStmt{Op: token.Prints, Val: &vStr},
 		},
 		Edge:  &EndStmt{},
 		Stack: stack,

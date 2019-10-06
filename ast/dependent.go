@@ -67,7 +67,7 @@ func isIO(node Node) bool {
 // RHS.
 func canThrow(node Node) bool {
 	if n, ok := node.(*ArithExpr); ok && n.Op == token.Div {
-		_, ok := n.RHS.(*ConstVal)
+		_, ok := (*n.RHS).(*ConstVal)
 		return !ok
 	}
 	return false

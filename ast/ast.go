@@ -45,11 +45,11 @@ type StringVal struct{ Val string }
 type ArrayVal struct{ Val []*big.Int }
 
 // AddrVal marks a value as being a pointer to a value.
-type AddrVal struct{ Val Val }
+type AddrVal struct{ Val *Val }
 
 // AssignStmt assigns the value of an expression to the stack or heap.
 type AssignStmt struct {
-	Assign Val
+	Assign *Val
 	Expr   Node
 }
 
@@ -57,21 +57,21 @@ type AssignStmt struct {
 // are add, sub, mul, div, and mod.
 type ArithExpr struct {
 	Op  token.Type
-	LHS Val
-	RHS Val
+	LHS *Val
+	RHS *Val
 }
 
 // HeapExpr evaluates a heap access operation. Valid operations are
 // store and retrieve.
 type HeapExpr struct {
 	Op  token.Type
-	Val Val
+	Val *Val
 }
 
 // PrintStmt prints a value. Valid operations are printc and printi.
 type PrintStmt struct {
 	Op  token.Type
-	Val Val
+	Val *Val
 }
 
 // ReadExpr reads a value from stdin. Valid operations are readc and
@@ -101,7 +101,7 @@ type JmpStmt struct {
 // instructions are jz and jn.
 type JmpCondStmt struct {
 	Op         token.Type
-	Val        Val
+	Val        *Val
 	TrueBlock  *BasicBlock
 	FalseBlock *BasicBlock
 }
@@ -204,8 +204,9 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 		})
 
 	case token.Store:
-		val, assign := block.Stack.Pop(), block.Stack.Pop()
-		block.assign(&AddrVal{assign}, &HeapExpr{
+		val, addr := block.Stack.Pop(), block.Stack.Pop()
+		assign := Val(&AddrVal{addr})
+		block.assign(&assign, &HeapExpr{
 			Op:  token.Store,
 			Val: val,
 		})
@@ -244,7 +245,8 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 			Val: block.Stack.Pop(),
 		})
 	case token.Readc, token.Readi:
-		block.assign(&AddrVal{block.Stack.Pop()}, &ReadExpr{
+		assign := Val(&AddrVal{block.Stack.Pop()})
+		block.assign(&assign, &ReadExpr{
 			Op: tok.Type,
 		})
 
@@ -254,7 +256,7 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	return nil
 }
 
-func (block *BasicBlock) assign(assign Val, expr Val) {
+func (block *BasicBlock) assign(assign *Val, expr Val) {
 	block.Nodes = append(block.Nodes, &AssignStmt{
 		Assign: assign,
 		Expr:   expr,
