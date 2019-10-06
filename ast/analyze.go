@@ -40,40 +40,9 @@ func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
 	block.Nodes = block.Nodes[:k]
 }
 
-// func (ast AST) JoinSafeCalls() {
-// 	safe := make(map[*BasicBlock]bool)
-// 	for _, block := range ast {
-// 		if jmp, ok := block.Edge.(*JmpStmt); ok && jmp.Op == token.Call {
-// 			if checkStackSafe(jmp.Block, safe) {
-// 				// join blocks
-// 			}
-// 		}
-// 	}
-// }
-
-func checkStackSafe(block *BasicBlock, safe map[*BasicBlock]bool) bool {
-	if len(block.Stack.Vals) != 0 || block.Stack.Low != 0 || block.Stack.Min != 0 {
-		safe[block] = false
-		return false
-	}
-	if safe[block] {
-		return true
-	}
-	switch edge := block.Edge.(type) {
-	case *CallStmt:
-		return checkStackSafe(edge.Call, safe) && checkStackSafe(edge.Next, safe)
-	case *JmpStmt:
-		return checkStackSafe(edge.Block, safe)
-	case *JmpCondStmt:
-		return checkStackSafe(edge.TrueBlock, safe) && checkStackSafe(edge.FalseBlock, safe)
-	case *RetStmt, *EndStmt:
-	}
-	return true
-}
-
 // ConcatStrings joins consecutive constant print expressions.
-func (ast AST) ConcatStrings() {
-	for _, block := range ast {
+func (ast *AST) ConcatStrings() {
+	for _, block := range ast.Blocks {
 		block.Reduce(func(acc, curr Node, i int) (Node, bool) {
 			if str, ok := checkPrint(curr); ok {
 				if acc == nil {
@@ -111,8 +80,10 @@ func checkPrint(node Node) (string, bool) {
 	return "", false
 }
 
-func (ast AST) FoldConstArith() {
-	for _, block := range ast {
+// FoldConstArith folds and propagates constant arithmetic expressions
+// or identities.
+func (ast *AST) FoldConstArith() {
+	for _, block := range ast.Blocks {
 		j := 0
 		for i := 0; i < len(block.Nodes); i++ {
 			if assign, ok := block.Nodes[i].(*AssignStmt); ok {

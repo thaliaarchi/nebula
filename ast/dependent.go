@@ -7,13 +7,13 @@ import (
 
 // FlowDependenceGraph creates a directed graph with edges representing
 // the connections between basic blocks.
-func (ast AST) FlowDependenceGraph() graph.Graph {
+func (ast *AST) FlowDependenceGraph() graph.Graph {
 	ids := make(map[*BasicBlock]uint)
-	for i, block := range ast {
+	for i, block := range ast.Blocks {
 		ids[block] = uint(i)
 	}
-	g := graph.NewGraph(uint(len(ast)))
-	for i, block := range ast {
+	g := graph.NewGraph(uint(len(ast.Blocks)))
+	for i, block := range ast.Blocks {
 		switch edge := block.Edge.(type) {
 		case *CallStmt:
 			g.Add(uint(i), ids[edge.Call])

@@ -53,7 +53,7 @@ l4:
     dup      ; Guess which variable we need.         [n h i k j j j]
     copy 5   ; Grab a copy of h                      [n h i k j j j h]
     sub      ; to subtract it from j                 [n h i k j j j-h]
-    retrieve ; to retrive a[j - h]                   [n h i k j j x]
+    retrieve ; to retrieve a[j - h]                  [n h i k j j x]
     store    ; and swap it into j, a[j] = a[j - h]   [n h i k j]
     copy 3   ; Grab one more h                       [n h i k j h]
     sub      ; to decrement the loop variable        [n h i k j-=h]

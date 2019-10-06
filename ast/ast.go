@@ -10,7 +10,9 @@ import (
 )
 
 // AST is a set of interconnected basic blocks.
-type AST []*BasicBlock
+type AST struct {
+	Blocks []*BasicBlock
+}
 
 // BasicBlock is a list of consecutive non-branching instructions in a
 // program followed by a branch.
@@ -113,7 +115,7 @@ type RetStmt struct{}
 type EndStmt struct{}
 
 // Parse parses tokens into an AST of basic blocks.
-func Parse(tokens []token.Token) (AST, error) {
+func Parse(tokens []token.Token) (*AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
@@ -121,7 +123,7 @@ func Parse(tokens []token.Token) (AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := connectBlockEdges(ast, branches, labels); err != nil {
+	if err := ast.connectBlockEdges(branches, labels); err != nil {
 		return nil, err
 	}
 	return ast, nil
@@ -138,17 +140,17 @@ func needsImplicitEnd(tokens []token.Token) bool {
 	return true
 }
 
-func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
+func parseBlocks(tokens []token.Token) (*AST, []*big.Int, *bigint.Map, error) {
 	var ast AST
 	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	for i := 0; i < len(tokens); i++ {
 		var block BasicBlock
-		block.ID = len(ast)
+		block.ID = len(ast.Blocks)
 
 		for tokens[i].Type == token.Label {
 			label := tokens[i].Arg
-			if labels.Put(label, len(ast)) {
+			if labels.Put(label, len(ast.Blocks)) {
 				return nil, nil, nil, fmt.Errorf("ast: label is not unique: %s", label)
 			}
 			block.Labels = append(block.Labels, label)
@@ -166,10 +168,10 @@ func parseBlocks(tokens []token.Token) (AST, []*big.Int, *bigint.Map, error) {
 			}
 		}
 
-		ast = append(ast, &block)
+		ast.Blocks = append(ast.Blocks, &block)
 		branches = append(branches, branch)
 	}
-	return ast, branches, labels, nil
+	return &ast, branches, labels, nil
 }
 
 func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
@@ -265,32 +267,32 @@ func (block *BasicBlock) assign(assign *Val, expr Val) {
 	})
 }
 
-func connectBlockEdges(ast AST, branches []*big.Int, labels *bigint.Map) error {
-	for i, block := range ast {
+func (ast *AST) connectBlockEdges(branches []*big.Int, labels *bigint.Map) error {
+	for i, block := range ast.Blocks {
 		branch := branches[i]
 		if branch != nil {
 			label, ok := labels.Get(branch)
 			if !ok {
 				return fmt.Errorf("ast: block %s jumps to non-existant label: %v", block.Name(), branch)
 			}
-			callee := ast[label.(int)]
+			callee := ast.Blocks[label.(int)]
 			callee.Callers = append(callee.Callers, block)
 
 			switch edge := block.Edge.(type) {
 			case *CallStmt:
-				if i >= len(ast) {
+				if i >= len(ast.Blocks) {
 					panic("ast: program ends with call")
 				}
 				edge.Call = callee
-				edge.Next = ast[i+1]
+				edge.Next = ast.Blocks[i+1]
 			case *JmpStmt:
 				edge.Block = callee
 			case *JmpCondStmt:
-				if i >= len(ast) {
+				if i >= len(ast.Blocks) {
 					panic("ast: program ends with conditional jump")
 				}
 				edge.TrueBlock = callee
-				edge.FalseBlock = ast[i+1]
+				edge.FalseBlock = ast.Blocks[i+1]
 			case *RetStmt, *EndStmt:
 			default:
 				panic(fmt.Sprintf("ast: invalid edge type: %T", block.Edge))
@@ -315,9 +317,9 @@ func (block *BasicBlock) Name() string {
 	return fmt.Sprintf("block_%d", block.ID)
 }
 
-func (ast AST) String() string {
+func (ast *AST) String() string {
 	var b strings.Builder
-	for i, block := range ast {
+	for i, block := range ast.Blocks {
 		if i != 0 {
 			b.WriteString("\n\n")
 		}

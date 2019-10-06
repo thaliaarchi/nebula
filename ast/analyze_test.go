@@ -84,7 +84,7 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 
-	astStart := AST{&BasicBlock{
+	astStart := &AST{Blocks: []*BasicBlock{{
 		Nodes: []Node{
 			&AssignStmt{Assign: s4, Expr: &ArithExpr{Op: token.Mul, LHS: s2, RHS: s3}},
 			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Add, LHS: s1, RHS: s4}},
@@ -98,7 +98,7 @@ func TestTransforms(t *testing.T) {
 		},
 		Edge:  &EndStmt{},
 		Stack: stack,
-	}}
+	}}}
 
 	ast, err := Parse(tokens)
 	if err != nil {
@@ -111,7 +111,7 @@ func TestTransforms(t *testing.T) {
 	vA := Val(&ConstVal{big.NewInt('A')})
 	vB := Val(&ConstVal{big.NewInt('B')})
 	v23 := Val(&ConstVal{big.NewInt(23)})
-	astConst := AST{&BasicBlock{
+	astConst := &AST{Blocks: []*BasicBlock{{
 		Nodes: []Node{
 			&PrintStmt{Op: token.Printc, Val: &vA},
 			&PrintStmt{Op: token.Printc, Val: &vB},
@@ -121,7 +121,7 @@ func TestTransforms(t *testing.T) {
 		},
 		Edge:  &EndStmt{},
 		Stack: stack,
-	}}
+	}}}
 
 	ast.FoldConstArith()
 	if !reflect.DeepEqual(ast, astConst) {
@@ -129,13 +129,13 @@ func TestTransforms(t *testing.T) {
 	}
 
 	vStr := Val(&StringVal{"ABC123"})
-	astStr := AST{&BasicBlock{
+	astStr := &AST{Blocks: []*BasicBlock{{
 		Nodes: []Node{
 			&PrintStmt{Op: token.Prints, Val: &vStr},
 		},
 		Edge:  &EndStmt{},
 		Stack: stack,
-	}}
+	}}}
 
 	ast.ConcatStrings()
 	if !reflect.DeepEqual(ast, astStr) {
