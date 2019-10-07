@@ -49,3 +49,7 @@
 - Special compiler treatment of std lib calls
 - Machine code compilation using LLVM IR
 - Tail call optimization
+- Lifetime analysis
+- Constant folding and propagation
+- Using an SMT solver
+- Abstract interpretation
