@@ -9,21 +9,24 @@ import (
 // the connections between basic blocks.
 func (ast *AST) FlowDependenceGraph() graph.Graph {
 	ids := make(map[*BasicBlock]uint)
-	for i, block := range ast.Blocks {
-		ids[block] = uint(i)
+	for _, block := range ast.Blocks {
+		ids[block] = uint(block.ID)
 	}
 	g := graph.NewGraph(uint(len(ast.Blocks)))
 	for i, block := range ast.Blocks {
-		switch edge := block.Edge.(type) {
+		switch exit := block.Exit.(type) {
 		case *CallStmt:
-			g.Add(uint(i), ids[edge.Callee])
-			g.Add(uint(i), ids[edge.Next])
+			g.Add(uint(i), ids[exit.Callee])
 		case *JmpStmt:
-			g.Add(uint(i), ids[edge.Block])
+			g.Add(uint(i), ids[exit.Block])
 		case *JmpCondStmt:
-			g.Add(uint(i), ids[edge.TrueBlock])
-			g.Add(uint(i), ids[edge.FalseBlock])
-		case *RetStmt, *EndStmt:
+			g.Add(uint(i), ids[exit.TrueBlock])
+			g.Add(uint(i), ids[exit.FalseBlock])
+		case *RetStmt:
+			for _, caller := range block.Callers {
+				g.Add(uint(i), ids[caller])
+			}
+		case *EndStmt:
 		}
 	}
 	return g

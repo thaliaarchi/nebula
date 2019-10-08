@@ -11,7 +11,7 @@ func (ast *AST) MergeSimpleCalls() {
 		}
 		if len(block.Callers) == 1 {
 			caller := block.Callers[0]
-			if _, ok := caller.Edge.(*JmpStmt); ok {
+			if _, ok := caller.Exit.(*JmpStmt); ok {
 				caller.Merge(block)
 				continue
 			}
@@ -43,7 +43,7 @@ func (block *BasicBlock) Merge(next *BasicBlock) {
 		}
 	}
 	block.Nodes = append(block.Nodes, next.Nodes...)
-	block.Edge = next.Edge
+	block.Exit = next.Exit
 
 	block.Stack.Next += next.Stack.Next
 	if next.Stack.Access > 0 {

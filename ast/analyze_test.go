@@ -96,7 +96,7 @@ func TestTransforms(t *testing.T) {
 			&PrintStmt{Op: token.Printi, Val: s0},
 			&PrintStmt{Op: token.Printi, Val: s5},
 		},
-		Edge:  &EndStmt{},
+		Exit:  &EndStmt{},
 		Stack: stack,
 	}}}
 
@@ -119,7 +119,7 @@ func TestTransforms(t *testing.T) {
 			&PrintStmt{Op: token.Printi, Val: s0},
 			&PrintStmt{Op: token.Printi, Val: &v23},
 		},
-		Edge:  &EndStmt{},
+		Exit:  &EndStmt{},
 		Stack: stack,
 	}}}
 
@@ -133,7 +133,7 @@ func TestTransforms(t *testing.T) {
 		Nodes: []Node{
 			&PrintStmt{Op: token.Prints, Val: &vStr},
 		},
-		Edge:  &EndStmt{},
+		Exit:  &EndStmt{},
 		Stack: stack,
 	}}}
 

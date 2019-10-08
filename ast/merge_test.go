@@ -49,7 +49,7 @@ func TestMergeSimpleCalls(t *testing.T) {
 			&AssignStmt{Assign: s3, Expr: &ArithExpr{Op: token.Mul, LHS: &n2, RHS: s2}},
 			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Mod, LHS: s3, RHS: &n7}},
 		},
-		Edge:  &EndStmt{},
+		Exit:  &EndStmt{},
 		Stack: stack,
 	}}}
 
