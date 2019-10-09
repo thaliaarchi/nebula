@@ -1,0 +1,5 @@
+63400:loop
+3:.loop_check
+4:.loop_break
+1:.fizz
+2:.buzz

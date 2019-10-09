@@ -384,10 +384,18 @@ func (block *BasicBlock) Name() string {
 func (ast *AST) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
+	b.WriteString("  entry[shape=point];\n")
 	for _, block := range ast.Blocks {
-		fmt.Fprintf(&b, "  block_%d[label=\"%s\"];\n", block.ID, block.Name())
+		if _, ok := block.Exit.(*EndStmt); ok {
+			fmt.Fprintf(&b, "  block_%d[label=\"%s\" peripheries=2];\n", block.ID, block.Name())
+		} else {
+			fmt.Fprintf(&b, "  block_%d[label=\"%s\"];\n", block.ID, block.Name())
+		}
 	}
 	b.WriteByte('\n')
+	if len(ast.Blocks) > 0 {
+		fmt.Fprintf(&b, "  entry -> block_%d;\n", ast.Blocks[0].ID)
+	}
 	for _, block := range ast.Blocks {
 		switch stmt := block.Exit.(type) {
 		case *CallStmt:
@@ -398,11 +406,9 @@ func (ast *AST) DotDigraph() string {
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, stmt.TrueBlock.ID)
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, stmt.FalseBlock.ID)
 		case *RetStmt:
-			for _, exit := range block.Exits() {
-				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\"];\n", block.ID, exit.ID)
+			for _, caller := range block.Callers {
+				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\\n%s\"];\n", block.ID, caller.Next.ID, caller.Name())
 			}
-		case *EndStmt:
-			fmt.Fprintf(&b, "  block_%d[peripheries=2];\n", block.ID)
 		}
 	}
 	b.WriteString("}\n")
