@@ -152,6 +152,9 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 	var ast AST
 	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
+	prevLabel := "entry"
+	labelIndex := 0
+
 	for i := 0; i < len(tokens); i++ {
 		var block BasicBlock
 		block.ID = len(ast.Blocks)
@@ -161,6 +164,10 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 			block.Prev = prev
 		}
 
+		if tokens[i].Type != token.Label && i != 0 && prevLabel != "" {
+			labelIndex++
+			block.Labels = append(block.Labels, Label{nil, fmt.Sprintf("%s@%d", prevLabel, labelIndex)})
+		}
 		for tokens[i].Type == token.Label {
 			label := tokens[i].Arg
 			if labels.Put(label, len(ast.Blocks)) {
@@ -168,9 +175,12 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 			}
 			var name string
 			if labelNames != nil {
-				n, _ := labelNames.Get(label)
-				name = n.(string)
+				if n, ok := labelNames.Get(label); ok {
+					name = n.(string)
+				}
 			}
+			prevLabel = name
+			labelIndex = 0
 			block.Labels = append(block.Labels, Label{label, name})
 			i++
 		}
@@ -361,11 +371,11 @@ func (block *BasicBlock) Name() string {
 	if block == nil {
 		return "<nil>"
 	}
-	if block.ID == 0 {
-		return "entry"
-	}
 	if len(block.Labels) != 0 {
 		return block.Labels[0].String()
+	}
+	if block.ID == 0 {
+		return "entry"
 	}
 	return fmt.Sprintf("block_%d", block.ID)
 }
@@ -375,21 +385,24 @@ func (ast *AST) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
 	for _, block := range ast.Blocks {
-		name := block.Name()
+		fmt.Fprintf(&b, "  block_%d[label=\"%s\"];\n", block.ID, block.Name())
+	}
+	b.WriteByte('\n')
+	for _, block := range ast.Blocks {
 		switch stmt := block.Exit.(type) {
 		case *CallStmt:
-			fmt.Fprintf(&b, "  %s -> %s[label=\"call\"];\n", name, stmt.Callee.Name())
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, stmt.Callee.ID)
 		case *JmpStmt:
-			fmt.Fprintf(&b, "  %s -> %s[label=\"jmp\"];\n", name, stmt.Block.Name())
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"jmp\"];\n", block.ID, stmt.Block.ID)
 		case *JmpCondStmt:
-			fmt.Fprintf(&b, "  %s -> %s[label=\"true\"];\n", name, stmt.TrueBlock.Name())
-			fmt.Fprintf(&b, "  %s -> %s[label=\"false\"];\n", name, stmt.FalseBlock.Name())
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, stmt.TrueBlock.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, stmt.FalseBlock.ID)
 		case *RetStmt:
 			for _, exit := range block.Exits() {
-				fmt.Fprintf(&b, "  %s -> %s[label=\"ret\"];\n", name, exit.Name())
+				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\"];\n", block.ID, exit.ID)
 			}
 		case *EndStmt:
-			fmt.Fprintf(&b, "  %s[peripheries=2];\n", name)
+			fmt.Fprintf(&b, "  block_%d[peripheries=2];\n", block.ID)
 		}
 	}
 	b.WriteString("}\n")
@@ -409,10 +422,12 @@ func (ast *AST) String() string {
 
 func (block *BasicBlock) String() string {
 	var b strings.Builder
-	if block.ID == 0 {
-		b.WriteString("entry:\n")
-	} else if len(block.Labels) == 0 {
-		fmt.Fprintf(&b, "block_%d:\n", block.ID)
+	if len(block.Labels) == 0 {
+		if block.ID == 0 {
+			b.WriteString("entry:\n")
+		} else {
+			fmt.Fprintf(&b, "block_%d:\n", block.ID)
+		}
 	}
 	for _, label := range block.Labels {
 		b.WriteString(label.String())

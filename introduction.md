@@ -10,7 +10,8 @@ The grammar of the language is very simple, consisting only of the
 characters space, tab, and line feed. Instructions are denoted with
 permutations of these characters, resembling a prefix tree. Integers are
 an arbitrary-length series of binary digits written as spaces and tabs
-and terminated with a line feed.
+and terminated with a line feed. The grammar is described further in the
+official tutorial.
 
 As the only recognized characters are invisible, programs are hard to
 read and write, thus I have only written one program directly with this
