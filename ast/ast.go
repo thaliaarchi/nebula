@@ -12,6 +12,8 @@ import (
 // AST is a set of interconnected basic blocks.
 type AST struct {
 	Blocks []*BasicBlock
+	Entry  *BasicBlock
+	NextID int
 }
 
 // BasicBlock is a list of consecutive non-branching instructions in a
@@ -123,8 +125,14 @@ type Label struct {
 	Name string
 }
 
+// ErrorRetUnderflow is an error given when ret is executed without a
+// caller.
+type ErrorRetUnderflow struct {
+	Trace []*BasicBlock
+}
+
 // Parse parses tokens into an AST of basic blocks.
-func Parse(tokens []token.Token, labelNames *bigint.Map) (*AST, error) {
+func Parse(tokens []token.Token, labelNames *bigint.Map, trim bool) (*AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
@@ -132,7 +140,7 @@ func Parse(tokens []token.Token, labelNames *bigint.Map) (*AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ast.connectEdges(branches, labels); err != nil {
+	if err := ast.connectEdges(branches, labels, trim); err != nil {
 		return nil, err
 	}
 	return ast, nil
@@ -200,6 +208,8 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 		ast.Blocks = append(ast.Blocks, &block)
 		branches = append(branches, branch)
 	}
+	ast.Entry = ast.Blocks[0]
+	ast.NextID = len(ast.Blocks)
 	return &ast, branches, labels, nil
 }
 
@@ -296,7 +306,7 @@ func (block *BasicBlock) assign(assign *Val, expr Val) {
 	})
 }
 
-func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
+func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map, trim bool) error {
 	for i, block := range ast.Blocks {
 		branch := branches[i]
 		if branch != nil {
@@ -319,50 +329,107 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 			}
 		}
 	}
-	for _, block := range ast.Blocks {
-		if call, ok := block.Exit.(*CallStmt); ok {
-			call.Callee.connectCaller(block)
-			block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
+	if err := ast.Entry.connectCaller(nil); err != nil {
+		return err
+	}
+	if trim {
+		ast.trimUnreachable()
+	} else {
+		for _, block := range ast.Blocks {
+			if call, ok := block.Exit.(*CallStmt); ok {
+				call.Callee.connectCaller(block)
+				block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
+			}
 		}
 	}
 	return nil
 }
 
-func (block *BasicBlock) connectCaller(caller *BasicBlock) {
+func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 	for _, c := range block.Callers {
 		if c == caller {
-			return
+			return nil
 		}
 	}
 	block.Callers = append(block.Callers, caller)
 	switch exit := block.Exit.(type) {
 	case *CallStmt:
-		exit.Callee.connectCaller(block)
-		block.Next.connectCaller(caller)
+		if err := exit.Callee.connectCaller(block); err != nil {
+			return err.append(block)
+		}
+		if err := block.Next.connectCaller(caller); err != nil {
+			return err.append(block)
+		}
 		block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 	case *JmpStmt:
-		exit.Block.connectCaller(caller)
+		if err := exit.Block.connectCaller(caller); err != nil {
+			return err.append(block)
+		}
 	case *JmpCondStmt:
-		exit.TrueBlock.connectCaller(caller)
-		exit.FalseBlock.connectCaller(caller)
+		if err := exit.TrueBlock.connectCaller(caller); err != nil {
+			return err.append(block)
+		}
+		if err := exit.FalseBlock.connectCaller(caller); err != nil {
+			return err.append(caller)
+		}
 	case *RetStmt:
+		if caller == nil {
+			return &ErrorRetUnderflow{[]*BasicBlock{block}}
+		}
 		caller.Returns = append(caller.Returns, block)
 	case *EndStmt:
 	}
+	return nil
 }
 
-func appendUnique(slice []*BasicBlock, blocks ...*BasicBlock) []*BasicBlock {
-	l := len(slice)
-outer:
-	for _, block := range blocks {
-		for i := 0; i < l; i++ {
-			if slice[i] == block {
-				continue outer
+func (ast *AST) trimUnreachable() {
+	visited := newBitset(ast.NextID)
+	ast.Entry.dfs(visited)
+	i := 0
+	for _, block := range ast.Blocks {
+		if !visited.Test(uint32(block.ID)) {
+			if block.Prev != nil {
+				block.Prev.Next = block.Next
 			}
+			if block.Next != nil {
+				block.Next.Prev = block.Prev
+			}
+			for _, exit := range block.Exits() {
+				j := 0
+				for _, entry := range exit.Entries {
+					if entry != block {
+						exit.Entries[j] = entry
+						j++
+					}
+				}
+				exit.Entries = exit.Entries[:j]
+			}
+			continue
 		}
-		slice = append(slice, block)
+		ast.Blocks[i] = block
+		i++
 	}
-	return slice
+	ast.Blocks = ast.Blocks[:i]
+}
+
+func (block *BasicBlock) dfs(visited bitset) {
+	if visited.Test(uint32(block.ID)) {
+		return
+	}
+	visited.Set(uint32(block.ID))
+	switch exit := block.Exit.(type) {
+	case *CallStmt:
+		exit.Callee.dfs(visited)
+		if len(block.Returns) != 0 {
+			block.Next.dfs(visited)
+		}
+	case *JmpStmt:
+		exit.Block.dfs(visited)
+	case *JmpCondStmt:
+		exit.TrueBlock.dfs(visited)
+		exit.FalseBlock.dfs(visited)
+	case *RetStmt, *EndStmt:
+	}
 }
 
 // Exits returns all outgoing edges of the block.
@@ -414,9 +481,7 @@ func (ast *AST) DotDigraph() string {
 		}
 	}
 	b.WriteByte('\n')
-	if len(ast.Blocks) > 0 {
-		fmt.Fprintf(&b, "  entry -> block_%d;\n", ast.Blocks[0].ID)
-	}
+	fmt.Fprintf(&b, "  entry -> block_%d;\n", ast.Entry.ID)
 	for _, block := range ast.Blocks {
 		switch stmt := block.Exit.(type) {
 		case *CallStmt:
@@ -514,30 +579,37 @@ func (l *Label) String() string {
 	return fmt.Sprintf("label_%v", l.ID)
 }
 
-// Op returns the op of the node.
-func Op(node Node) token.Type {
-	switch expr := node.(type) {
-	case *AssignStmt:
-		return Op(expr.Expr)
-	case *ArithExpr:
-		return expr.Op
-	case *HeapExpr:
-		return expr.Op
-	case *PrintStmt:
-		return expr.Op
-	case *ReadExpr:
-		return expr.Op
-	case *CallStmt:
-		return token.Call
-	case *JmpStmt:
-		return expr.Op
-	case *JmpCondStmt:
-		return expr.Op
-	case *RetStmt:
-		return token.Ret
-	case *EndStmt:
-		return token.End
-	default:
-		return token.Illegal
+func (err *ErrorRetUnderflow) append(block *BasicBlock) *ErrorRetUnderflow {
+	err.Trace = append(err.Trace, block)
+	return err
+}
+
+func (err *ErrorRetUnderflow) Error() string {
+	if len(err.Trace) == 0 {
+		return "call stack underflow"
 	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "call stack underflow at %s: ", err.Trace[0].Name())
+	for i := len(err.Trace); i > 0; {
+		i--
+		b.WriteString(err.Trace[i].Name())
+		if i != 0 {
+			b.WriteString(" -> ")
+		}
+	}
+	return b.String()
+}
+
+func appendUnique(slice []*BasicBlock, blocks ...*BasicBlock) []*BasicBlock {
+	l := len(slice)
+outer:
+	for _, block := range blocks {
+		for i := 0; i < l; i++ {
+			if slice[i] == block {
+				continue outer
+			}
+		}
+		slice = append(slice, block)
+	}
+	return slice
 }

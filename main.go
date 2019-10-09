@@ -11,22 +11,24 @@ import (
 	"github.com/andrewarchi/wspace/ws"
 )
 
-const usage = `wspace ast [file]
-wspace matrix [file]
-wspace dot [file] | dot -Tpng > graph.png`
+const usage = `wspace ast <file> [trim?]
+wspace matrix <file> [trim?]
+wspace dot <file> [trim?] | dot -Tpng > graph.png`
 
 func main() {
-	if len(os.Args) != 3 {
+	if len(os.Args) < 3 || len(os.Args) > 4 {
 		fmt.Println(usage)
 		return
 	}
 	mode := os.Args[1]
-	filename := os.Args[2]
 	if mode != "ast" && mode != "dot" && mode != "matrix" {
 		fmt.Printf("Unrecognized mode: %s\n", mode)
 		fmt.Println(usage)
 		return
 	}
+	filename := os.Args[2]
+	trim := len(os.Args) != 4 || os.Args[3] != "false"
+
 	f, err := os.Open(filename)
 	if err != nil {
 		fmt.Println(err)
@@ -50,7 +52,7 @@ func main() {
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	ast, err := ast.Parse(tokens, labelNames)
+	ast, err := ast.Parse(tokens, labelNames, trim)
 	if err != nil {
 		fmt.Println(err)
 		return

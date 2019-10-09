@@ -1,0 +1,12 @@
+    push 0
+    readi
+    push 0
+    retrieve
+    jz zero
+    push 1
+    printi
+    call zero
+zero:
+    push 0
+    printi
+    ret
