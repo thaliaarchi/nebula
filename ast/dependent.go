@@ -5,28 +5,17 @@ import (
 	"github.com/andrewarchi/wspace/token"
 )
 
-// FlowDependenceGraph creates a directed graph with edges representing
-// the connections between basic blocks.
-func (ast *AST) FlowDependenceGraph() graph.Graph {
-	ids := make(map[*BasicBlock]uint)
+// ControlFlowGraph creates a directed graph with edges representing the
+// connections between basic blocks.
+func (ast *AST) ControlFlowGraph() graph.Graph {
+	ids := make(map[*BasicBlock]int)
 	for _, block := range ast.Blocks {
-		ids[block] = uint(block.ID)
+		ids[block] = block.ID
 	}
 	g := graph.NewGraph(uint(len(ast.Blocks)))
 	for i, block := range ast.Blocks {
-		switch exit := block.Exit.(type) {
-		case *CallStmt:
-			g.Add(uint(i), ids[exit.Callee])
-		case *JmpStmt:
-			g.Add(uint(i), ids[exit.Block])
-		case *JmpCondStmt:
-			g.Add(uint(i), ids[exit.TrueBlock])
-			g.Add(uint(i), ids[exit.FalseBlock])
-		case *RetStmt:
-			for _, caller := range block.Callers {
-				g.Add(uint(i), ids[caller])
-			}
-		case *EndStmt:
+		for _, exit := range block.Exits() {
+			g.Add(uint(i), uint(ids[exit]))
 		}
 	}
 	return g

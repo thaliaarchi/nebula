@@ -323,6 +323,23 @@ func (block *BasicBlock) annotateCaller(caller *BasicBlock, visited map[*BasicBl
 	}
 }
 
+// Exits returns all outgoing edges of the block.
+func (block *BasicBlock) Exits() []*BasicBlock {
+	switch exit := block.Exit.(type) {
+	case *CallStmt:
+		return []*BasicBlock{exit.Callee}
+	case *JmpStmt:
+		return []*BasicBlock{exit.Block}
+	case *JmpCondStmt:
+		return []*BasicBlock{exit.TrueBlock, exit.FalseBlock}
+	case *RetStmt:
+		return block.Callers
+	case *EndStmt:
+		return nil
+	}
+	panic(fmt.Errorf("ast: invalid exit type: %T", block.Exit))
+}
+
 // Name returns the name of the basic block from either the first label
 // or the block address.
 func (block *BasicBlock) Name() string {

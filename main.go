@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/wspace/ast"
 	"github.com/andrewarchi/wspace/token"
 	"github.com/andrewarchi/wspace/ws"
@@ -40,10 +41,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	// ast.MergeSimpleCalls()
 	ast.FoldConstArith()
 	ast.ConcatStrings()
 	fmt.Println(ast.String())
+	fmt.Println("\nControl flow:")
+	fmt.Print(graph.FormatMatrix(ast.ControlFlowGraph()))
+
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {
 	// 	fmt.Println(err)
