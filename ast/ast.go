@@ -321,13 +321,14 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 	}
 	for _, block := range ast.Blocks {
 		if call, ok := block.Exit.(*CallStmt); ok {
-			call.Callee.annotateCaller(block)
+			call.Callee.connectCaller(block)
+			block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 		}
 	}
 	return nil
 }
 
-func (block *BasicBlock) annotateCaller(caller *BasicBlock) {
+func (block *BasicBlock) connectCaller(caller *BasicBlock) {
 	for _, c := range block.Callers {
 		if c == caller {
 			return
@@ -336,17 +337,32 @@ func (block *BasicBlock) annotateCaller(caller *BasicBlock) {
 	block.Callers = append(block.Callers, caller)
 	switch exit := block.Exit.(type) {
 	case *CallStmt:
-		exit.Callee.annotateCaller(block)
-		block.Next.annotateCaller(caller)
+		exit.Callee.connectCaller(block)
+		block.Next.connectCaller(caller)
+		block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 	case *JmpStmt:
-		exit.Block.annotateCaller(caller)
+		exit.Block.connectCaller(caller)
 	case *JmpCondStmt:
-		exit.TrueBlock.annotateCaller(caller)
-		exit.FalseBlock.annotateCaller(caller)
+		exit.TrueBlock.connectCaller(caller)
+		exit.FalseBlock.connectCaller(caller)
 	case *RetStmt:
 		caller.Returns = append(caller.Returns, block)
 	case *EndStmt:
 	}
+}
+
+func appendUnique(slice []*BasicBlock, blocks ...*BasicBlock) []*BasicBlock {
+	l := len(slice)
+outer:
+	for _, block := range blocks {
+		for i := 0; i < l; i++ {
+			if slice[i] == block {
+				continue outer
+			}
+		}
+		slice = append(slice, block)
+	}
+	return slice
 }
 
 // Exits returns all outgoing edges of the block.
@@ -446,6 +462,7 @@ func (block *BasicBlock) String() string {
 	}
 	fmt.Fprintf(&b, "    ; entries: %s\n", formatBlockList(block.Entries))
 	fmt.Fprintf(&b, "    ; callers: %s\n", formatBlockList(block.Callers))
+	fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockList(block.Returns))
 	fmt.Fprintf(&b, "    ; stack %v, pop %d, access %d\n", &block.Stack, block.Stack.Pops, block.Stack.Access)
 	for _, node := range block.Nodes {
 		b.WriteString("    ")

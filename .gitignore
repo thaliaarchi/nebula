@@ -3,6 +3,7 @@ wspace
 *.out.ws
 *.out.wsa
 *.wsx
+*.ast
 *.dot
 *.png
 .vscode
