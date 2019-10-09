@@ -1,18 +1,14 @@
 package ast
 
-// MergeSimpleCalls merges blocks that are only called once with their
-// predecessor and removes uncalled blocks.
-// TODO: this is flawed because Callers does not contain all in-edges.
+// MergeSimpleCalls merges blocks that have only one entry with their
+// entry block.
 func (ast *AST) MergeSimpleCalls() {
 	j := 0
 	for i, block := range ast.Blocks {
-		if len(block.Callers) == 0 && block.ID != 0 {
-			continue
-		}
-		if len(block.Callers) == 1 {
-			caller := block.Callers[0]
-			if _, ok := caller.Exit.(*JmpStmt); ok {
-				caller.Merge(block)
+		if len(block.Entries) == 1 {
+			entry := block.Entries[0]
+			if _, ok := entry.Exit.(*JmpStmt); ok {
+				entry.Merge(block)
 				continue
 			}
 		}
@@ -51,6 +47,13 @@ func (block *BasicBlock) Merge(next *BasicBlock) {
 	}
 	block.Stack.PopN(next.Stack.Pops)
 	block.Stack.Vals = append(block.Stack.Vals, next.Stack.Vals...)
+
+	if next.Prev != nil {
+		next.Prev.Next = next.Next
+	}
+	if next.Next != nil {
+		next.Next.Prev = next.Prev
+	}
 }
 
 func renumber(val *Val, stack *Stack) {

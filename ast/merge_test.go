@@ -19,7 +19,7 @@ func TestMergeSimpleCalls(t *testing.T) {
 		{Type: token.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
-	ast, err := Parse(tokens, nil)
+	ast, err := Parse(tokens, nil, true)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -41,15 +41,22 @@ func TestMergeSimpleCalls(t *testing.T) {
 	n2 := Val(&StackVal{-2})
 	n7 := Val(&StackVal{-7})
 
-	astMerged := &AST{Blocks: []*BasicBlock{{
+	blockMerged := &BasicBlock{
+		Stack: stack,
 		Nodes: []Node{
 			&AssignStmt{Assign: s2, Expr: &ArithExpr{Op: token.Add, LHS: &n1, RHS: s1}},
 			&AssignStmt{Assign: s3, Expr: &ArithExpr{Op: token.Mul, LHS: &n2, RHS: s2}},
 			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Mod, LHS: s3, RHS: &n7}},
 		},
-		Exit:  &EndStmt{},
-		Stack: stack,
-	}}}
+		Exit:    &EndStmt{},
+		Entries: []*BasicBlock{entryBlock},
+		Callers: []*BasicBlock{entryBlock},
+	}
+	astMerged := &AST{
+		Blocks: []*BasicBlock{blockMerged},
+		Entry:  blockMerged,
+		NextID: 2,
+	}
 
 	ast.MergeSimpleCalls()
 	if !reflect.DeepEqual(ast, astMerged) {

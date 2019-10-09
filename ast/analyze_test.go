@@ -84,7 +84,8 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 
-	astStart := &AST{Blocks: []*BasicBlock{{
+	blockStart := &BasicBlock{
+		Stack: stack,
 		Nodes: []Node{
 			&AssignStmt{Assign: s4, Expr: &ArithExpr{Op: token.Mul, LHS: s2, RHS: s3}},
 			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Add, LHS: s1, RHS: s4}},
@@ -96,22 +97,29 @@ func TestTransforms(t *testing.T) {
 			&PrintStmt{Op: token.Printi, Val: s0},
 			&PrintStmt{Op: token.Printi, Val: s5},
 		},
-		Exit:  &EndStmt{},
-		Stack: stack,
-	}}}
+		Exit:    &EndStmt{},
+		Entries: []*BasicBlock{entryBlock},
+		Callers: []*BasicBlock{entryBlock},
+	}
+	astStart := &AST{
+		Blocks: []*BasicBlock{blockStart},
+		Entry:  blockStart,
+		NextID: 1,
+	}
 
-	ast, err := Parse(tokens, nil)
+	ast, err := Parse(tokens, nil, true)
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
 	if !reflect.DeepEqual(ast, astStart) {
-		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", ast, astStart)
+		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", *ast, *astStart)
 	}
 
 	vA := Val(&ConstVal{big.NewInt('A')})
 	vB := Val(&ConstVal{big.NewInt('B')})
 	v23 := Val(&ConstVal{big.NewInt(23)})
-	astConst := &AST{Blocks: []*BasicBlock{{
+	blockConst := &BasicBlock{
+		Stack: stack,
 		Nodes: []Node{
 			&PrintStmt{Op: token.Printc, Val: &vA},
 			&PrintStmt{Op: token.Printc, Val: &vB},
@@ -119,9 +127,15 @@ func TestTransforms(t *testing.T) {
 			&PrintStmt{Op: token.Printi, Val: s0},
 			&PrintStmt{Op: token.Printi, Val: &v23},
 		},
-		Exit:  &EndStmt{},
-		Stack: stack,
-	}}}
+		Exit:    &EndStmt{},
+		Entries: []*BasicBlock{entryBlock},
+		Callers: []*BasicBlock{entryBlock},
+	}
+	astConst := &AST{
+		Blocks: []*BasicBlock{blockConst},
+		Entry:  blockConst,
+		NextID: 1,
+	}
 
 	ast.FoldConstArith()
 	if !reflect.DeepEqual(ast, astConst) {
@@ -129,13 +143,20 @@ func TestTransforms(t *testing.T) {
 	}
 
 	vStr := Val(&StringVal{"ABC123"})
-	astStr := &AST{Blocks: []*BasicBlock{{
+	blockStr := &BasicBlock{
 		Nodes: []Node{
 			&PrintStmt{Op: token.Prints, Val: &vStr},
 		},
-		Exit:  &EndStmt{},
-		Stack: stack,
-	}}}
+		Exit:    &EndStmt{},
+		Stack:   stack,
+		Entries: []*BasicBlock{entryBlock},
+		Callers: []*BasicBlock{entryBlock},
+	}
+	astStr := &AST{
+		Blocks: []*BasicBlock{blockStr},
+		Entry:  blockStr,
+		NextID: 1,
+	}
 
 	ast.ConcatStrings()
 	if !reflect.DeepEqual(ast, astStr) {
