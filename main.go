@@ -10,8 +10,9 @@ import (
 	"github.com/andrewarchi/wspace/ws"
 )
 
-const usage = `wspace run [file]
-wspace debug [file]`
+const usage = `wspace ast [file]
+wspace matrix [file]
+wspace dot [file] | dot -Tpng > graph.png`
 
 func main() {
 	if len(os.Args) != 3 {
@@ -19,7 +20,7 @@ func main() {
 		return
 	}
 	mode := os.Args[1]
-	if mode != "run" && mode != "debug" {
+	if mode != "ast" && mode != "dot" && mode != "matrix" {
 		fmt.Printf("Unrecognized mode: %s\n", mode)
 		fmt.Println(usage)
 		return
@@ -43,9 +44,15 @@ func main() {
 	}
 	ast.FoldConstArith()
 	ast.ConcatStrings()
-	fmt.Println(ast.String())
-	fmt.Println("\nControl flow:")
-	fmt.Print(graph.FormatMatrix(ast.ControlFlowGraph()))
+
+	switch mode {
+	case "ast":
+		fmt.Print(ast.String())
+	case "matrix":
+		fmt.Print(graph.FormatMatrix(ast.ControlFlowGraph()))
+	case "dot":
+		fmt.Print(ast.DotDigraph())
+	}
 
 	// vm, err := ws.NewVM(ast)
 	// if err != nil {

@@ -333,7 +333,11 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 	case *JmpCondStmt:
 		return []*BasicBlock{exit.TrueBlock, exit.FalseBlock}
 	case *RetStmt:
-		return block.Callers
+		exits := make([]*BasicBlock, len(block.Callers))
+		for i, caller := range block.Callers {
+			exits[i] = caller.Next
+		}
+		return exits
 	case *EndStmt:
 		return nil
 	}
@@ -355,11 +359,36 @@ func (block *BasicBlock) Name() string {
 	return fmt.Sprintf("block_%d", block.ID)
 }
 
+func (ast *AST) DotDigraph() string {
+	var b strings.Builder
+	b.WriteString("digraph {\n")
+	for _, block := range ast.Blocks {
+		name := block.Name()
+		switch stmt := block.Exit.(type) {
+		case *CallStmt:
+			fmt.Fprintf(&b, "  %s -> %s[label=\"call\"];\n", name, stmt.Callee.Name())
+		case *JmpStmt:
+			fmt.Fprintf(&b, "  %s -> %s[label=\"jmp\"];\n", name, stmt.Block.Name())
+		case *JmpCondStmt:
+			fmt.Fprintf(&b, "  %s -> %s[label=\"true\"];\n", name, stmt.TrueBlock.Name())
+			fmt.Fprintf(&b, "  %s -> %s[label=\"false\"];\n", name, stmt.FalseBlock.Name())
+		case *RetStmt:
+			for _, exit := range block.Exits() {
+				fmt.Fprintf(&b, "  %s -> %s[label=\"ret\"];\n", name, exit.Name())
+			}
+		case *EndStmt:
+			fmt.Fprintf(&b, "  %s;\n", name)
+		}
+	}
+	b.WriteString("}\n")
+	return b.String()
+}
+
 func (ast *AST) String() string {
 	var b strings.Builder
 	for i, block := range ast.Blocks {
 		if i != 0 {
-			b.WriteString("\n\n")
+			b.WriteByte('\n')
 		}
 		b.WriteString(block.String())
 	}
@@ -388,6 +417,7 @@ func (block *BasicBlock) String() string {
 	}
 	b.WriteString("    ")
 	b.WriteString(block.Exit.String())
+	b.WriteByte('\n')
 	return b.String()
 }
 
