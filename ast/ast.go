@@ -22,8 +22,9 @@ type BasicBlock struct {
 	Stack   Stack         // Stack frame of this block
 	Nodes   []Node        // Non-branching non-stack instructions
 	Exit    FlowStmt      // Control flow instruction
-	Callers []*BasicBlock // Calling blocks; blocks calling this block or its parents
 	Entries []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
+	Callers []*BasicBlock // Calling blocks; blocks calling this block or its parents
+	Returns []*BasicBlock // Returning blocks; blocks returning to this block
 	Prev    *BasicBlock   // Predecessor block in source
 	Next    *BasicBlock   // Successor block in source
 }
@@ -320,27 +321,31 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 	}
 	for _, block := range ast.Blocks {
 		if call, ok := block.Exit.(*CallStmt); ok {
-			call.Callee.annotateCaller(block, make(map[*BasicBlock]bool))
+			call.Callee.annotateCaller(block)
 		}
 	}
 	return nil
 }
 
-func (block *BasicBlock) annotateCaller(caller *BasicBlock, visited map[*BasicBlock]bool) {
-	if visited[block] {
-		return
+func (block *BasicBlock) annotateCaller(caller *BasicBlock) {
+	for _, c := range block.Callers {
+		if c == caller {
+			return
+		}
 	}
-	visited[block] = true
 	block.Callers = append(block.Callers, caller)
 	switch exit := block.Exit.(type) {
 	case *CallStmt:
-		exit.Callee.annotateCaller(caller, visited)
+		exit.Callee.annotateCaller(block)
+		block.Next.annotateCaller(caller)
 	case *JmpStmt:
-		exit.Block.annotateCaller(caller, visited)
+		exit.Block.annotateCaller(caller)
 	case *JmpCondStmt:
-		exit.TrueBlock.annotateCaller(caller, visited)
-		exit.FalseBlock.annotateCaller(caller, visited)
-	case *RetStmt, *EndStmt:
+		exit.TrueBlock.annotateCaller(caller)
+		exit.FalseBlock.annotateCaller(caller)
+	case *RetStmt:
+		caller.Returns = append(caller.Returns, block)
+	case *EndStmt:
 	}
 }
 
