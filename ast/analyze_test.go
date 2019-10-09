@@ -100,7 +100,7 @@ func TestTransforms(t *testing.T) {
 		Stack: stack,
 	}}}
 
-	ast, err := Parse(tokens)
+	ast, err := Parse(tokens, nil)
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}

@@ -18,7 +18,7 @@ type AST struct {
 // program followed by a branch.
 type BasicBlock struct {
 	ID      int           // Unique block ID for printing
-	Labels  []*big.Int    // Labels for this block in source
+	Labels  []Label       // Labels for this block in source
 	Stack   Stack         // Stack frame of this block
 	Nodes   []Node        // Non-branching non-stack instructions
 	Exit    FlowStmt      // Control flow instruction
@@ -116,12 +116,18 @@ type RetStmt struct{}
 // EndStmt represents an end.
 type EndStmt struct{}
 
+// Label is a label with an optional name.
+type Label struct {
+	ID   *big.Int
+	Name string
+}
+
 // Parse parses tokens into an AST of basic blocks.
-func Parse(tokens []token.Token) (*AST, error) {
+func Parse(tokens []token.Token, labelNames *bigint.Map) (*AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
-	ast, branches, labels, err := parseBlocks(tokens)
+	ast, branches, labels, err := parseBlocks(tokens, labelNames)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +148,7 @@ func needsImplicitEnd(tokens []token.Token) bool {
 	return true
 }
 
-func parseBlocks(tokens []token.Token) (*AST, []*big.Int, *bigint.Map, error) {
+func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int, *bigint.Map, error) {
 	var ast AST
 	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
@@ -160,7 +166,12 @@ func parseBlocks(tokens []token.Token) (*AST, []*big.Int, *bigint.Map, error) {
 			if labels.Put(label, len(ast.Blocks)) {
 				return nil, nil, nil, fmt.Errorf("ast: label is not unique: %s", label)
 			}
-			block.Labels = append(block.Labels, label)
+			var name string
+			if labelNames != nil {
+				n, _ := labelNames.Get(label)
+				name = n.(string)
+			}
+			block.Labels = append(block.Labels, Label{label, name})
 			i++
 		}
 
@@ -354,11 +365,12 @@ func (block *BasicBlock) Name() string {
 		return "entry"
 	}
 	if len(block.Labels) != 0 {
-		return fmt.Sprintf("label_%v", block.Labels[0])
+		return block.Labels[0].String()
 	}
 	return fmt.Sprintf("block_%d", block.ID)
 }
 
+// DotDigraph creates a control flow graph in the Graphviz DOT format.
 func (ast *AST) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
@@ -377,7 +389,7 @@ func (ast *AST) DotDigraph() string {
 				fmt.Fprintf(&b, "  %s -> %s[label=\"ret\"];\n", name, exit.Name())
 			}
 		case *EndStmt:
-			fmt.Fprintf(&b, "  %s;\n", name)
+			fmt.Fprintf(&b, "  %s[peripheries=2];\n", name)
 		}
 	}
 	b.WriteString("}\n")
@@ -403,7 +415,6 @@ func (block *BasicBlock) String() string {
 		fmt.Fprintf(&b, "block_%d:\n", block.ID)
 	}
 	for _, label := range block.Labels {
-		b.WriteString("label_")
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
@@ -452,6 +463,13 @@ func (j *JmpCondStmt) String() string {
 }
 func (r *RetStmt) String() string { return fmt.Sprintf("ret") }
 func (*EndStmt) String() string   { return "end" }
+
+func (l *Label) String() string {
+	if l.Name != "" {
+		return l.Name
+	}
+	return fmt.Sprintf("label_%v", l.ID)
+}
 
 // Op returns the op of the node.
 func Op(node Node) token.Type {

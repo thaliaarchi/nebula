@@ -6,6 +6,7 @@ import (
 
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/wspace/ast"
+	"github.com/andrewarchi/wspace/bigint"
 	"github.com/andrewarchi/wspace/token"
 	"github.com/andrewarchi/wspace/ws"
 )
@@ -20,12 +21,13 @@ func main() {
 		return
 	}
 	mode := os.Args[1]
+	filename := os.Args[2]
 	if mode != "ast" && mode != "dot" && mode != "matrix" {
 		fmt.Printf("Unrecognized mode: %s\n", mode)
 		fmt.Println(usage)
 		return
 	}
-	f, err := os.Open(os.Args[2])
+	f, err := os.Open(filename)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -37,11 +39,23 @@ func main() {
 	for tok := range tokenChan {
 		tokens = append(tokens, tok)
 	}
-	ast, err := ast.Parse(tokens)
+
+	var labelNames *bigint.Map
+	if _, err := os.Stat(filename + ".map"); err == nil {
+		sourceMap, err := os.Open(filename + ".map")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		labelNames, err = ws.ParseSourceMap(sourceMap)
+	}
+
+	ast, err := ast.Parse(tokens, labelNames)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
 	ast.FoldConstArith()
 	ast.ConcatStrings()
 

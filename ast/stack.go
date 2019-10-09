@@ -148,6 +148,11 @@ func (s *Stack) Nth(n int) *Val {
 	return &v
 }
 
+// Len returns the number of items on the stack.
+func (s *Stack) Len() int {
+	return len(s.Vals)
+}
+
 // simplify cleans up low elements.
 func (s *Stack) simplify() {
 	i := 0

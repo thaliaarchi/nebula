@@ -1,0 +1,7 @@
+0:.loop
+3:.loop_break
+8805516035739:print_bottles
+5:.print_bottles_one
+147732044523289313280:print_bottles_on_wall
+1100690080279:print_string
+6:.print_string_break

@@ -1,7 +1,9 @@
 wspace
 *.exe
-*.processed.ws
-*.processed.wsa
+*.out.ws
+*.out.wsa
 *.wsx
+*.dot
+*.png
 .vscode
 .DS_Store
