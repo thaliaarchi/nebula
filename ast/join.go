@@ -1,14 +1,14 @@
 package ast
 
-// MergeSimpleCalls merges blocks that have only one entry with their
+// JoinSimpleCalls joins blocks that have only one entry with their
 // entry block.
-func (ast *AST) MergeSimpleCalls() {
+func (ast *AST) JoinSimpleCalls() {
 	j := 0
 	for i, block := range ast.Blocks {
 		if len(block.Entries) == 1 {
 			entry := block.Entries[0]
-			if _, ok := entry.Exit.(*JmpStmt); ok {
-				entry.Merge(block)
+			if _, ok := entry.Terminator.(*JmpStmt); ok {
+				entry.Join(block)
 				continue
 			}
 		}
@@ -18,9 +18,9 @@ func (ast *AST) MergeSimpleCalls() {
 	ast.Blocks = ast.Blocks[:j]
 }
 
-// Merge concatenates two basic blocks, renumbering the assignments in
+// Join concatenates two basic blocks, renumbering the assignments in
 // the second block.
-func (block *BasicBlock) Merge(next *BasicBlock) {
+func (block *BasicBlock) Join(next *BasicBlock) {
 	for i := range next.Nodes {
 		node := next.Nodes[i]
 		if assign, ok := node.(*AssignStmt); ok {
@@ -39,7 +39,7 @@ func (block *BasicBlock) Merge(next *BasicBlock) {
 		}
 	}
 	block.Nodes = append(block.Nodes, next.Nodes...)
-	block.Exit = next.Exit
+	block.Terminator = next.Terminator
 
 	block.Stack.Next += next.Stack.Next
 	if next.Stack.Access > 0 {
@@ -58,7 +58,8 @@ func (block *BasicBlock) Merge(next *BasicBlock) {
 
 func renumber(val *Val, stack *Stack) {
 	if v, ok := (*val).(*AddrVal); ok {
-		val = v.Val
+		renumber(v.Val, stack)
+		return
 	}
 	if v, ok := (*val).(*StackVal); ok {
 		if v.Val >= 0 {

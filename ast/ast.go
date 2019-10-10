@@ -19,16 +19,16 @@ type AST struct {
 // BasicBlock is a list of consecutive non-branching instructions in a
 // program followed by a branch.
 type BasicBlock struct {
-	ID      int           // Unique block ID for printing
-	Labels  []Label       // Labels for this block in source
-	Stack   Stack         // Stack frame of this block
-	Nodes   []Node        // Non-branching non-stack instructions
-	Exit    FlowStmt      // Control flow instruction
-	Entries []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
-	Callers []*BasicBlock // Calling blocks; blocks calling this block or its parents
-	Returns []*BasicBlock // Returning blocks; blocks returning to this block
-	Prev    *BasicBlock   // Predecessor block in source
-	Next    *BasicBlock   // Successor block in source
+	ID         int           // Unique block ID for printing
+	Labels     []Label       // Labels for this block in source
+	Stack      Stack         // Stack frame of this block
+	Nodes      []Node        // Non-branching non-stack instructions
+	Terminator FlowStmt      // Terminator control flow instruction
+	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
+	Callers    []*BasicBlock // Calling blocks; blocks calling this block or its parents
+	Returns    []*BasicBlock // Returning blocks; blocks returning to this block
+	Prev       *BasicBlock   // Predecessor block in source
+	Next       *BasicBlock   // Successor block in source
 }
 
 var entryBlock = &BasicBlock{ID: -1, Labels: []Label{{nil, "@entry"}}}
@@ -199,7 +199,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 		var branch *big.Int
 		for ; i < len(tokens); i++ {
 			branch = block.appendToken(tokens[i])
-			if block.Exit != nil {
+			if block.Terminator != nil {
 				if tokens[i].Type == token.Label {
 					i--
 				}
@@ -258,31 +258,32 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 			Val: val,
 		})
 	case token.Retrieve:
-		val, assign := block.Stack.Pop(), block.Stack.Push()
+		addr, assign := block.Stack.Pop(), block.Stack.Push()
+		val := Val(&AddrVal{addr})
 		block.assign(assign, &HeapExpr{
 			Op:  token.Retrieve,
-			Val: val,
+			Val: &val,
 		})
 
 	case token.Label:
-		block.Exit = &JmpStmt{Op: token.Fallthrough}
+		block.Terminator = &JmpStmt{Op: token.Fallthrough}
 		return tok.Arg
 	case token.Call:
-		block.Exit = &CallStmt{}
+		block.Terminator = &CallStmt{}
 		return tok.Arg
 	case token.Jmp:
-		block.Exit = &JmpStmt{Op: tok.Type}
+		block.Terminator = &JmpStmt{Op: tok.Type}
 		return tok.Arg
 	case token.Jz, token.Jn:
-		block.Exit = &JmpCondStmt{
+		block.Terminator = &JmpCondStmt{
 			Op:  tok.Type,
 			Val: block.Stack.Pop(),
 		}
 		return tok.Arg
 	case token.Ret:
-		block.Exit = &RetStmt{}
+		block.Terminator = &RetStmt{}
 	case token.End:
-		block.Exit = &EndStmt{}
+		block.Terminator = &EndStmt{}
 
 	case token.Printc, token.Printi:
 		block.Nodes = append(block.Nodes, &PrintStmt{
@@ -320,14 +321,14 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map, trim bool)
 			callee := ast.Blocks[label.(int)]
 			callee.Entries = append(callee.Entries, block)
 
-			switch exit := block.Exit.(type) {
+			switch term := block.Terminator.(type) {
 			case *CallStmt:
-				exit.Callee = callee
+				term.Callee = callee
 			case *JmpStmt:
-				exit.Block = callee
+				term.Block = callee
 			case *JmpCondStmt:
-				exit.TrueBlock = callee
-				exit.FalseBlock = block.Next
+				term.TrueBlock = callee
+				term.FalseBlock = block.Next
 				block.Next.Entries = append(block.Next.Entries, block)
 			}
 		}
@@ -339,7 +340,7 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map, trim bool)
 		ast.trimUnreachable()
 	} else {
 		for _, block := range ast.Blocks {
-			if call, ok := block.Exit.(*CallStmt); ok {
+			if call, ok := block.Terminator.(*CallStmt); ok {
 				call.Callee.connectCaller(block)
 				block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 			}
@@ -355,9 +356,9 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		}
 	}
 	block.Callers = append(block.Callers, caller)
-	switch exit := block.Exit.(type) {
+	switch term := block.Terminator.(type) {
 	case *CallStmt:
-		if err := exit.Callee.connectCaller(block); err != nil {
+		if err := term.Callee.connectCaller(block); err != nil {
 			return err.append(block)
 		}
 		if err := block.Next.connectCaller(caller); err != nil {
@@ -365,14 +366,14 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		}
 		block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 	case *JmpStmt:
-		if err := exit.Block.connectCaller(caller); err != nil {
+		if err := term.Block.connectCaller(caller); err != nil {
 			return err.append(block)
 		}
 	case *JmpCondStmt:
-		if err := exit.TrueBlock.connectCaller(caller); err != nil {
+		if err := term.TrueBlock.connectCaller(caller); err != nil {
 			return err.append(block)
 		}
-		if err := exit.FalseBlock.connectCaller(caller); err != nil {
+		if err := term.FalseBlock.connectCaller(caller); err != nil {
 			return err.append(caller)
 		}
 	case *RetStmt:
@@ -420,30 +421,30 @@ func (block *BasicBlock) dfs(visited bitset) {
 		return
 	}
 	visited.Set(uint32(block.ID))
-	switch exit := block.Exit.(type) {
+	switch term := block.Terminator.(type) {
 	case *CallStmt:
-		exit.Callee.dfs(visited)
+		term.Callee.dfs(visited)
 		if len(block.Returns) != 0 {
 			block.Next.dfs(visited)
 		}
 	case *JmpStmt:
-		exit.Block.dfs(visited)
+		term.Block.dfs(visited)
 	case *JmpCondStmt:
-		exit.TrueBlock.dfs(visited)
-		exit.FalseBlock.dfs(visited)
+		term.TrueBlock.dfs(visited)
+		term.FalseBlock.dfs(visited)
 	case *RetStmt, *EndStmt:
 	}
 }
 
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
-	switch exit := block.Exit.(type) {
+	switch term := block.Terminator.(type) {
 	case *CallStmt:
-		return []*BasicBlock{exit.Callee}
+		return []*BasicBlock{term.Callee}
 	case *JmpStmt:
-		return []*BasicBlock{exit.Block}
+		return []*BasicBlock{term.Block}
 	case *JmpCondStmt:
-		return []*BasicBlock{exit.TrueBlock, exit.FalseBlock}
+		return []*BasicBlock{term.TrueBlock, term.FalseBlock}
 	case *RetStmt:
 		exits := make([]*BasicBlock, len(block.Callers))
 		for i, caller := range block.Callers {
@@ -453,7 +454,7 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 	case *EndStmt:
 		return nil
 	}
-	panic(fmt.Errorf("ast: invalid exit type: %T", block.Exit))
+	panic(fmt.Errorf("ast: invalid terminator type: %T", block.Terminator))
 }
 
 // Name returns the name of the basic block from either the first label
@@ -477,7 +478,7 @@ func (ast *AST) DotDigraph() string {
 	b.WriteString("digraph {\n")
 	b.WriteString("  entry[shape=point];\n")
 	for _, block := range ast.Blocks {
-		if _, ok := block.Exit.(*EndStmt); ok {
+		if _, ok := block.Terminator.(*EndStmt); ok {
 			fmt.Fprintf(&b, "  block_%d[label=\"%s\" peripheries=2];\n", block.ID, block.Name())
 		} else {
 			fmt.Fprintf(&b, "  block_%d[label=\"%s\"];\n", block.ID, block.Name())
@@ -486,7 +487,7 @@ func (ast *AST) DotDigraph() string {
 	b.WriteByte('\n')
 	fmt.Fprintf(&b, "  entry -> block_%d;\n", ast.Entry.ID)
 	for _, block := range ast.Blocks {
-		switch stmt := block.Exit.(type) {
+		switch stmt := block.Terminator.(type) {
 		case *CallStmt:
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, stmt.Callee.ID)
 		case *JmpStmt:
@@ -538,7 +539,7 @@ func (block *BasicBlock) String() string {
 		b.WriteByte('\n')
 	}
 	b.WriteString("    ")
-	b.WriteString(block.Exit.String())
+	b.WriteString(block.Terminator.String())
 	b.WriteByte('\n')
 	return b.String()
 }

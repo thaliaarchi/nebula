@@ -8,7 +8,7 @@ import (
 	"github.com/andrewarchi/wspace/token"
 )
 
-func TestMergeSimpleCalls(t *testing.T) {
+func TestJoinSimpleCalls(t *testing.T) {
 	tokens := []token.Token{
 		{Type: token.Push, Arg: big.NewInt(1)},  // 0
 		{Type: token.Add},                       // 1
@@ -41,25 +41,25 @@ func TestMergeSimpleCalls(t *testing.T) {
 	n2 := Val(&StackVal{-2})
 	n7 := Val(&StackVal{-7})
 
-	blockMerged := &BasicBlock{
+	blockJoined := &BasicBlock{
 		Stack: stack,
 		Nodes: []Node{
 			&AssignStmt{Assign: s2, Expr: &ArithExpr{Op: token.Add, LHS: &n1, RHS: s1}},
 			&AssignStmt{Assign: s3, Expr: &ArithExpr{Op: token.Mul, LHS: &n2, RHS: s2}},
 			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Mod, LHS: s3, RHS: &n7}},
 		},
-		Exit:    &EndStmt{},
-		Entries: []*BasicBlock{entryBlock},
-		Callers: []*BasicBlock{entryBlock},
+		Terminator: &EndStmt{},
+		Entries:    []*BasicBlock{entryBlock},
+		Callers:    []*BasicBlock{entryBlock},
 	}
-	astMerged := &AST{
-		Blocks: []*BasicBlock{blockMerged},
-		Entry:  blockMerged,
+	astJoined := &AST{
+		Blocks: []*BasicBlock{blockJoined},
+		Entry:  blockJoined,
 		NextID: 2,
 	}
 
-	ast.MergeSimpleCalls()
-	if !reflect.DeepEqual(ast, astMerged) {
-		t.Errorf("merge not equal\ngot:\n%v\nwant:\n%v", ast, astMerged)
+	ast.JoinSimpleCalls()
+	if !reflect.DeepEqual(ast, astJoined) {
+		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", ast, astJoined)
 	}
 }

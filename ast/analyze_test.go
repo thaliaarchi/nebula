@@ -97,9 +97,9 @@ func TestTransforms(t *testing.T) {
 			&PrintStmt{Op: token.Printi, Val: s0},
 			&PrintStmt{Op: token.Printi, Val: s5},
 		},
-		Exit:    &EndStmt{},
-		Entries: []*BasicBlock{entryBlock},
-		Callers: []*BasicBlock{entryBlock},
+		Terminator: &EndStmt{},
+		Entries:    []*BasicBlock{entryBlock},
+		Callers:    []*BasicBlock{entryBlock},
 	}
 	astStart := &AST{
 		Blocks: []*BasicBlock{blockStart},
@@ -127,9 +127,9 @@ func TestTransforms(t *testing.T) {
 			&PrintStmt{Op: token.Printi, Val: s0},
 			&PrintStmt{Op: token.Printi, Val: &v23},
 		},
-		Exit:    &EndStmt{},
-		Entries: []*BasicBlock{entryBlock},
-		Callers: []*BasicBlock{entryBlock},
+		Terminator: &EndStmt{},
+		Entries:    []*BasicBlock{entryBlock},
+		Callers:    []*BasicBlock{entryBlock},
 	}
 	astConst := &AST{
 		Blocks: []*BasicBlock{blockConst},
@@ -147,10 +147,10 @@ func TestTransforms(t *testing.T) {
 		Nodes: []Node{
 			&PrintStmt{Op: token.Prints, Val: &vStr},
 		},
-		Exit:    &EndStmt{},
-		Stack:   stack,
-		Entries: []*BasicBlock{entryBlock},
-		Callers: []*BasicBlock{entryBlock},
+		Terminator: &EndStmt{},
+		Stack:      stack,
+		Entries:    []*BasicBlock{entryBlock},
+		Callers:    []*BasicBlock{entryBlock},
 	}
 	astStr := &AST{
 		Blocks: []*BasicBlock{blockStr},
