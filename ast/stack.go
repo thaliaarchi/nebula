@@ -121,14 +121,14 @@ func (s *Stack) At(n int) *Val {
 	if id > s.Access {
 		s.Access = id
 	}
-	if id >= len(s.Under) {
-		s.Under = append(s.Under, make([]*Val, id-len(s.Under)+1)...)
+	if id > len(s.Under) {
+		s.Under = append(s.Under, make([]*Val, id-len(s.Under))...)
 	}
-	if s.Under[id] == nil {
+	if s.Under[id-1] == nil {
 		v := Val(&StackVal{-id})
-		s.Under[id] = &v
+		s.Under[id-1] = &v
 	}
-	return s.Under[id]
+	return s.Under[id-1]
 }
 
 // Len returns the number of items on the stack.
@@ -138,12 +138,23 @@ func (s *Stack) Len() int {
 
 func (s *Stack) String() string {
 	var b strings.Builder
-	b.WriteByte('[')
+	b.WriteString("push [")
 	for i, val := range s.Vals {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
 		b.WriteString((*val).String())
+	}
+	fmt.Fprintf(&b, "], pop %d, access %d [", s.Pops, s.Access)
+	first := true
+	for _, val := range s.Under {
+		if val != nil {
+			if !first {
+				b.WriteByte(' ')
+			}
+			b.WriteString((*val).String())
+			first = false
+		}
 	}
 	b.WriteByte(']')
 	return b.String()

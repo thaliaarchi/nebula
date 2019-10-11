@@ -538,8 +538,10 @@ func (block *BasicBlock) String() string {
 	}
 	fmt.Fprintf(&b, "    ; entries: %s\n", formatBlockList(block.Entries))
 	fmt.Fprintf(&b, "    ; callers: %s\n", formatBlockList(block.Callers))
-	fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockList(block.Returns))
-	fmt.Fprintf(&b, "    ; stack %v, pop %d, access %d\n", &block.Stack, block.Stack.Pops, block.Stack.Access)
+	if len(block.Returns) != 0 {
+		fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockList(block.Returns))
+	}
+	fmt.Fprintf(&b, "    ; stack: %s\n", &block.Stack)
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
 		b.WriteString(node.String())
