@@ -1,7 +1,5 @@
 package ast
 
-import "fmt"
-
 // Digraph is a directed graph.
 type Digraph []graphNode
 
@@ -18,12 +16,10 @@ func (g Digraph) AddEdge(i, j int) {
 // SCCs computes the strongly connected components of a graph.
 func (g Digraph) SCCs() [][]int {
 	postOrder := g.Reverse().PostOrder()
-	fmt.Println(postOrder)
 	var sccs [][]int
 	for i := len(postOrder) - 1; i >= 0; i-- {
 		if !g[postOrder[i]].Visited {
 			sccs = append(sccs, g.visit(postOrder[i], nil))
-			fmt.Println(g)
 		}
 	}
 	return sccs
@@ -53,9 +49,9 @@ func (g Digraph) visit(node int, postOrder []int) []int {
 // Reverse creates the reverse graph of g.
 func (g Digraph) Reverse() Digraph {
 	r := make(Digraph, len(g))
-	for i := range g {
-		for _, j := range g[i].Edges {
-			r[j].Edges = append(r[j].Edges, i)
+	for node := range g {
+		for _, edge := range g[node].Edges {
+			r[edge].Edges = append(r[edge].Edges, node)
 		}
 	}
 	return r

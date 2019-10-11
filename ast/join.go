@@ -3,15 +3,19 @@ package ast
 // JoinSimpleCalls joins blocks that have only one entry with their
 // entry block.
 func (ast *AST) JoinSimpleCalls() {
+	j := 0
 	for i, block := range ast.Blocks {
 		if len(block.Entries) == 1 {
 			entry := block.Entries[0]
 			if _, ok := entry.Terminator.(*JmpStmt); ok {
 				entry.Join(block)
-				ast.Blocks[i] = nil
+				continue
 			}
 		}
+		ast.Blocks[j] = ast.Blocks[i]
+		j++
 	}
+	ast.Blocks = ast.Blocks[:j]
 }
 
 // Join concatenates two basic blocks, renumbering the assignments in

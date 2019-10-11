@@ -495,12 +495,37 @@ func (ast *AST) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
 	b.WriteString("  entry[shape=point];\n")
+	ids := make(map[int]*BasicBlock)
 	for _, block := range ast.Blocks {
-		if _, ok := block.Terminator.(*EndStmt); ok {
-			fmt.Fprintf(&b, "  block_%d[label=\"%s\" peripheries=2];\n", block.ID, block.Name())
-		} else {
-			fmt.Fprintf(&b, "  block_%d[label=\"%s\"];\n", block.ID, block.Name())
+		ids[block.ID] = block
+	}
+	for i, scc := range ast.Digraph().SCCs() {
+		fmt.Fprintf(&b, "  subgraph cluster_%d {\n", i)
+		for _, node := range scc {
+			block := ids[node]
+			if block == nil {
+				panic(fmt.Sprintf("block_%d was not fully removed from graph", node))
+			}
+			fmt.Fprintf(&b, "    block_%d[label=\"%s\\n", block.ID, block.Name())
+			if block.Stack.Len() != 0 {
+				fmt.Fprintf(&b, " +%d", block.Stack.Len())
+			}
+			if block.Stack.Pops != 0 {
+				fmt.Fprintf(&b, " -%d", block.Stack.Pops)
+			}
+			if block.Stack.Access != 0 {
+				fmt.Fprintf(&b, " a%d", block.Stack.Access)
+			}
+			if len(block.Stack.Under) != 0 {
+				fmt.Fprintf(&b, " r%d", len(block.Stack.Under))
+			}
+			b.WriteByte('"')
+			if _, ok := block.Terminator.(*EndStmt); ok {
+				b.WriteString(" peripheries=2")
+			}
+			b.WriteString("];\n")
 		}
+		b.WriteString("  }\n")
 	}
 	b.WriteByte('\n')
 	fmt.Fprintf(&b, "  entry -> block_%d;\n", ast.Entry.ID)
