@@ -38,7 +38,8 @@ type Node interface {
 	String() string
 }
 
-// Val can be StackVal, HeapVal, ConstVal, or AddrVal.
+// Val can be StackVal, HeapVal, ConstVal, or AddrVal. Two vals can be
+// compared by address for equality.
 type Val = Node
 
 // StackVal is a position on the stack.
@@ -56,6 +57,12 @@ type ArrayVal struct{ Val []*big.Int }
 
 // AddrVal marks a value as being a pointer to a value.
 type AddrVal struct{ Val *Val }
+
+// PhiVal represents an SSA Φ function and stores the set of values it
+// could be.
+type PhiVal struct {
+	Vals []*Val
+}
 
 // AssignStmt assigns the value of an expression to the stack or heap.
 type AssignStmt struct {
@@ -198,7 +205,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 
 		var branch *big.Int
 		for ; i < len(tokens); i++ {
-			branch = block.appendToken(tokens[i])
+			branch = block.appendInstruction(tokens[i])
 			if block.Terminator != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -215,7 +222,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 	return &ast, branches, labels, nil
 }
 
-func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
+func (block *BasicBlock) appendInstruction(tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
 		block.Stack.PushConst(tok.Arg)
@@ -224,7 +231,7 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Copy:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ast: copy argument overflows size: %v", tok.Arg))
+			panic(fmt.Sprintf("ast: copy argument overflow: %v", tok.Arg))
 		} else if n < 0 {
 			panic(fmt.Sprintf("ast: copy argument negative: %v", tok.Arg))
 		}
@@ -232,11 +239,11 @@ func (block *BasicBlock) appendToken(tok token.Token) *big.Int {
 	case token.Swap:
 		block.Stack.Swap()
 	case token.Drop:
-		block.Stack.Pop()
+		block.Stack.Drop()
 	case token.Slide:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ast: slide argument overflows size: %v", tok.Arg))
+			panic(fmt.Sprintf("ast: slide argument overflow: %v", tok.Arg))
 		} else if n < 0 {
 			panic(fmt.Sprintf("ast: slide argument negative: %v", tok.Arg))
 		}
@@ -563,6 +570,7 @@ func (c *ConstVal) String() string   { return c.Val.String() }
 func (s *StringVal) String() string  { return fmt.Sprintf("%q", s.Val) }
 func (a *ArrayVal) String() string   { return bigint.FormatSlice(a.Val) }
 func (a *AddrVal) String() string    { return fmt.Sprintf("*%v", *a.Val) }
+func (p *PhiVal) String() string     { return fmt.Sprintf("phi(%s)", formatValSlice(p.Vals)) }
 func (a *AssignStmt) String() string { return fmt.Sprintf("%v = %v", *a.Assign, a.Expr) }
 func (b *ArithExpr) String() string  { return fmt.Sprintf("%v %v %v", b.Op, *b.LHS, *b.RHS) }
 func (u *HeapExpr) String() string   { return fmt.Sprintf("%v %v", u.Op, *u.Val) }
@@ -616,4 +624,15 @@ outer:
 		slice = append(slice, block)
 	}
 	return slice
+}
+
+func formatValSlice(vals []*Val) string {
+	var b strings.Builder
+	for i, val := range vals {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString((*val).String())
+	}
+	return b.String()
 }

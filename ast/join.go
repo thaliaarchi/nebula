@@ -43,7 +43,7 @@ func (block *BasicBlock) Join(next *BasicBlock) {
 
 	block.Stack.Next += next.Stack.Next
 	if next.Stack.Access > 0 {
-		block.Stack.Nth(next.Stack.Access - 1)
+		block.Stack.At(next.Stack.Access - 1)
 	}
 	block.Stack.PopN(next.Stack.Pops)
 	block.Stack.Vals = append(block.Stack.Vals, next.Stack.Vals...)
@@ -65,7 +65,7 @@ func renumber(val *Val, stack *Stack) {
 		if v.Val >= 0 {
 			v.Val += stack.Next
 		} else {
-			*val = *stack.Nth(-v.Val - 1)
+			*val = *stack.At(-v.Val - 1)
 		}
 	}
 }

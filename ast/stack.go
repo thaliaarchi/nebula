@@ -11,13 +11,15 @@ import (
 // block are represented as negative numbers. Operations are expressed
 // in terms of push and pop.
 type Stack struct {
-	Vals   []*Val
-	Next   int // Next id to push
-	Pops   int // Number of items popped below stack
-	Access int // Number of items accessed below stack
+	Vals   []*Val // Values in the current stack frame
+	Under  []*Val // Values under the current stack frame
+	Next   int    // Next id to push
+	Pops   int    // Number of items popped below stack
+	Access int    // Number of items accessed below stack
 }
 
-// Push pushes an item to the stack and returns a val with a unique id.
+// Push pushes an item to the stack and returns a val with a locally
+// unique id.
 func (s *Stack) Push() *Val {
 	val := Val(&StackVal{s.Next})
 	s.Vals = append(s.Vals, &val)
@@ -32,21 +34,11 @@ func (s *Stack) PushConst(c *big.Int) *Val {
 	return &val
 }
 
-// Pop pops an item from the stack and returns the id of the removed
+// Pop pops an item from the stack and returns the val of the removed
 // item.
 func (s *Stack) Pop() *Val {
-	var val *Val
-	if len(s.Vals) == 0 {
-		s.Pops++
-		v := Val(&StackVal{-s.Pops})
-		val = &v
-		if s.Pops > s.Access {
-			s.Access = s.Pops
-		}
-	} else {
-		val = s.Vals[len(s.Vals)-1]
-		s.Vals = s.Vals[:len(s.Vals)-1]
-	}
+	val := s.Top()
+	s.Drop()
 	return val
 }
 
@@ -71,44 +63,38 @@ func (s *Stack) PopN(n int) {
 	}
 }
 
-// Dup pushes a copy of the top item to the stack without creating an
-// id.
+// Drop pops the top item from the stack without returning a val.
+func (s *Stack) Drop() {
+	if len(s.Vals) == 0 {
+		s.Pops++
+		if s.Pops > s.Access {
+			s.Access = s.Pops
+		}
+	} else {
+		s.Vals = s.Vals[:len(s.Vals)-1]
+	}
+}
+
+// Dup pushes a copy of the top item to the stack.
 func (s *Stack) Dup() *Val {
 	top := s.Top()
 	s.Vals = append(s.Vals, top)
 	return top
 }
 
-// Copy pushes a copy of the nth item to the stack without creating an
-// id.
+// Copy pushes a copy of the nth item to the stack.
 func (s *Stack) Copy(n int) *Val {
 	if n < 0 {
 		panic(fmt.Sprintf("stack: copy index must be positive: %d", n))
 	}
-	val := s.Nth(n)
+	val := s.At(n)
 	s.Vals = append(s.Vals, val)
 	return val
 }
 
 // Swap swaps the top two items on the stack.
 func (s *Stack) Swap() {
-	l := len(s.Vals)
-	switch l {
-	case 0:
-		v1, v2 := Val(&StackVal{-s.Pops - 1}), Val(&StackVal{-s.Pops - 2})
-		s.Vals = append(s.Vals, &v1, &v2)
-		s.Pops += 2
-	case 1:
-		v := Val(&StackVal{-s.Pops - 1})
-		s.Vals = append(s.Vals, &v)
-		s.Pops++
-	default:
-		s.Vals[l-2], s.Vals[l-1] = s.Vals[l-1], s.Vals[l-2]
-	}
-	if s.Pops > s.Access {
-		s.Access = s.Pops
-	}
-	s.simplify()
+	s.Vals = append(s.Vals, s.Pop(), s.Pop())
 }
 
 // Slide slides n items off the stack, leaving the top item.
@@ -119,53 +105,35 @@ func (s *Stack) Slide(n int) {
 	top := s.Top()
 	s.PopN(n + 1)
 	s.Vals = append(s.Vals, top)
-	s.simplify()
 }
 
-// Top returns the id of the top item on the stack.
+// Top returns the val of the top item on the stack.
 func (s *Stack) Top() *Val {
-	if len(s.Vals) != 0 {
-		return s.Vals[len(s.Vals)-1]
-	}
-	top := s.Pops + 1
-	if top > s.Access {
-		s.Access = top
-	}
-	val := Val(&StackVal{-top})
-	return &val
+	return s.At(0)
 }
 
-// Nth returns the id of the nth item on the stack.
-func (s *Stack) Nth(n int) *Val {
+// At returns the val of the nth item on the stack.
+func (s *Stack) At(n int) *Val {
 	if n < len(s.Vals) {
 		return s.Vals[len(s.Vals)-n-1]
 	}
-	val := s.Pops + n + 1 - len(s.Vals)
-	if val > s.Access {
-		s.Access = val
+	id := s.Pops + n + 1 - len(s.Vals)
+	if id > s.Access {
+		s.Access = id
 	}
-	v := Val(&StackVal{-val})
-	return &v
+	if id >= len(s.Under) {
+		s.Under = append(s.Under, make([]*Val, id-len(s.Under)+1)...)
+	}
+	if s.Under[id] == nil {
+		v := Val(&StackVal{-id})
+		s.Under[id] = &v
+	}
+	return s.Under[id]
 }
 
 // Len returns the number of items on the stack.
 func (s *Stack) Len() int {
 	return len(s.Vals)
-}
-
-// simplify cleans up low elements.
-func (s *Stack) simplify() {
-	i := 0
-	for ; i < len(s.Vals); i++ {
-		if s.Pops <= 0 {
-			break
-		}
-		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Val != -s.Pops {
-			break
-		}
-		s.Pops--
-	}
-	s.Vals = s.Vals[i:]
 }
 
 func (s *Stack) String() string {
