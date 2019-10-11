@@ -443,6 +443,17 @@ func (block *BasicBlock) dfs(visited bitset) {
 	}
 }
 
+// Digraph constructs a digraph representing control flow.
+func (ast *AST) Digraph() Digraph {
+	g := make(Digraph, ast.NextID)
+	for _, block := range ast.Blocks {
+		for _, edge := range block.Exits() {
+			g.AddEdge(block.ID, edge.ID)
+		}
+	}
+	return g
+}
+
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {
