@@ -454,6 +454,14 @@ func (ast *AST) Digraph() Digraph {
 	return g
 }
 
+// RenumberIDs cleans up block IDs to match the block index.
+func (ast *AST) RenumberIDs() {
+	for i, block := range ast.Blocks {
+		block.ID = i
+	}
+	ast.NextID = len(ast.Blocks)
+}
+
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {
@@ -495,17 +503,11 @@ func (ast *AST) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
 	b.WriteString("  entry[shape=point];\n")
-	ids := make(map[int]*BasicBlock)
-	for _, block := range ast.Blocks {
-		ids[block.ID] = block
-	}
+	ast.RenumberIDs()
 	for i, scc := range ast.Digraph().SCCs() {
 		fmt.Fprintf(&b, "  subgraph cluster_%d {\n", i)
 		for _, node := range scc {
-			block := ids[node]
-			if block == nil {
-				panic(fmt.Sprintf("block_%d was not fully removed from graph", node))
-			}
+			block := ast.Blocks[node]
 			fmt.Fprintf(&b, "    block_%d[label=\"%s\\n", block.ID, block.Name())
 			if block.Stack.Len() != 0 {
 				fmt.Fprintf(&b, " +%d", block.Stack.Len())

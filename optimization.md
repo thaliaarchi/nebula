@@ -1,6 +1,12 @@
 # Optimization strategies
 
+Interpreters that directly execute the Whitespace instruction set can
+optimize for instruction count by reducing to equivalent fewer
+instructions. This project no longer optimizes in the interpreter and
+instead optimizes while compiling.
+
 ## Instruction reductions
+
 - Replace `call l; ret` with `jmp l`
 - Replace `push n; push n` with `push n; dup`
 - Replace `copy n; copy n+1` with `copy n; dup`
@@ -21,6 +27,7 @@
 - Reassign stack values after last usage
 
 ## Interpreter specializations
+
 - Specialize arithmetic, jump, heap, and io instructions to not pop when preceded with `dup`
 - Specialize instructions with non-arbitrary size arguments
 - Consolidate successive stack underflow checks
@@ -28,5 +35,6 @@
 - Replace `mul` and `div` of powers of two with shl and shr
 
 ## Runtime analysis
+
 - Insert profile points to identify slow points
 - Track common branching

@@ -1,55 +1,48 @@
-# Whitespace Goals
+# Wspace
 
-## Languages
+Wspace is a compiler for the Whitespace programming language.
+
+This project is evolving very rapidly, so documentation may not
+represent its current state.
+
+## Project Goals
+
+### Compilation
+
+- Static single assignment form
+  - [x] Stack access converted to indexed variables
+  - [x] Connected graph of basic blocks
+  - [x] Minimize stack pointer updates to once per block
+- Intraprocedural analysis
+  - [x] Constant stack folding and propagation
+  - [x] Constant stack string concatenation
+- Interprocedural analysis
+  - [x] Dead code elimination
+  - [x] Call stack underflow detection
+  - [ ] Register allocation
+  - [ ] Reduction of arbitrary precision integers to fixed width
+  - [ ] Tail call optimization
+  - [ ] Heap access analysis
+    - [ ] Lifetime analysis
+    - [ ] Constant folding and propagation
+  - [ ] Contract assertions
+    - [ ] Using an SMT solver
+    - [ ] Abstract interpretation
+- Targets
+  - [ ] LLVM IR
+  - [ ] WebAssembly
+
+### Languages
 
 - High level language
-  - Abstracted away from WS
+  - Abstracted away from the WS stack and heap
   - Compiles to WS instruction set
   - Memory safe
 - Assembly syntax language
   - Very close to WS instruction set
   - Assembly-like syntax
   - Allows additional metadata for compiler
+  - Special compiler treatment of standard library functions
 - Whitespace language
   - Direct representation of WS instruction set
   - Follows WS language spec syntax
-
-## Instruction sets
-
-- Whitespace
-  - Core WS language instructions from spec
-- Extended WS
-  - Adds bitwise operations not defined by WS language
-  - Pure WS fallbacks defined in std lib
-
-## Intermediate representations
-
-- WS IR
-  - Tail call optimization
-  - Connected basic blocks
-- Atomic WS IR
-  - Separates push, pop, and stack assertions from instructions
-  - Dead code removal
-  - Reduction of arbitrary precision integers
-  - Connected basic blocks
-- Register WS IR
-  - Convert to register based
-  - Minimal register coloring
-  - SSA or CPS form
-  - Connected basic blocks
-- LLVM IR
-  - Machine code compilation
-
-## What I want to learn from Whitespace
-
-- Stack-based to register-based
-- Register coloring
-- SSA or CPS intermediate representation
-- Reduction of arbitrary precision integers
-- Special compiler treatment of std lib calls
-- Machine code compilation using LLVM IR
-- Tail call optimization
-- Lifetime analysis
-- Constant folding and propagation
-- Using an SMT solver
-- Abstract interpretation
