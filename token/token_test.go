@@ -1,4 +1,4 @@
-package token
+package token // import "github.com/andrewarchi/nebula/token"
 
 import (
 	"math/big"

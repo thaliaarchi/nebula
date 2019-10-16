@@ -1,4 +1,4 @@
-package ws
+package ws // import "github.com/andrewarchi/nebula/ws"
 
 /*
 import (

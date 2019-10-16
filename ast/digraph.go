@@ -1,4 +1,4 @@
-package ast
+package ast // import "github.com/andrewarchi/nebula/ast"
 
 // Digraph is a directed graph.
 type Digraph []graphNode

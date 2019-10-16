@@ -1,4 +1,4 @@
-package ast
+package ast // import "github.com/andrewarchi/nebula/ast"
 
 const uintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
 

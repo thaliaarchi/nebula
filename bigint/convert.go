@@ -1,4 +1,4 @@
-package bigint
+package bigint // import "github.com/andrewarchi/nebula/bigint"
 
 import (
 	"math"

@@ -1,4 +1,4 @@
-package ast
+package ast // import "github.com/andrewarchi/nebula/ast"
 
 // JoinSimpleCalls joins blocks that have only one entry with their
 // entry block.
