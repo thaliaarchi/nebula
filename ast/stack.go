@@ -82,6 +82,7 @@ func (s *Stack) Copy(n int) *Val {
 // Swap swaps the top two items on the stack.
 func (s *Stack) Swap() {
 	s.Vals = append(s.Vals, s.Pop(), s.Pop())
+	s.simplify()
 }
 
 // Slide slides n items off the stack, leaving the top item.
@@ -92,6 +93,7 @@ func (s *Stack) Slide(n int) {
 	top := s.Top()
 	s.PopN(n + 1)
 	s.Vals = append(s.Vals, top)
+	s.simplify()
 }
 
 // Top returns the val of the top item on the stack.
@@ -116,6 +118,21 @@ func (s *Stack) At(n int) *Val {
 		s.Under[id-1] = &v
 	}
 	return s.Under[id-1]
+}
+
+// simplify cleans up low elements.
+func (s *Stack) simplify() {
+	i := 0
+	for ; i < len(s.Vals); i++ {
+		if s.Pops <= 0 {
+			break
+		}
+		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Val != -s.Pops {
+			break
+		}
+		s.Pops--
+	}
+	s.Vals = s.Vals[i:]
 }
 
 // Len returns the number of items on the stack.
