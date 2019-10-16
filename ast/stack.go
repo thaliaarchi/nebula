@@ -120,6 +120,53 @@ func (s *Stack) At(n int) *Val {
 	return s.Under[id-1]
 }
 
+// AtExists returns the val of the nth item on the stack or false if
+// the lookup would cause an underflow access.
+func (s *Stack) AtExists(n int) (*Val, bool) {
+	var val *Val
+	if n < len(s.Vals) {
+		val = s.Vals[len(s.Vals)-n-1]
+	} else if n < len(s.Under)-len(s.Vals) {
+		val = s.Under[len(s.Under)-len(s.Vals)-n-1]
+	}
+	if val != nil {
+		if v, ok := (*val).(*StackVal); ok && v.Val >= 0 {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
+// LookupUnderflow replaces vals referencing the preceding stack frame
+// with the defined val.
+func (s *Stack) LookupUnderflow(prev *Stack) {
+	for _, val := range s.Under {
+		if val != nil {
+			if v, ok := (*val).(*StackVal); ok && v.Val < 0 {
+				if pv, ok := prev.AtExists(-v.Val - 1); ok {
+					*val = *pv
+				}
+			}
+		}
+	}
+}
+
+// Concat joins two stacks.
+func (s *Stack) Concat(next *Stack) {
+	for _, val := range next.Under {
+		if val != nil {
+			if v, ok := (*val).(*StackVal); ok && v.Val < 0 {
+				*val = *s.At(-v.Val - 1)
+			}
+		}
+	}
+	if next.Access > 0 {
+		s.At(next.Access - 1)
+	}
+	s.PopN(next.Pops)
+	s.Vals = append(s.Vals, next.Vals...)
+}
+
 // simplify cleans up low elements.
 func (s *Stack) simplify() {
 	i := 0

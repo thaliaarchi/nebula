@@ -59,6 +59,7 @@ func main() {
 		}
 	}
 
+	a.JoinSimpleEntries()
 	a.FoldConstArith()
 	a.ConcatStrings()
 

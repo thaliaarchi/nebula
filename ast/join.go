@@ -1,8 +1,9 @@
 package ast // import "github.com/andrewarchi/nebula/ast"
 
-// JoinSimpleCalls joins blocks that have only one entry with their
+// JoinSimpleEntries joins blocks that have only one entry with their
 // entry block.
-func (ast *AST) JoinSimpleCalls() {
+// TODO: this does not repect the graph dependency ordering.
+func (ast *AST) JoinSimpleEntries() {
 	j := 0
 	for i, block := range ast.Blocks {
 		if len(block.Entries) == 1 {
@@ -10,6 +11,8 @@ func (ast *AST) JoinSimpleCalls() {
 			if _, ok := entry.Terminator.(*JmpStmt); ok {
 				entry.Join(block)
 				continue
+			} else {
+				block.Stack.LookupUnderflow(&entry.Stack)
 			}
 		}
 		ast.Blocks[j] = ast.Blocks[i]
@@ -20,44 +23,14 @@ func (ast *AST) JoinSimpleCalls() {
 
 // Join concatenates two basic blocks, renumbering the assignments in
 // the second block.
+// TODO: this does not update Callers.
 func (block *BasicBlock) Join(next *BasicBlock) {
-	next.lookupUnderflow(&block.Stack)
-	if next.Stack.Access > 0 {
-		block.Stack.At(next.Stack.Access - 1)
-	}
-	block.Stack.PopN(next.Stack.Pops)
-	block.Stack.Vals = append(block.Stack.Vals, next.Stack.Vals...)
-
+	block.Stack.Concat(&next.Stack)
 	block.Nodes = append(block.Nodes, next.Nodes...)
 	block.Terminator = next.Terminator
+	exits := next.Exits()
 	next.Disconnect()
-}
-
-func (block *BasicBlock) lookupUnderflow(stack *Stack) {
-	for _, node := range block.Nodes {
-		if assign, ok := node.(*AssignStmt); ok {
-			lookupUnderflow(assign.Assign, stack)
-			node = assign.Expr
-		}
-		switch expr := node.(type) {
-		case *ArithExpr:
-			lookupUnderflow(expr.LHS, stack)
-			lookupUnderflow(expr.RHS, stack)
-		case *HeapExpr:
-			lookupUnderflow(expr.Val, stack)
-		case *PrintStmt:
-			lookupUnderflow(expr.Val, stack)
-		case *ReadExpr:
-		}
-	}
-}
-
-func lookupUnderflow(val *Val, stack *Stack) {
-	if v, ok := (*val).(*AddrVal); ok {
-		lookupUnderflow(v.Val, stack)
-		return
-	}
-	if v, ok := (*val).(*StackVal); ok && v.Val < 0 {
-		*val = *stack.At(-v.Val - 1)
+	for _, exit := range exits {
+		exit.Entries = appendUnique(exit.Entries, block)
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/andrewarchi/nebula/token"
 )
 
-func TestJoinSimpleCalls(t *testing.T) {
+func TestJoinSimpleEntries(t *testing.T) {
 	tokens := []token.Token{
 		{Type: token.Push, Arg: big.NewInt(1)},  // 0
 		{Type: token.Add},                       // 1
@@ -69,7 +69,7 @@ func TestJoinSimpleCalls(t *testing.T) {
 		NextStackID: 3,
 	}
 
-	ast.JoinSimpleCalls()
+	ast.JoinSimpleEntries()
 	if !reflect.DeepEqual(ast, astJoined) {
 		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", ast, astJoined)
 	}
