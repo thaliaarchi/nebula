@@ -141,7 +141,7 @@ type ErrorRetUnderflow struct {
 }
 
 // Parse parses tokens into an AST of basic blocks.
-func Parse(tokens []token.Token, labelNames *bigint.Map, trim bool) (*AST, error) {
+func Parse(tokens []token.Token, labelNames *bigint.Map) (*AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
@@ -149,7 +149,7 @@ func Parse(tokens []token.Token, labelNames *bigint.Map, trim bool) (*AST, error
 	if err != nil {
 		return nil, err
 	}
-	if err := ast.connectEdges(branches, labels, trim); err != nil {
+	if err := ast.connectEdges(branches, labels); err != nil {
 		return nil, err
 	}
 	return ast, nil
@@ -316,7 +316,7 @@ func (block *BasicBlock) assign(assign *Val, expr Val) {
 	})
 }
 
-func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map, trim bool) error {
+func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 	ast.Entry.Entries = append(ast.Entry.Entries, entryBlock)
 	for i, block := range ast.Blocks {
 		branch := branches[i]
@@ -343,16 +343,7 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map, trim bool)
 	if err := ast.Entry.connectCaller(entryBlock); err != nil {
 		return err
 	}
-	if trim {
-		ast.trimUnreachable()
-	} else {
-		for _, block := range ast.Blocks {
-			if call, ok := block.Terminator.(*CallStmt); ok {
-				call.Callee.connectCaller(block)
-				block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
-			}
-		}
-	}
+	ast.trimUnreachable()
 	return nil
 }
 
@@ -394,11 +385,9 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 }
 
 func (ast *AST) trimUnreachable() {
-	visited := newBitset(ast.NextID)
-	ast.Entry.dfs(visited)
 	i := 0
 	for _, block := range ast.Blocks {
-		if !visited.Test(uint32(block.ID)) {
+		if len(block.Callers) == 0 {
 			if block.Prev != nil {
 				block.Prev.Next = block.Next
 			}
@@ -421,26 +410,6 @@ func (ast *AST) trimUnreachable() {
 		i++
 	}
 	ast.Blocks = ast.Blocks[:i]
-}
-
-func (block *BasicBlock) dfs(visited bitset) {
-	if visited.Test(uint32(block.ID)) {
-		return
-	}
-	visited.Set(uint32(block.ID))
-	switch term := block.Terminator.(type) {
-	case *CallStmt:
-		term.Callee.dfs(visited)
-		if len(block.Returns) != 0 {
-			block.Next.dfs(visited)
-		}
-	case *JmpStmt:
-		term.Block.dfs(visited)
-	case *JmpCondStmt:
-		term.TrueBlock.dfs(visited)
-		term.FalseBlock.dfs(visited)
-	case *RetStmt, *EndStmt:
-	}
 }
 
 // Digraph constructs a digraph representing control flow.

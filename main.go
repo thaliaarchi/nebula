@@ -11,12 +11,12 @@ import (
 	"github.com/andrewarchi/nebula/ws"
 )
 
-const usage = `nebula ast <file> [trim?]
-nebula matrix <file> [trim?]
-nebula dot <file> [trim?] | dot -Tpng > graph.png`
+const usage = `nebula ast <file>
+nebula matrix <file>
+nebula dot <file> | dot -Tpng > graph.png`
 
 func main() {
-	if len(os.Args) < 3 || len(os.Args) > 4 {
+	if len(os.Args) != 3 {
 		fmt.Println(usage)
 		return
 	}
@@ -27,7 +27,6 @@ func main() {
 		return
 	}
 	filename := os.Args[2]
-	trim := len(os.Args) != 4 || os.Args[3] != "false"
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -52,7 +51,7 @@ func main() {
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	ast, err := ast.Parse(tokens, labelNames, trim)
+	ast, err := ast.Parse(tokens, labelNames)
 	if err != nil {
 		fmt.Println(err)
 		return

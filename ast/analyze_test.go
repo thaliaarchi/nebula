@@ -107,7 +107,7 @@ func TestTransforms(t *testing.T) {
 		NextID: 1,
 	}
 
-	ast, err := Parse(tokens, nil, true)
+	ast, err := Parse(tokens, nil)
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
