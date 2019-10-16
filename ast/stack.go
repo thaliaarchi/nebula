@@ -13,17 +13,15 @@ import (
 type Stack struct {
 	Vals   []*Val // Values in the current stack frame
 	Under  []*Val // Values under the current stack frame
-	Next   int    // Next id to push
 	Pops   int    // Number of items popped below stack
 	Access int    // Number of items accessed below stack
 }
 
 // Push pushes an item to the stack and returns a val with a locally
 // unique id.
-func (s *Stack) Push() *Val {
-	val := Val(&StackVal{s.Next})
+func (s *Stack) Push(id int) *Val {
+	val := Val(&StackVal{id})
 	s.Vals = append(s.Vals, &val)
-	s.Next++
 	return &val
 }
 

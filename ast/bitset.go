@@ -15,14 +15,14 @@ func (bs bitset) Reset() {
 	}
 }
 
-func (bs bitset) Set(i uint32) {
-	bs[i/uintSize] |= 1 << (i % uintSize)
+func (bs bitset) Set(i int) {
+	bs[i/uintSize] |= 1 << (uint(i) % uintSize)
 }
 
-func (bs bitset) Clear(i uint32) {
-	bs[i/uintSize] &^= 1 << (i % uintSize)
+func (bs bitset) Clear(i int) {
+	bs[i/uintSize] &^= 1 << (uint(i) % uintSize)
 }
 
-func (bs bitset) Test(i uint32) bool {
-	return bs[i/uintSize]&(1<<(i%uintSize)) != 0
+func (bs bitset) Test(i int) bool {
+	return bs[i/uintSize]&(1<<(uint(i)%uintSize)) != 0
 }

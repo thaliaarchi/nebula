@@ -58,22 +58,22 @@ func TestTransforms(t *testing.T) {
 	s3 := stack.PushConst(big.NewInt(2))    // 3
 	stack.Pop()                             // 4
 	stack.Pop()                             // 4
-	s4 := stack.Push()                      // 4
+	s4 := stack.Push(0)                     // 4
 	stack.Pop()                             // 5
 	stack.Pop()                             // 5
-	s5 := stack.Push()                      // 5
+	s5 := stack.Push(1)                     // 5
 	stack.Swap()                            // 6
 	s7 := stack.PushConst(big.NewInt('C'))  // 7
 	stack.Dup()                             // 8
 	stack.Copy(2)                           // 9
 	stack.Pop()                             // 10
 	stack.Pop()                             // 10
-	s10 := stack.Push()                     // 10
+	s10 := stack.Push(2)                    // 10
 	s11 := stack.PushConst(big.NewInt(-32)) // 11
 	s12 := stack.PushConst(big.NewInt('a')) // 12
 	stack.Pop()                             // 13
 	stack.Pop()                             // 13
-	s13 := stack.Push()                     // 13
+	s13 := stack.Push(3)                    // 13
 	stack.Pop()                             // 14
 	stack.Pop()                             // 15
 	stack.Pop()                             // 16
@@ -102,9 +102,10 @@ func TestTransforms(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astStart := &AST{
-		Blocks: []*BasicBlock{blockStart},
-		Entry:  blockStart,
-		NextID: 1,
+		Blocks:      []*BasicBlock{blockStart},
+		Entry:       blockStart,
+		NextBlockID: 1,
+		NextStackID: 4,
 	}
 
 	ast, err := Parse(tokens, nil)
@@ -112,7 +113,7 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("unexpected parse error: %v", err)
 	}
 	if !reflect.DeepEqual(ast, astStart) {
-		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", *ast, *astStart)
+		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", ast, astStart)
 	}
 
 	vA := Val(&ConstVal{big.NewInt('A')})
@@ -132,9 +133,10 @@ func TestTransforms(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astConst := &AST{
-		Blocks: []*BasicBlock{blockConst},
-		Entry:  blockConst,
-		NextID: 1,
+		Blocks:      []*BasicBlock{blockConst},
+		Entry:       blockConst,
+		NextBlockID: 1,
+		NextStackID: 4,
 	}
 
 	ast.FoldConstArith()
@@ -153,9 +155,10 @@ func TestTransforms(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astStr := &AST{
-		Blocks: []*BasicBlock{blockStr},
-		Entry:  blockStr,
-		NextID: 1,
+		Blocks:      []*BasicBlock{blockStr},
+		Entry:       blockStr,
+		NextBlockID: 1,
+		NextStackID: 4,
 	}
 
 	ast.ConcatStrings()

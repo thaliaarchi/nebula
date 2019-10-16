@@ -21,51 +21,43 @@ func (ast *AST) JoinSimpleCalls() {
 // Join concatenates two basic blocks, renumbering the assignments in
 // the second block.
 func (block *BasicBlock) Join(next *BasicBlock) {
-	for i := range next.Nodes {
-		node := next.Nodes[i]
-		if assign, ok := node.(*AssignStmt); ok {
-			renumber(assign.Assign, &block.Stack)
-			node = assign.Expr
-		}
-		switch expr := node.(type) {
-		case *ArithExpr:
-			renumber(expr.LHS, &block.Stack)
-			renumber(expr.RHS, &block.Stack)
-		case *HeapExpr:
-			renumber(expr.Val, &block.Stack)
-		case *PrintStmt:
-			renumber(expr.Val, &block.Stack)
-		case *ReadExpr:
-		}
-	}
-	block.Nodes = append(block.Nodes, next.Nodes...)
-	block.Terminator = next.Terminator
-
-	block.Stack.Next += next.Stack.Next
+	next.lookupUnderflow(&block.Stack)
 	if next.Stack.Access > 0 {
 		block.Stack.At(next.Stack.Access - 1)
 	}
 	block.Stack.PopN(next.Stack.Pops)
 	block.Stack.Vals = append(block.Stack.Vals, next.Stack.Vals...)
 
-	if next.Prev != nil {
-		next.Prev.Next = next.Next
-	}
-	if next.Next != nil {
-		next.Next.Prev = next.Prev
+	block.Nodes = append(block.Nodes, next.Nodes...)
+	block.Terminator = next.Terminator
+	next.Disconnect()
+}
+
+func (block *BasicBlock) lookupUnderflow(stack *Stack) {
+	for _, node := range block.Nodes {
+		if assign, ok := node.(*AssignStmt); ok {
+			lookupUnderflow(assign.Assign, stack)
+			node = assign.Expr
+		}
+		switch expr := node.(type) {
+		case *ArithExpr:
+			lookupUnderflow(expr.LHS, stack)
+			lookupUnderflow(expr.RHS, stack)
+		case *HeapExpr:
+			lookupUnderflow(expr.Val, stack)
+		case *PrintStmt:
+			lookupUnderflow(expr.Val, stack)
+		case *ReadExpr:
+		}
 	}
 }
 
-func renumber(val *Val, stack *Stack) {
+func lookupUnderflow(val *Val, stack *Stack) {
 	if v, ok := (*val).(*AddrVal); ok {
-		renumber(v.Val, stack)
+		lookupUnderflow(v.Val, stack)
 		return
 	}
-	if v, ok := (*val).(*StackVal); ok {
-		if v.Val >= 0 {
-			v.Val += stack.Next
-		} else {
-			*val = *stack.At(-v.Val - 1)
-		}
+	if v, ok := (*val).(*StackVal); ok && v.Val < 0 {
+		*val = *stack.At(-v.Val - 1)
 	}
 }

@@ -11,9 +11,10 @@ import (
 
 // AST is a set of interconnected basic blocks.
 type AST struct {
-	Blocks []*BasicBlock
-	Entry  *BasicBlock
-	NextID int
+	Blocks      []*BasicBlock
+	Entry       *BasicBlock
+	NextBlockID int
+	NextStackID int
 }
 
 // BasicBlock is a list of consecutive non-branching instructions in a
@@ -205,7 +206,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 
 		var branch *big.Int
 		for ; i < len(tokens); i++ {
-			branch = block.appendInstruction(tokens[i])
+			branch = ast.appendInstruction(&block, tokens[i])
 			if block.Terminator != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -218,11 +219,11 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 		branches = append(branches, branch)
 	}
 	ast.Entry = ast.Blocks[0]
-	ast.NextID = len(ast.Blocks)
+	ast.NextBlockID = len(ast.Blocks)
 	return &ast, branches, labels, nil
 }
 
-func (block *BasicBlock) appendInstruction(tok token.Token) *big.Int {
+func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
 		block.Stack.PushConst(tok.Arg)
@@ -250,7 +251,8 @@ func (block *BasicBlock) appendInstruction(tok token.Token) *big.Int {
 		block.Stack.Slide(n)
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
-		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), block.Stack.Push()
+		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), block.Stack.Push(ast.NextStackID)
+		ast.NextStackID++
 		block.assign(assign, &ArithExpr{
 			Op:  tok.Type,
 			LHS: lhs,
@@ -265,7 +267,8 @@ func (block *BasicBlock) appendInstruction(tok token.Token) *big.Int {
 			Val: val,
 		})
 	case token.Retrieve:
-		addr, assign := block.Stack.Pop(), block.Stack.Push()
+		addr, assign := block.Stack.Pop(), block.Stack.Push(ast.NextStackID)
+		ast.NextStackID++
 		val := Val(&AddrVal{addr})
 		block.assign(assign, &HeapExpr{
 			Op:  token.Retrieve,
@@ -384,43 +387,38 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 	return nil
 }
 
+// Disconnect removes all incoming edges to a basic block. The block is
+// not removed from the AST block slice.
+func (block *BasicBlock) Disconnect() {
+	if block.Prev != nil {
+		block.Prev.Next = block.Next
+	}
+	if block.Next != nil {
+		block.Next.Prev = block.Prev
+	}
+	for _, exit := range block.Exits() {
+		i := 0
+		for _, entry := range exit.Entries {
+			if entry != block {
+				exit.Entries[i] = entry
+				i++
+			}
+		}
+		exit.Entries = exit.Entries[:i]
+	}
+}
+
 func (ast *AST) trimUnreachable() {
 	i := 0
 	for _, block := range ast.Blocks {
 		if len(block.Callers) == 0 {
-			if block.Prev != nil {
-				block.Prev.Next = block.Next
-			}
-			if block.Next != nil {
-				block.Next.Prev = block.Prev
-			}
-			for _, exit := range block.Exits() {
-				j := 0
-				for _, entry := range exit.Entries {
-					if entry != block {
-						exit.Entries[j] = entry
-						j++
-					}
-				}
-				exit.Entries = exit.Entries[:j]
-			}
-			continue
+			block.Disconnect()
+		} else {
+			ast.Blocks[i] = block
+			i++
 		}
-		ast.Blocks[i] = block
-		i++
 	}
 	ast.Blocks = ast.Blocks[:i]
-}
-
-// Digraph constructs a digraph representing control flow.
-func (ast *AST) Digraph() Digraph {
-	g := make(Digraph, ast.NextID)
-	for _, block := range ast.Blocks {
-		for _, edge := range block.Exits() {
-			g.AddEdge(block.ID, edge.ID)
-		}
-	}
-	return g
 }
 
 // RenumberIDs cleans up block IDs to match the block index.
@@ -428,7 +426,18 @@ func (ast *AST) RenumberIDs() {
 	for i, block := range ast.Blocks {
 		block.ID = i
 	}
-	ast.NextID = len(ast.Blocks)
+	ast.NextBlockID = len(ast.Blocks)
+}
+
+// Digraph constructs a digraph representing control flow.
+func (ast *AST) Digraph() Digraph {
+	g := make(Digraph, ast.NextBlockID)
+	for _, block := range ast.Blocks {
+		for _, edge := range block.Exits() {
+			g.AddEdge(block.ID, edge.ID)
+		}
+	}
+	return g
 }
 
 // Exits returns all outgoing edges of the block.

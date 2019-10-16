@@ -28,14 +28,14 @@ func TestJoinSimpleCalls(t *testing.T) {
 	s1 := stack.PushConst(big.NewInt(1)) // 0
 	stack.Pop()                          // 1
 	stack.Pop()                          // 1
-	s2 := stack.Push()                   // 1
+	s2 := stack.Push(0)                  // 1
 	stack.Pop()                          // 2
 	stack.Pop()                          // 2
-	s3 := stack.Push()                   // 2
+	s3 := stack.Push(1)                  // 2
 	stack.Copy(5)                        // 4
 	stack.Pop()                          // 5
 	stack.Pop()                          // 5
-	s5 := stack.Push()                   // 5
+	s5 := stack.Push(2)                  // 5
 	stack.Slide(2)                       // 6
 	n1 := Val(&StackVal{-1})
 	n2 := Val(&StackVal{-2})
@@ -53,9 +53,10 @@ func TestJoinSimpleCalls(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astJoined := &AST{
-		Blocks: []*BasicBlock{blockJoined},
-		Entry:  blockJoined,
-		NextID: 2,
+		Blocks:      []*BasicBlock{blockJoined},
+		Entry:       blockJoined,
+		NextBlockID: 2,
+		NextStackID: 3,
 	}
 
 	ast.JoinSimpleCalls()
