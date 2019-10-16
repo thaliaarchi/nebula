@@ -6,7 +6,7 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/andrewarchi/wspace/token"
+	"github.com/andrewarchi/nebula/token"
 )
 
 type Lexer struct {

@@ -2,7 +2,7 @@ package ast
 
 import (
 	"github.com/andrewarchi/graph"
-	"github.com/andrewarchi/wspace/token"
+	"github.com/andrewarchi/nebula/token"
 )
 
 // ControlFlowGraph creates a directed graph with edges representing the

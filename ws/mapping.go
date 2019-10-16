@@ -6,7 +6,7 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/andrewarchi/wspace/bigint"
+	"github.com/andrewarchi/nebula/bigint"
 )
 
 // ParseSourceMap reads a source map and parses it into mappings from

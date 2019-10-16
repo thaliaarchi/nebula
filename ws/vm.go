@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/andrewarchi/wspace/ast"
-	"github.com/andrewarchi/wspace/bigint"
-	"github.com/andrewarchi/wspace/token"
+	"github.com/andrewarchi/nebula/ast"
+	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/token"
 )
 
 const eofValue = 0

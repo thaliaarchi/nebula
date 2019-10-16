@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/andrewarchi/wspace/token"
+	"github.com/andrewarchi/nebula/token"
 )
 
 func TestJoinSimpleCalls(t *testing.T) {

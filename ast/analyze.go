@@ -3,8 +3,8 @@ package ast
 import (
 	"math/big"
 
-	"github.com/andrewarchi/wspace/bigint"
-	"github.com/andrewarchi/wspace/token"
+	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/token"
 )
 
 // Reduce accumulates sequences of nodes and replaces the starting node

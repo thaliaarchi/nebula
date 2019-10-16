@@ -5,15 +5,15 @@ import (
 	"os"
 
 	"github.com/andrewarchi/graph"
-	"github.com/andrewarchi/wspace/ast"
-	"github.com/andrewarchi/wspace/bigint"
-	"github.com/andrewarchi/wspace/token"
-	"github.com/andrewarchi/wspace/ws"
+	"github.com/andrewarchi/nebula/ast"
+	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/token"
+	"github.com/andrewarchi/nebula/ws"
 )
 
-const usage = `wspace ast <file> [trim?]
-wspace matrix <file> [trim?]
-wspace dot <file> [trim?] | dot -Tpng > graph.png`
+const usage = `nebula ast <file> [trim?]
+nebula matrix <file> [trim?]
+nebula dot <file> [trim?] | dot -Tpng > graph.png`
 
 func main() {
 	if len(os.Args) < 3 || len(os.Args) > 4 {

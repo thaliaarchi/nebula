@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/andrewarchi/wspace/bigint"
-	"github.com/andrewarchi/wspace/token"
+	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/token"
 )
 
 // AST is a set of interconnected basic blocks.

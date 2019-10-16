@@ -1,6 +1,7 @@
-# Wspace
+# Nebula
 
-Wspace is a compiler for the Whitespace programming language.
+Nebula is an optimizing compiler for the Whitespace programming
+language.
 
 This project is evolving very rapidly, so documentation may not
 represent its current state.
@@ -46,3 +47,13 @@ represent its current state.
 - Whitespace language
   - Direct representation of WS instruction set
   - Follows WS language spec syntax
+
+## Naming
+
+Nebula's name is derived from the stellar gas clouds, nebulae. Nebulae
+are incredibly diffuse, yet form some of the most beautiful astronomical
+landscapes. Similarly, of all programming languages, Whitespace is the
+least dense in visible characters and despite its simplicity, is Turing
+complete. The name is also a call-out to the star-forming region of
+[IC 1396](https://nitarp.ipac.caltech.edu/system/media_files/binaries/191/original/johnson2017sci.pdf),
+that contains many nebulae including the famous Elephant's Trunk Nebula.
