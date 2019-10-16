@@ -139,7 +139,7 @@ type Label struct {
 // ErrorRetUnderflow is an error given when ret is executed without a
 // caller.
 type ErrorRetUnderflow struct {
-	Trace []*BasicBlock
+	Traces [][]*BasicBlock
 }
 
 // Parse parses tokens into an AST of basic blocks.
@@ -152,7 +152,7 @@ func Parse(tokens []token.Token, labelNames *bigint.Map) (*AST, error) {
 		return nil, err
 	}
 	if err := ast.connectEdges(branches, labels); err != nil {
-		return nil, err
+		return ast, err
 	}
 	return ast, nil
 }
@@ -358,34 +358,25 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		}
 	}
 	block.Callers = append(block.Callers, caller)
+	var errs *ErrorRetUnderflow
 	switch term := block.Terminator.(type) {
 	case *CallStmt:
-		if err := term.Callee.connectCaller(block); err != nil {
-			return err.append(block)
-		}
-		if err := block.Next.connectCaller(caller); err != nil {
-			return err.append(block)
-		}
+		errs = errs.addTrace(term.Callee.connectCaller(block), block)
+		errs = errs.addTrace(block.Next.connectCaller(caller), block)
 		block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 	case *JmpStmt:
-		if err := term.Block.connectCaller(caller); err != nil {
-			return err.append(block)
-		}
+		errs = errs.addTrace(term.Block.connectCaller(caller), block)
 	case *JmpCondStmt:
-		if err := term.TrueBlock.connectCaller(caller); err != nil {
-			return err.append(block)
-		}
-		if err := term.FalseBlock.connectCaller(caller); err != nil {
-			return err.append(caller)
-		}
+		errs = errs.addTrace(term.TrueBlock.connectCaller(caller), block)
+		errs = errs.addTrace(term.FalseBlock.connectCaller(caller), caller)
 	case *RetStmt:
 		if caller == entryBlock {
-			return &ErrorRetUnderflow{[]*BasicBlock{block}}
+			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
 		}
 		caller.Returns = append(caller.Returns, block)
 	case *EndStmt:
 	}
-	return nil
+	return errs
 }
 
 // Disconnect removes all incoming edges to a basic block. The block is
@@ -625,23 +616,39 @@ func (l *Label) String() string {
 	return fmt.Sprintf("label_%v", l.ID)
 }
 
-func (err *ErrorRetUnderflow) append(block *BasicBlock) *ErrorRetUnderflow {
-	err.Trace = append(err.Trace, block)
+func (err *ErrorRetUnderflow) addTrace(err2 *ErrorRetUnderflow, trace *BasicBlock) *ErrorRetUnderflow {
+	if err2 == nil {
+		return err
+	}
+	for i := range err2.Traces {
+		err2.Traces[i] = append(err2.Traces[i], trace)
+	}
+	if err == nil {
+		return err2
+	}
+	err.Traces = append(err.Traces, err2.Traces...)
 	return err
 }
 
 func (err *ErrorRetUnderflow) Error() string {
-	if len(err.Trace) == 0 {
+	if err == nil {
+		return "<nil>"
+	}
+	if len(err.Traces) == 0 {
 		return "call stack underflow"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "call stack underflow at %s: ", err.Trace[0].Name())
-	for i := len(err.Trace); i > 0; {
-		i--
-		b.WriteString(err.Trace[i].Name())
-		if i != 0 {
-			b.WriteString(" -> ")
+	b.WriteString("call stack underflow\n")
+	for _, trace := range err.Traces {
+		fmt.Fprintf(&b, "  %s: ", trace[0].Name())
+		for i := len(trace); i > 0; {
+			i--
+			b.WriteString(trace[i].Name())
+			if i != 0 {
+				b.WriteString(" -> ")
+			}
 		}
+		b.WriteByte('\n')
 	}
 	return b.String()
 }

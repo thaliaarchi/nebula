@@ -17,20 +17,20 @@ nebula dot <file> | dot -Tpng > graph.png`
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Println(usage)
+		fmt.Fprintln(os.Stderr, usage)
 		return
 	}
 	mode := os.Args[1]
 	if mode != "ast" && mode != "dot" && mode != "matrix" {
-		fmt.Printf("Unrecognized mode: %s\n", mode)
-		fmt.Println(usage)
+		fmt.Fprintf(os.Stderr, "Unrecognized mode: %s\n", mode)
+		fmt.Fprintln(os.Stderr, usage)
 		return
 	}
 	filename := os.Args[2]
 
 	f, err := os.Open(filename)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 
@@ -45,28 +45,30 @@ func main() {
 	if _, err := os.Stat(filename + ".map"); err == nil {
 		sourceMap, err := os.Open(filename + ".map")
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, err)
 			return
 		}
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	ast, err := ast.Parse(tokens, labelNames)
+	a, err := ast.Parse(tokens, labelNames)
 	if err != nil {
-		fmt.Println(err)
-		return
+		fmt.Fprintln(os.Stderr, err)
+		if _, ok := err.(*ast.ErrorRetUnderflow); !ok {
+			return
+		}
 	}
 
-	ast.FoldConstArith()
-	ast.ConcatStrings()
+	a.FoldConstArith()
+	a.ConcatStrings()
 
 	switch mode {
 	case "ast":
-		fmt.Print(ast.String())
+		fmt.Print(a.String())
 	case "matrix":
-		fmt.Print(graph.FormatMatrix(ast.ControlFlowGraph()))
+		fmt.Print(graph.FormatMatrix(a.ControlFlowGraph()))
 	case "dot":
-		fmt.Print(ast.DotDigraph())
+		fmt.Print(a.DotDigraph())
 	}
 
 	// vm, err := ws.NewVM(ast)
