@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/token"
 )
 
@@ -24,29 +25,37 @@ func TestJoinSimpleCalls(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	v1 := Val(&ConstVal{big.NewInt(1)})
+	s0 := Val(&StackVal{0})
+	s1 := Val(&StackVal{1})
+	s2 := Val(&StackVal{2})
+	sn1 := Val(&StackVal{-1})
+	sn2 := Val(&StackVal{-2})
+	sn7 := Val(&StackVal{-7})
+
 	var stack Stack
-	s1 := stack.PushConst(big.NewInt(1)) // 0
-	stack.Pop()                          // 1
-	stack.Pop()                          // 1
-	s2 := stack.Push(0)                  // 1
-	stack.Pop()                          // 2
-	stack.Pop()                          // 2
-	s3 := stack.Push(1)                  // 2
-	stack.Copy(5)                        // 4
-	stack.Pop()                          // 5
-	stack.Pop()                          // 5
-	s5 := stack.Push(2)                  // 5
-	stack.Slide(2)                       // 6
-	n1 := Val(&StackVal{-1})
-	n2 := Val(&StackVal{-2})
-	n7 := Val(&StackVal{-7})
+	stack.Push(&v1) // 0
+	stack.Pop()     // 1
+	stack.Pop()     // 1
+	stack.Push(&s0) // 1
+	stack.Pop()     // 2
+	stack.Pop()     // 2
+	stack.Push(&s1) // 2
+	stack.Copy(5)   // 4
+	stack.Pop()     // 5
+	stack.Pop()     // 5
+	stack.Push(&s2) // 5
+	stack.Slide(2)  // 6
+
+	constVals := bigint.NewMap(nil)
+	constVals.Put(big.NewInt(1), &v1)
 
 	blockJoined := &BasicBlock{
 		Stack: stack,
 		Nodes: []Node{
-			&AssignStmt{Assign: s2, Expr: &ArithExpr{Op: token.Add, LHS: &n1, RHS: s1}},
-			&AssignStmt{Assign: s3, Expr: &ArithExpr{Op: token.Mul, LHS: &n2, RHS: s2}},
-			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Mod, LHS: s3, RHS: &n7}},
+			&AssignStmt{Assign: &s0, Expr: &ArithExpr{Op: token.Add, LHS: &sn1, RHS: &v1}},
+			&AssignStmt{Assign: &s1, Expr: &ArithExpr{Op: token.Mul, LHS: &sn2, RHS: &s0}},
+			&AssignStmt{Assign: &s2, Expr: &ArithExpr{Op: token.Mod, LHS: &s1, RHS: &sn7}},
 		},
 		Terminator: &EndStmt{},
 		Entries:    []*BasicBlock{entryBlock},
@@ -55,6 +64,7 @@ func TestJoinSimpleCalls(t *testing.T) {
 	astJoined := &AST{
 		Blocks:      []*BasicBlock{blockJoined},
 		Entry:       blockJoined,
+		ConstVals:   *constVals,
 		NextBlockID: 2,
 		NextStackID: 3,
 	}

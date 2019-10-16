@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/token"
 )
 
@@ -51,51 +52,77 @@ func TestTransforms(t *testing.T) {
 		{Type: token.Printi},                     // 18
 	}
 
+	v1 := Val(&ConstVal{big.NewInt(1)})
+	v2 := Val(&ConstVal{big.NewInt(2)})
+	v3 := Val(&ConstVal{big.NewInt(3)})
+	v10 := Val(&ConstVal{big.NewInt(10)})
+	v23 := Val(&ConstVal{big.NewInt(23)})
+	vn32 := Val(&ConstVal{big.NewInt(-32)})
+	vA := Val(&ConstVal{big.NewInt('A')})
+	vB := Val(&ConstVal{big.NewInt('B')})
+	vC := Val(&ConstVal{big.NewInt('C')})
+	va := Val(&ConstVal{big.NewInt('a')})
+	vABC123 := Val(&StringVal{"ABC123"})
+	s0 := Val(&StackVal{0})
+	s1 := Val(&StackVal{1})
+	s2 := Val(&StackVal{2})
+	s3 := Val(&StackVal{3})
+
 	var stack Stack
-	s0 := stack.PushConst(big.NewInt(1))    // 0
-	s1 := stack.PushConst(big.NewInt(3))    // 1
-	s2 := stack.PushConst(big.NewInt(10))   // 2
-	s3 := stack.PushConst(big.NewInt(2))    // 3
-	stack.Pop()                             // 4
-	stack.Pop()                             // 4
-	s4 := stack.Push(0)                     // 4
-	stack.Pop()                             // 5
-	stack.Pop()                             // 5
-	s5 := stack.Push(1)                     // 5
-	stack.Swap()                            // 6
-	s7 := stack.PushConst(big.NewInt('C'))  // 7
-	stack.Dup()                             // 8
-	stack.Copy(2)                           // 9
-	stack.Pop()                             // 10
-	stack.Pop()                             // 10
-	s10 := stack.Push(2)                    // 10
-	s11 := stack.PushConst(big.NewInt(-32)) // 11
-	s12 := stack.PushConst(big.NewInt('a')) // 12
-	stack.Pop()                             // 13
-	stack.Pop()                             // 13
-	s13 := stack.Push(3)                    // 13
-	stack.Pop()                             // 14
-	stack.Pop()                             // 15
-	stack.Pop()                             // 16
-	stack.Pop()                             // 17
-	stack.Pop()                             // 18
+	stack.Push(&v1)   // 0
+	stack.Push(&v3)   // 1
+	stack.Push(&v10)  // 2
+	stack.Push(&v2)   // 3
+	stack.Pop()       // 4
+	stack.Pop()       // 4
+	stack.Push(&s0)   // 4
+	stack.Pop()       // 5
+	stack.Pop()       // 5
+	stack.Push(&s1)   // 5
+	stack.Swap()      // 6
+	stack.Push(&vC)   // 7
+	stack.Dup()       // 8
+	stack.Copy(2)     // 9
+	stack.Pop()       // 10
+	stack.Pop()       // 10
+	stack.Push(&s2)   // 10
+	stack.Push(&vn32) // 11
+	stack.Push(&va)   // 12
+	stack.Pop()       // 13
+	stack.Pop()       // 13
+	stack.Push(&s3)   // 13
+	stack.Pop()       // 14
+	stack.Pop()       // 15
+	stack.Pop()       // 16
+	stack.Pop()       // 17
+	stack.Pop()       // 18
 
 	if len(stack.Vals) != 0 || stack.Pops != 0 || stack.Access != 0 {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 
+	constVals := bigint.NewMap(nil)
+	constVals.Put(big.NewInt(1), &v1)
+	constVals.Put(big.NewInt(3), &v3)
+	constVals.Put(big.NewInt(10), &v10)
+	constVals.Put(big.NewInt(2), &v2)
+	constVals.Put(big.NewInt('C'), &vC)
+	constVals.Put(big.NewInt(2), &v2)
+	constVals.Put(big.NewInt(-32), &vn32)
+	constVals.Put(big.NewInt('a'), &va)
+
 	blockStart := &BasicBlock{
 		Stack: stack,
 		Nodes: []Node{
-			&AssignStmt{Assign: s4, Expr: &ArithExpr{Op: token.Mul, LHS: s2, RHS: s3}},
-			&AssignStmt{Assign: s5, Expr: &ArithExpr{Op: token.Add, LHS: s1, RHS: s4}},
-			&AssignStmt{Assign: s10, Expr: &ArithExpr{Op: token.Sub, LHS: s7, RHS: s0}},
-			&AssignStmt{Assign: s13, Expr: &ArithExpr{Op: token.Add, LHS: s11, RHS: s12}},
-			&PrintStmt{Op: token.Printc, Val: s13},
-			&PrintStmt{Op: token.Printc, Val: s10},
-			&PrintStmt{Op: token.Printc, Val: s7},
-			&PrintStmt{Op: token.Printi, Val: s0},
-			&PrintStmt{Op: token.Printi, Val: s5},
+			&AssignStmt{Assign: &s0, Expr: &ArithExpr{Op: token.Mul, LHS: &v10, RHS: &v2}},
+			&AssignStmt{Assign: &s1, Expr: &ArithExpr{Op: token.Add, LHS: &v3, RHS: &s0}},
+			&AssignStmt{Assign: &s2, Expr: &ArithExpr{Op: token.Sub, LHS: &vC, RHS: &v1}},
+			&AssignStmt{Assign: &s3, Expr: &ArithExpr{Op: token.Add, LHS: &vn32, RHS: &va}},
+			&PrintStmt{Op: token.Printc, Val: &s3},
+			&PrintStmt{Op: token.Printc, Val: &s2},
+			&PrintStmt{Op: token.Printc, Val: &vC},
+			&PrintStmt{Op: token.Printi, Val: &v1},
+			&PrintStmt{Op: token.Printi, Val: &s1},
 		},
 		Terminator: &EndStmt{},
 		Entries:    []*BasicBlock{entryBlock},
@@ -104,6 +131,7 @@ func TestTransforms(t *testing.T) {
 	astStart := &AST{
 		Blocks:      []*BasicBlock{blockStart},
 		Entry:       blockStart,
+		ConstVals:   *constVals,
 		NextBlockID: 1,
 		NextStackID: 4,
 	}
@@ -116,16 +144,13 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", ast, astStart)
 	}
 
-	vA := Val(&ConstVal{big.NewInt('A')})
-	vB := Val(&ConstVal{big.NewInt('B')})
-	v23 := Val(&ConstVal{big.NewInt(23)})
 	blockConst := &BasicBlock{
 		Stack: stack,
 		Nodes: []Node{
 			&PrintStmt{Op: token.Printc, Val: &vA},
 			&PrintStmt{Op: token.Printc, Val: &vB},
-			&PrintStmt{Op: token.Printc, Val: s7},
-			&PrintStmt{Op: token.Printi, Val: s0},
+			&PrintStmt{Op: token.Printc, Val: &vC},
+			&PrintStmt{Op: token.Printi, Val: &v1},
 			&PrintStmt{Op: token.Printi, Val: &v23},
 		},
 		Terminator: &EndStmt{},
@@ -135,6 +160,7 @@ func TestTransforms(t *testing.T) {
 	astConst := &AST{
 		Blocks:      []*BasicBlock{blockConst},
 		Entry:       blockConst,
+		ConstVals:   *constVals,
 		NextBlockID: 1,
 		NextStackID: 4,
 	}
@@ -144,10 +170,9 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", ast, astConst)
 	}
 
-	vStr := Val(&StringVal{"ABC123"})
 	blockStr := &BasicBlock{
 		Nodes: []Node{
-			&PrintStmt{Op: token.Prints, Val: &vStr},
+			&PrintStmt{Op: token.Prints, Val: &vABC123},
 		},
 		Terminator: &EndStmt{},
 		Stack:      stack,
@@ -157,6 +182,7 @@ func TestTransforms(t *testing.T) {
 	astStr := &AST{
 		Blocks:      []*BasicBlock{blockStr},
 		Entry:       blockStr,
+		ConstVals:   *constVals,
 		NextBlockID: 1,
 		NextStackID: 4,
 	}

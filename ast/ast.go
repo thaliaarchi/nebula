@@ -13,6 +13,7 @@ import (
 type AST struct {
 	Blocks      []*BasicBlock
 	Entry       *BasicBlock
+	ConstVals   bigint.Map // map[*big.Int]*Val
 	NextBlockID int
 	NextStackID int
 }
@@ -168,7 +169,7 @@ func needsImplicitEnd(tokens []token.Token) bool {
 }
 
 func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int, *bigint.Map, error) {
-	var ast AST
+	ast := &AST{ConstVals: *bigint.NewMap(nil)}
 	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	prevLabel := "entry"
@@ -220,13 +221,13 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int
 	}
 	ast.Entry = ast.Blocks[0]
 	ast.NextBlockID = len(ast.Blocks)
-	return &ast, branches, labels, nil
+	return ast, branches, labels, nil
 }
 
 func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
-		block.Stack.PushConst(tok.Arg)
+		block.Stack.Push(ast.lookupConst(tok.Arg))
 	case token.Dup:
 		block.Stack.Dup()
 	case token.Copy:
@@ -251,8 +252,8 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 		block.Stack.Slide(n)
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
-		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), block.Stack.Push(ast.NextStackID)
-		ast.NextStackID++
+		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), ast.nextVal()
+		block.Stack.Push(assign)
 		block.assign(assign, &ArithExpr{
 			Op:  tok.Type,
 			LHS: lhs,
@@ -267,8 +268,8 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 			Val: val,
 		})
 	case token.Retrieve:
-		addr, assign := block.Stack.Pop(), block.Stack.Push(ast.NextStackID)
-		ast.NextStackID++
+		addr, assign := block.Stack.Pop(), ast.nextVal()
+		block.Stack.Push(assign)
 		val := Val(&AddrVal{addr})
 		block.assign(assign, &HeapExpr{
 			Op:  token.Retrieve,
@@ -438,6 +439,21 @@ func (ast *AST) Digraph() Digraph {
 		}
 	}
 	return g
+}
+
+func (ast *AST) lookupConst(c *big.Int) *Val {
+	if val, ok := ast.ConstVals.Get(c); ok {
+		return val.(*Val)
+	}
+	val := Val(&ConstVal{c})
+	ast.ConstVals.Put(c, &val)
+	return &val
+}
+
+func (ast *AST) nextVal() *Val {
+	val := Val(&StackVal{ast.NextStackID})
+	ast.NextStackID++
+	return &val
 }
 
 // Exits returns all outgoing edges of the block.

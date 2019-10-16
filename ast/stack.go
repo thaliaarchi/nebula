@@ -2,7 +2,6 @@ package ast // import "github.com/andrewarchi/nebula/ast"
 
 import (
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -17,19 +16,9 @@ type Stack struct {
 	Access int    // Number of items accessed below stack
 }
 
-// Push pushes an item to the stack and returns a val with a locally
-// unique id.
-func (s *Stack) Push(id int) *Val {
-	val := Val(&StackVal{id})
-	s.Vals = append(s.Vals, &val)
-	return &val
-}
-
-// PushConst pushes a constant value to the stack and returns its val.
-func (s *Stack) PushConst(c *big.Int) *Val {
-	val := Val(&ConstVal{c})
-	s.Vals = append(s.Vals, &val)
-	return &val
+// Push pushes a value to the stack.
+func (s *Stack) Push(val *Val) {
+	s.Vals = append(s.Vals, val)
 }
 
 // Pop pops an item from the stack and returns the val of the removed
