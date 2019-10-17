@@ -1,6 +1,5 @@
 nebula
 *.exe
-*.out.ws
 *.out.wsa
 *.wsx
 *.ast

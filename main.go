@@ -61,7 +61,7 @@ func main() {
 
 	a.JoinSimpleEntries()
 	a.FoldConstArith()
-	a.ConcatStrings()
+	// a.ConcatStrings()
 
 	switch mode {
 	case "ast":

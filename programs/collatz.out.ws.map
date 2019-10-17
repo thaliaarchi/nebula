@@ -1,0 +1,6 @@
+30094426:collatz
+2:.loop
+4:.even
+5:.next
+3:.done
+1:.invalid
