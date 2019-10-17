@@ -253,13 +253,15 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 		block.Stack.Slide(n)
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
-		rhs, lhs, assign := block.Stack.Pop(), block.Stack.Pop(), ast.nextVal()
-		block.Stack.Push(assign)
-		block.assign(assign, &ArithExpr{
-			Op:  tok.Type,
-			LHS: lhs,
-			RHS: rhs,
-		})
+		rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
+		expr := &ArithExpr{Op: tok.Type, LHS: lhs, RHS: rhs}
+		if val, ok := expr.FoldConst(ast); ok {
+			block.Stack.Push(val)
+		} else {
+			assign := ast.nextVal()
+			block.Stack.Push(assign)
+			block.assign(assign, expr)
+		}
 
 	case token.Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
@@ -447,6 +449,11 @@ func (ast *AST) nextVal() *Val {
 	val := Val(&StackVal{ast.NextStackID})
 	ast.NextStackID++
 	return &val
+}
+
+// ValEq returns whether the two vals reference the same definition.
+func ValEq(a, b *Val) bool {
+	return a != nil && b != nil && *a == *b
 }
 
 // Exits returns all outgoing edges of the block.

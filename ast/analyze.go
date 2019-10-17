@@ -88,8 +88,8 @@ func (ast *AST) FoldConstArith() {
 		for i := 0; i < len(block.Nodes); i++ {
 			if assign, ok := block.Nodes[i].(*AssignStmt); ok {
 				if expr, ok := assign.Expr.(*ArithExpr); ok {
-					if val, ok := expr.FoldConst(); ok {
-						*assign.Assign = val
+					if val, ok := expr.FoldConst(ast); ok {
+						*assign.Assign = *val
 						continue
 					}
 				}
@@ -102,19 +102,19 @@ func (ast *AST) FoldConstArith() {
 }
 
 // FoldConst reduces constant arithmetic expressions or identities.
-func (expr *ArithExpr) FoldConst() (Val, bool) {
+func (expr *ArithExpr) FoldConst(ast *AST) (*Val, bool) {
 	if lhs, ok := (*expr.LHS).(*ConstVal); ok {
 		if rhs, ok := (*expr.RHS).(*ConstVal); ok {
-			return expr.foldConstLR(lhs.Val, rhs.Val)
+			return expr.foldConstLR(ast, lhs.Val, rhs.Val)
 		}
-		return expr.foldConstL(lhs.Val)
+		return expr.foldConstL(ast, lhs.Val)
 	} else if rhs, ok := (*expr.RHS).(*ConstVal); ok {
-		return expr.foldConstR(rhs.Val)
+		return expr.foldConstR(ast, rhs.Val)
 	}
-	return expr.foldConst()
+	return expr.foldConst(ast)
 }
 
-func (expr *ArithExpr) foldConstLR(lhs, rhs *big.Int) (Val, bool) {
+func (expr *ArithExpr) foldConstLR(ast *AST, lhs, rhs *big.Int) (*Val, bool) {
 	result := new(big.Int)
 	switch expr.Op {
 	case token.Add:
@@ -128,58 +128,58 @@ func (expr *ArithExpr) foldConstLR(lhs, rhs *big.Int) (Val, bool) {
 	case token.Mod:
 		result.Mod(lhs, rhs)
 	}
-	return &ConstVal{result}, true
+	return ast.lookupConst(result), true
 }
 
 var bigOne = big.NewInt(1)
 
-func (expr *ArithExpr) foldConstL(lhs *big.Int) (Val, bool) {
+func (expr *ArithExpr) foldConstL(ast *AST, lhs *big.Int) (*Val, bool) {
 	if lhs.Sign() == 0 {
 		switch expr.Op {
 		case token.Add:
-			return *expr.RHS, true
+			return expr.RHS, true
 		case token.Sub:
 			// negation
 		case token.Mul, token.Div, token.Mod:
-			return *expr.LHS, true
+			return expr.LHS, true
 		}
 	} else if lhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
 		case token.Mul, token.Div:
-			return *expr.RHS, true
+			return expr.RHS, true
 		}
 	}
 	return nil, false
 }
 
-func (expr *ArithExpr) foldConstR(rhs *big.Int) (Val, bool) {
+func (expr *ArithExpr) foldConstR(ast *AST, rhs *big.Int) (*Val, bool) {
 	if rhs.Sign() == 0 {
 		switch expr.Op {
 		case token.Add, token.Sub:
-			return *expr.LHS, true
+			return expr.LHS, true
 		case token.Mul:
-			return *expr.RHS, true
+			return expr.RHS, true
 		case token.Div, token.Mod:
 			panic("ast: division by zero")
 		}
 	} else if rhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
 		case token.Mul, token.Div:
-			return *expr.LHS, true
+			return expr.LHS, true
 		case token.Mod:
-			return &ConstVal{big.NewInt(0)}, true
+			return ast.lookupConst(big.NewInt(0)), true
 		}
 	}
 	return nil, false
 }
 
-func (expr *ArithExpr) foldConst() (Val, bool) {
-	if expr.LHS == expr.RHS {
+func (expr *ArithExpr) foldConst(ast *AST) (*Val, bool) {
+	if ValEq(expr.LHS, expr.RHS) {
 		switch expr.Op {
 		case token.Sub, token.Mod:
-			return &ConstVal{big.NewInt(0)}, true
+			return ast.lookupConst(big.NewInt(0)), true
 		case token.Div:
-			return &ConstVal{big.NewInt(1)}, true
+			return ast.lookupConst(big.NewInt(1)), true
 		}
 	}
 	return nil, false
