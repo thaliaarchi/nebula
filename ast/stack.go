@@ -130,7 +130,7 @@ func (s *Stack) AtExists(n int) (*Val, bool) {
 		val = s.Under[len(s.Under)-len(s.Vals)-n-1]
 	}
 	if val != nil {
-		if v, ok := (*val).(*StackVal); ok && v.Val >= 0 {
+		if v, ok := (*val).(*StackVal); !ok || v.Val >= 0 {
 			return val, true
 		}
 	}
@@ -161,7 +161,10 @@ func (s *Stack) Concat(next *Stack) {
 		}
 	}
 	if next.Access > 0 {
-		s.At(next.Access - 1)
+		id := s.Pops + next.Access - len(s.Vals)
+		if id > s.Access {
+			s.Access = id
+		}
 	}
 	s.PopN(next.Pops)
 	s.Vals = append(s.Vals, next.Vals...)
