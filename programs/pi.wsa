@@ -67,11 +67,13 @@
     call extract_digit
     sub
     jz .print_digit
+    drop
+    swap
     jmp .loop
 
 .print_digit:
     dup
-    printc
+    printi
     swap
     push 1
     add
@@ -87,12 +89,13 @@
     printc
     push ':'
     printc
-    copy 1
+    dup
     printi
     push '\n'
     printc
 
 .after_total:
+    swap
     call eliminate_digit
     swap
     jmp .loop
