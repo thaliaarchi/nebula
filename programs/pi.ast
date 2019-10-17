@@ -1,0 +1,78 @@
+# The Computer Language Benchmarks Game
+# https://salsa.debian.org/benchmarksgame-team/benchmarksgame/
+#
+# Contributed by Andrew Archibald
+# Derived from Mr Ledrug's C version
+
+    define ACC 0
+    define DEN 1
+    define NUM 2
+    define TMP 3
+
+main:
+    store *ACC 0
+    store *DEN 1
+    store *NUM 1
+
+    prints "N = "
+    %n = readi
+
+    %i = 0
+    %k = 0
+.loop:
+    %0 = sub %i %n
+    jn %0 .loop_body
+    jmp .loop_exit
+
+.loop_body:
+    %k <- add %k 1
+    call next_term(%k)
+    %1 = sub *ACC *NUM
+    jn %1 .loop
+
+    %d = call extract_digit(3)
+    %2 = call extract_digit(4)
+    %3 = sub %d %2
+    jz %3 .print_digit
+    jmp .loop
+
+.print_digit:
+    printc %d
+    %i <- add %i 1
+    %4 = mod %i 10
+    jz %4 .line_total
+    jmp .after_total
+.line_total:
+    printc '\t'
+    printc ':'
+    printi %i
+    printc '\n'
+.after_total:
+    call eliminate_digit(%d)
+    jmp .loop
+
+.loop_exit:
+    end
+
+extract_digit(%nth):
+    %5 = mul *NUM %nth
+    %6 = add %5 *ACC
+    %7 = div %6 *DEN
+    ret %7
+
+eliminate_digit(%d):
+    %8 = mul *DEN %d
+    %9 = sub *ACC %8
+    *ACC <- mul %9 10
+    *NUM <- mul *NUM 10
+    ret
+
+next_term(%k):
+    %10 = mul %k 2
+    %k2 = add %10 1
+    %11 = mul *NUM 2
+    %12 = add *ACC %11
+    *ACC <- mul %12 %k2
+    *DEN <- mul *DEN %k2
+    *NUM <- mul *NUM %k
+    ret

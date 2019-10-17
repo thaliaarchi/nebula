@@ -1,0 +1,171 @@
+# The Computer Language Benchmarks Game
+# https://salsa.debian.org/benchmarksgame-team/benchmarksgame/
+#
+# Contributed by Andrew Archibald
+# Derived from Mr Ledrug's C version
+
+    define ACC 0
+    define DEN 1
+    define NUM 2
+    define TMP 3
+
+# main:
+    push ACC
+    push 0
+    store
+    push DEN
+    push 1
+    store
+    push NUM
+    push 1
+    store
+
+    push 'N'
+    printc
+    push ' '
+    printc
+    push '='
+    printc
+    push ' '
+    printc
+
+    # %n
+    push TMP
+    dup
+    readi
+    retrieve
+
+    push 0  # %i
+    push 0  # %k
+
+.loop:
+    copy 1
+    copy 3
+    sub
+    jn .loop_body
+    jmp .loop_exit
+
+.loop_body:
+    push 1
+    add
+
+    dup
+    call next_term
+
+    push ACC
+    retrieve
+    push NUM
+    retrieve
+    sub
+    jn .loop
+
+    swap
+    push 3
+    call extract_digit
+    dup
+    push 4
+    call extract_digit
+    sub
+    jz .print_digit
+    jmp .loop
+
+.print_digit:
+    dup
+    printc
+    swap
+    push 1
+    add
+
+    dup
+    push 10
+    mod
+    jz .line_total
+    jmp .after_total
+
+.line_total:
+    push '\t'
+    printc
+    push ':'
+    printc
+    copy 1
+    printi
+    push '\n'
+    printc
+
+.after_total:
+    call eliminate_digit
+    swap
+    jmp .loop
+
+.loop_exit:
+    end
+
+
+# params: %nth
+# return: %7
+extract_digit:
+    push NUM
+    retrieve
+    mul
+    push ACC
+    retrieve
+    add
+    push DEN
+    retrieve
+    div
+    ret
+
+# params: %d
+eliminate_digit:
+    push DEN
+    retrieve
+    mul
+    push ACC
+    swap
+    copy 1
+    retrieve
+    swap
+    sub
+    push 10
+    mul
+    store
+    push NUM
+    dup
+    retrieve
+    push 10
+    mul
+    store
+    ret
+
+# params: %k
+next_term:
+    dup
+    push 2
+    mul
+    push 1
+    add
+    push NUM
+    retrieve
+    dup
+    push 2
+    mul
+    push ACC
+    retrieve
+    add
+    copy 2
+    mul
+    push ACC
+    swap
+    store
+    push DEN
+    dup
+    retrieve
+    copy 3
+    mul
+    store
+    slide 1
+    mul
+    push NUM
+    swap
+    store
+    ret

@@ -1,0 +1,9 @@
+0:.loop
+1:.loop_body
+5:.print_digit
+6:.line_total
+7:.after_total
+2:.loop_exit
+8113183174524:extract_digit
+511857581010812:eliminate_digit
+2093020477:next_term
