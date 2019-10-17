@@ -35,21 +35,23 @@
     readi
     retrieve
 
-    push 0  # %i
     push 0  # %k
+    push 0  # %i
 
 .loop:
-    copy 1
+    dup
     copy 3
     sub
     jn .loop_body
     jmp .loop_exit
 
 .loop_body:
+    swap
     push 1
     add
+    swap
 
-    dup
+    copy 1
     call next_term
 
     push ACC
@@ -59,7 +61,6 @@
     sub
     jn .loop
 
-    swap
     push 3
     call extract_digit
     dup
@@ -68,7 +69,6 @@
     sub
     jz .print_digit
     drop
-    swap
     jmp .loop
 
 .print_digit:
@@ -97,7 +97,6 @@
 .after_total:
     swap
     call eliminate_digit
-    swap
     jmp .loop
 
 .loop_exit:
