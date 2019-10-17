@@ -9,7 +9,7 @@ func (ast *AST) JoinSimpleEntries() {
 		if len(block.Entries) == 1 {
 			entry := block.Entries[0]
 			if _, ok := entry.Terminator.(*JmpStmt); ok {
-				entry.Join(block)
+				ast.Join(entry, block)
 				continue
 			} else {
 				block.Stack.LookupUnderflow(&entry.Stack)
@@ -21,16 +21,22 @@ func (ast *AST) JoinSimpleEntries() {
 	ast.Blocks = ast.Blocks[:j]
 }
 
-// Join concatenates two basic blocks, renumbering the assignments in
-// the second block.
-// TODO: this does not update Callers.
-func (block *BasicBlock) Join(next *BasicBlock) {
-	block.Stack.Concat(&next.Stack)
-	block.Nodes = append(block.Nodes, next.Nodes...)
-	block.Terminator = next.Terminator
-	exits := next.Exits()
-	next.Disconnect()
-	for _, exit := range exits {
-		exit.Entries = appendUnique(exit.Entries, block)
+// Join concatenates two basic blocks.
+func (ast *AST) Join(prev, next *BasicBlock) {
+	prev.Stack.Concat(&next.Stack)
+	prev.Nodes = append(prev.Nodes, next.Nodes...)
+	prev.Terminator = next.Terminator
+
+	if next.Prev != nil {
+		next.Prev.Next = next.Next
+	}
+	if next.Next != nil {
+		next.Next.Prev = next.Prev
+	}
+	for _, exit := range next.Exits() {
+		replaceUnique(exit.Entries, next, prev)
+	}
+	for _, block := range ast.Blocks {
+		replaceUnique(block.Callers, next, prev)
 	}
 }

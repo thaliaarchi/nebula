@@ -379,8 +379,8 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 	return errs
 }
 
-// Disconnect removes all incoming edges to a basic block. The block is
-// not removed from the AST block slice.
+// Disconnect removes incoming edges to a basic block. The block is not
+// removed from the AST block slice and callers are not updated.
 func (block *BasicBlock) Disconnect() {
 	if block.Prev != nil {
 		block.Prev.Next = block.Next
@@ -665,6 +665,15 @@ outer:
 		slice = append(slice, block)
 	}
 	return slice
+}
+
+func replaceUnique(blocks []*BasicBlock, block, replace *BasicBlock) {
+	for i := range blocks {
+		if blocks[i] == block {
+			blocks[i] = replace
+			break
+		}
+	}
 }
 
 func formatValSlice(vals []*Val) string {

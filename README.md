@@ -3,8 +3,21 @@
 Nebula is an optimizing compiler for the Whitespace programming
 language.
 
-This project is evolving very rapidly, so documentation may not
-represent its current state.
+This project is evolving very rapidly.
+
+## Usage
+
+Building Nebula requires Go to be installed. Graphviz can be optionally
+used to render generated DOT graphs.
+
+```sh
+go get https://github.com/andrewarchi/nebula
+cd nebula
+go get ./...
+go build
+./nebula ast programs/interpret.out.ws
+./nebula dot programs/interpret.out.ws | dot -Tpng > graph.png
+```
 
 ## Project Goals
 
@@ -54,6 +67,6 @@ Nebula's name is derived from the stellar gas clouds, nebulae. Nebulae
 are incredibly diffuse, yet form some of the most beautiful astronomical
 landscapes. Similarly, of all programming languages, Whitespace is the
 least dense in visible characters and despite its simplicity, is Turing
-complete. The name is also a call-out to the star-forming region of
-[IC 1396](https://nitarp.ipac.caltech.edu/system/media_files/binaries/191/original/johnson2017sci.pdf),
+complete. The name is also a call-out to the star-forming region
+[IC 1396](https://nitarp.ipac.caltech.edu/system/media_files/binaries/191/original/johnson2017sci.pdf)
 that contains many nebulae including the famous Elephant's Trunk Nebula.
