@@ -57,9 +57,6 @@ type StringVal struct{ Val string }
 // ArrayVal is a sequence of integers.
 type ArrayVal struct{ Val []*big.Int }
 
-// AddrVal marks a value as being a pointer to a value.
-type AddrVal struct{ Val *Val }
-
 // PhiVal represents an SSA Φ function and stores the set of values it
 // could be.
 type PhiVal struct {
@@ -80,11 +77,15 @@ type ArithExpr struct {
 	RHS *Val
 }
 
-// HeapExpr evaluates a heap access operation. Valid operations are
-// store and retrieve.
-type HeapExpr struct {
-	Op  token.Type
-	Val *Val
+// StoreExpr evaluates a store operation.
+type StoreExpr struct {
+	Addr *Val
+	Val  *Val
+}
+
+// RetrieveExpr evaluates a retrieve operation.
+type RetrieveExpr struct {
+	Addr *Val
 }
 
 // PrintStmt prints a value. Valid operations are printc and printi.
@@ -262,18 +263,15 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 
 	case token.Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
-		assign := Val(&AddrVal{addr})
-		block.assign(&assign, &HeapExpr{
-			Op:  token.Store,
-			Val: val,
+		block.Nodes = append(block.Nodes, &StoreExpr{
+			Addr: addr,
+			Val:  val,
 		})
 	case token.Retrieve:
 		addr, assign := block.Stack.Pop(), ast.nextVal()
 		block.Stack.Push(assign)
-		val := Val(&AddrVal{addr})
-		block.assign(assign, &HeapExpr{
-			Op:  token.Retrieve,
-			Val: &val,
+		block.assign(assign, &RetrieveExpr{
+			Addr: addr,
 		})
 
 	case token.Label:
@@ -302,9 +300,13 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 			Val: block.Stack.Pop(),
 		})
 	case token.Readc, token.Readi:
-		assign := Val(&AddrVal{block.Stack.Pop()})
-		block.assign(&assign, &ReadExpr{
+		addr, assign := block.Stack.Pop(), ast.nextVal()
+		block.assign(assign, &ReadExpr{
 			Op: tok.Type,
+		})
+		block.Nodes = append(block.Nodes, &StoreExpr{
+			Addr: addr,
+			Val:  assign,
 		})
 
 	default:
@@ -590,19 +592,19 @@ func formatBlockList(blocks []*BasicBlock) string {
 	return b.String()
 }
 
-func (s *StackVal) String() string   { return fmt.Sprintf("%%%d", s.Val) }
-func (c *ConstVal) String() string   { return c.Val.String() }
-func (s *StringVal) String() string  { return fmt.Sprintf("%q", s.Val) }
-func (a *ArrayVal) String() string   { return bigint.FormatSlice(a.Val) }
-func (a *AddrVal) String() string    { return fmt.Sprintf("*%v", *a.Val) }
-func (p *PhiVal) String() string     { return fmt.Sprintf("phi(%s)", formatValSlice(p.Vals)) }
-func (a *AssignStmt) String() string { return fmt.Sprintf("%v = %v", *a.Assign, a.Expr) }
-func (b *ArithExpr) String() string  { return fmt.Sprintf("%v %v %v", b.Op, *b.LHS, *b.RHS) }
-func (u *HeapExpr) String() string   { return fmt.Sprintf("%v %v", u.Op, *u.Val) }
-func (p *PrintStmt) String() string  { return fmt.Sprintf("%v %v", p.Op, *p.Val) }
-func (r *ReadExpr) String() string   { return r.Op.String() }
-func (c *CallStmt) String() string   { return fmt.Sprintf("call %s", c.Callee.Name()) }
-func (j *JmpStmt) String() string    { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
+func (s *StackVal) String() string     { return fmt.Sprintf("%%%d", s.Val) }
+func (c *ConstVal) String() string     { return c.Val.String() }
+func (s *StringVal) String() string    { return fmt.Sprintf("%q", s.Val) }
+func (a *ArrayVal) String() string     { return bigint.FormatSlice(a.Val) }
+func (p *PhiVal) String() string       { return fmt.Sprintf("phi(%s)", formatValSlice(p.Vals)) }
+func (a *AssignStmt) String() string   { return fmt.Sprintf("%v = %v", *a.Assign, a.Expr) }
+func (b *ArithExpr) String() string    { return fmt.Sprintf("%v %v %v", b.Op, *b.LHS, *b.RHS) }
+func (u *StoreExpr) String() string    { return fmt.Sprintf("store *%v %v", *u.Addr, *u.Val) }
+func (u *RetrieveExpr) String() string { return fmt.Sprintf("retrieve *%v", *u.Addr) }
+func (p *PrintStmt) String() string    { return fmt.Sprintf("%v %v", p.Op, *p.Val) }
+func (r *ReadExpr) String() string     { return r.Op.String() }
+func (c *CallStmt) String() string     { return fmt.Sprintf("call %s", c.Callee.Name()) }
+func (j *JmpStmt) String() string      { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
 func (j *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", j.Op, *j.Val, j.TrueBlock.Name(), j.FalseBlock.Name())
 }

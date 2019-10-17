@@ -79,8 +79,10 @@ func references(a, b Node) bool {
 		switch expr := b.(type) {
 		case *ArithExpr:
 			return expr.LHS == assign || expr.RHS == assign
-		case *HeapExpr:
-			return expr.Val == assign
+		case *StoreExpr:
+			return expr.Addr == assign || expr.Val == assign
+		case *RetrieveExpr:
+			return expr.Addr == assign
 		case *PrintStmt:
 			return expr.Val == assign
 		case *ReadExpr:
