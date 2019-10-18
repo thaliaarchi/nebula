@@ -36,7 +36,7 @@ main:
     jmp .loop
 
 .print_digit:
-    printc %d
+    printi %d
     %i <- add %i 1
     %4 = mod %i 10
     jz %4 .line_total

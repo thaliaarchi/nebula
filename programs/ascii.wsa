@@ -1,0 +1,69 @@
+# Show ASCII Table
+# http://rosettacode.org/wiki/Show_Ascii_table
+
+    push 32
+
+.loop:
+    push 99
+    copy 1
+    sub
+    jn .print_code
+    push ' '; printc
+
+.print_code:
+    dup
+    printi
+
+    push ' '; printc
+    push ':'; printc
+    push ' '; printc
+
+    dup
+    push 32
+    sub
+    jz .print_spc
+    dup
+    push 127
+    sub
+    jz .print_del
+
+    dup
+    printc
+
+    push ' '; printc
+    push ' '; printc
+
+.pad:
+    push ' '; printc
+    push ' '; printc
+    push ' '; printc
+
+    push 16
+    add
+    dup
+    push 128
+    sub
+    jn .loop
+    push 95
+    sub
+    push '\n'; printc
+
+    dup
+    push 48
+    sub
+    jz .loop_exit
+    jmp .loop
+
+.loop_exit:
+    end
+
+.print_spc:
+    push 'S'; printc
+    push 'p'; printc
+    push 'c'; printc
+    jmp .pad
+.print_del:
+    push 'D'; printc
+    push 'e'; printc
+    push 'l'; printc
+    jmp .pad

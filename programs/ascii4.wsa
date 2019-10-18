@@ -1,0 +1,199 @@
+# Four Column ASCII
+# Prints the ASCII table as formatted on
+# https://garbagecollected.org/2017/01/31/four-column-ascii/
+
+    push 0; push 'N'; store
+    push 1; push 'U'; store
+    push 2; push 'L'; store
+    push 3; push 'S'; store
+    push 4; push 'O'; store
+    push 5; push 'H'; store
+    push 6; push 'S'; store
+    push 7; push 'T'; store
+    push 8; push 'X'; store
+    push 9; push 'E'; store
+    push 10; push 'T'; store
+    push 11; push 'X'; store
+    push 12; push 'E'; store
+    push 13; push 'O'; store
+    push 14; push 'T'; store
+    push 15; push 'E'; store
+    push 16; push 'N'; store
+    push 17; push 'Q'; store
+    push 18; push 'A'; store
+    push 19; push 'C'; store
+    push 20; push 'K'; store
+    push 21; push 'B'; store
+    push 22; push 'E'; store
+    push 23; push 'L'; store
+    push 24; push 'B'; store
+    push 25; push 'S'; store
+    push 27; push 'T'; store
+    push 28; push 'A'; store
+    push 29; push 'B'; store
+    push 30; push 'L'; store
+    push 31; push 'F'; store
+    push 33; push 'V'; store
+    push 34; push 'T'; store
+    push 36; push 'F'; store
+    push 37; push 'F'; store
+    push 39; push 'C'; store
+    push 40; push 'R'; store
+    push 42; push 'S'; store
+    push 43; push 'O'; store
+    push 45; push 'S'; store
+    push 46; push 'I'; store
+    push 48; push 'D'; store
+    push 49; push 'L'; store
+    push 50; push 'E'; store
+    push 51; push 'D'; store
+    push 52; push 'C'; store
+    push 53; push '1'; store
+    push 54; push 'D'; store
+    push 55; push 'C'; store
+    push 56; push '2'; store
+    push 57; push 'D'; store
+    push 58; push 'C'; store
+    push 59; push '3'; store
+    push 60; push 'D'; store
+    push 61; push 'C'; store
+    push 62; push '4'; store
+    push 63; push 'N'; store
+    push 64; push 'A'; store
+    push 65; push 'K'; store
+    push 66; push 'S'; store
+    push 67; push 'Y'; store
+    push 68; push 'N'; store
+    push 69; push 'E'; store
+    push 70; push 'T'; store
+    push 71; push 'B'; store
+    push 72; push 'C'; store
+    push 73; push 'A'; store
+    push 74; push 'N'; store
+    push 75; push 'E'; store
+    push 76; push 'M'; store
+    push 78; push 'S'; store
+    push 79; push 'U'; store
+    push 80; push 'B'; store
+    push 81; push 'E'; store
+    push 82; push 'S'; store
+    push 83; push 'C'; store
+    push 84; push 'F'; store
+    push 85; push 'S'; store
+    push 87; push 'G'; store
+    push 88; push 'S'; store
+    push 90; push 'R'; store
+    push 91; push 'S'; store
+    push 93; push 'U'; store
+    push 94; push 'S'; store
+    push 96; push 'S'; store
+    push 97; push 'p'; store
+    push 98; push 'c'; store
+    push 381; push 'D'; store
+    push 382; push 'E'; store
+    push 383; push 'L'; store
+
+    push '0'; printc
+    push '0'; printc
+    push ' '; printc
+    push ' '; printc
+    push '0'; printc
+    push '1'; printc
+    push ' '; printc
+    push ' '; printc
+    push '1'; printc
+    push '0'; printc
+    push ' '; printc
+    push ' '; printc
+    push '1'; printc
+    push '1'; printc
+    push '\n'; printc
+
+    push 0
+
+.loop:
+    dup
+    dup
+    call print_name
+    push 32
+    add
+    dup
+    call print_name
+    push 32
+    add
+    dup
+    call print_name
+    push 32
+    add
+    #dup
+    call print_name
+    #drop
+
+    dup
+    call print_bin
+    push '\n'
+    printc
+
+    push 1
+    add
+
+    dup
+    push 32
+    sub
+    jz .loop_exit
+    jmp .loop
+
+.loop_exit:
+    end
+
+print_name:
+    dup
+    push 3
+    mul
+    dup
+    retrieve
+    dup
+    jz .print_char
+    printc
+
+    push 1
+    add
+    dup
+    retrieve
+    dup
+    jz .print_space_2
+    printc
+
+    push 1
+    add
+    retrieve
+    dup
+    jz .print_space_3
+    printc
+    jmp .print_name_exit
+
+.print_char:
+    copy 2
+    printc
+.print_space_2:
+    push ' '
+    printc
+    drop
+.print_space_3:
+    push ' '
+    printc
+    drop
+
+.print_name_exit:
+    push ' '
+    printc
+    drop
+    ret
+
+print_bin:
+    dup; push 16; div; push 2; mod; printi
+    dup; push 8; div; push 2; mod; printi
+    dup; push 4; div; push 2; mod; printi
+    dup; push 2; div; push 2; mod; printi
+    push 2; mod; printi
+    ret

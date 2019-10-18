@@ -1,0 +1,6 @@
+0:.loop
+1:.print_code
+4:.pad
+5:.loop_exit
+2:.print_spc
+3:.print_del

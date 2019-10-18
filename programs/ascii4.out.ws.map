@@ -1,0 +1,8 @@
+0:.loop
+3:.loop_exit
+17198278669:print_name
+4:.print_char
+5:.print_space_2
+6:.print_space_3
+7:.print_name_exit
+2149784118:print_bin
