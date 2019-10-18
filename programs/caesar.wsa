@@ -1,0 +1,102 @@
+    push 'K'; printc
+    push 'e'; printc
+    push 'y'; printc
+    push ':'; printc
+    push ' '; printc
+
+    push 0
+    readi
+
+    push 'P'; printc
+    push 'l'; printc
+    push 'a'; printc
+    push 'i'; printc
+    push 'n'; printc
+    push ':'; printc
+    push ' '; printc
+
+    push 1
+loop:
+    dup
+    readc
+    dup
+    retrieve
+
+    dup
+    push 1
+    sub
+    jn encode
+    push '\n'
+    sub
+    jz encode
+
+    push 1
+    add
+    jmp loop
+
+encode:
+    push 0
+    store
+    push 0
+    retrieve
+    push 0
+
+.encode_loop:
+    push 1
+    add
+
+    dup
+    retrieve
+    dup
+    jz exit
+
+    dup
+    push 'A'
+    sub
+    jn .skip
+    dup
+    push '['
+    sub
+    jn .upper
+    dup
+    push 'a'
+    sub
+    jn .skip
+    dup
+    push '{'
+    sub
+    jn .lower
+
+.skip:
+    printc
+    jmp .encode_loop
+
+.upper:
+    push 'A'
+    sub
+    copy 2
+    add
+    push 26
+    mod
+    push 'A'
+    add
+    printc
+    jmp .encode_loop
+
+.lower:
+    push 'a'
+    sub
+    copy 2
+    add
+    push 26
+    mod
+    push 'a'
+    add
+    printc
+    jmp .encode_loop
+
+exit:
+    push '\n'
+    printc
+    drop
+    end

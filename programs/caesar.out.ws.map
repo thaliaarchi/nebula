@@ -1,0 +1,7 @@
+63400:loop
+3818821:encode
+2:.encode_loop
+4:.skip
+5:.upper
+6:.lower
+60348:exit
