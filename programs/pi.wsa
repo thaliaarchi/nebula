@@ -2,7 +2,7 @@
 # https://salsa.debian.org/benchmarksgame-team/benchmarksgame/
 #
 # Contributed by Andrew Archibald
-# Derived from Mr Ledrug's C version
+# Derived from the GNU C version by Mr Ledrug
 
     define ACC 0
     define DEN 1
@@ -19,15 +19,6 @@
     push NUM
     push 1
     store
-
-    push 'N'
-    printc
-    push ' '
-    printc
-    push '='
-    printc
-    push ' '
-    printc
 
     # %n
     push TMP
