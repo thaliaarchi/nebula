@@ -7,6 +7,7 @@ import (
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/nebula/ast"
 	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/codegen"
 	"github.com/andrewarchi/nebula/token"
 	"github.com/andrewarchi/nebula/ws"
 )
@@ -21,11 +22,17 @@ func main() {
 		return
 	}
 	mode := os.Args[1]
-	if mode != "ast" && mode != "dot" && mode != "matrix" {
+	if mode != "ast" && mode != "dot" && mode != "matrix" && mode != "llvm" {
 		fmt.Fprintf(os.Stderr, "Unrecognized mode: %s\n", mode)
 		fmt.Fprintln(os.Stderr, usage)
 		return
 	}
+
+	if mode == "llvm" {
+		codegen.EmitLLVMIR()
+		return
+	}
+
 	filename := os.Args[2]
 
 	f, err := os.Open(filename)
@@ -59,7 +66,7 @@ func main() {
 		}
 	}
 
-	a.JoinSimpleEntries()
+	// a.JoinSimpleEntries()
 	a.FoldConstArith()
 	// a.ConcatStrings()
 

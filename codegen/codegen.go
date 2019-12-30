@@ -3,27 +3,47 @@ package codegen
 import (
 	"fmt"
 
+	"github.com/andrewarchi/nebula/token"
 	"llvm.org/llvm/bindings/go/llvm"
 )
 
+const maxStackSize = 1024
+
 func EmitLLVMIR() {
 	builder := llvm.NewBuilder()
-	mod := llvm.NewModule("my_module")
+	mod := llvm.NewModule("module")
 
-	main := llvm.FunctionType(llvm.Int32Type(), []llvm.Type{}, false)
+	main := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	llvm.AddFunction(mod, "main", main)
 	block := llvm.AddBasicBlock(mod.NamedFunction("main"), "entry")
 	builder.SetInsertPoint(block, block.FirstInstruction())
 
-	a := builder.CreateAlloca(llvm.Int32Type(), "a")
-	builder.CreateStore(llvm.ConstInt(llvm.Int32Type(), 32, false), a)
+	fortyTwo := llvm.ConstInt(llvm.Int64Type(), 42, false)
+	stack := builder.CreateArrayAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), fortyTwo, "stack") // should be global
 
-	b := builder.CreateAlloca(llvm.Int32Type(), "b")
-	builder.CreateStore(llvm.ConstInt(llvm.Int32Type(), 16, false), b)
+	zero := llvm.ConstInt(llvm.Int64Type(), 0, false)
+	aIdx := llvm.ConstInt(llvm.Int64Type(), 5, false)
+	bIdx := llvm.ConstInt(llvm.Int64Type(), 4, false)
+	aGep := builder.CreateInBoundsGEP(stack, []llvm.Value{zero, aIdx}, "a.gep")
+	bGep := builder.CreateInBoundsGEP(stack, []llvm.Value{zero, bIdx}, "b.gep")
+	a := builder.CreateLoad(aGep, "a")
+	b := builder.CreateLoad(bGep, "b")
 
-	bVal := builder.CreateLoad(b, "b_val")
-	aVal := builder.CreateLoad(a, "a_val")
-	result := builder.CreateAdd(aVal, bVal, "ab_val")
+	op := token.Add
+	var result llvm.Value
+	switch op {
+	case token.Add:
+		result = builder.CreateAdd(a, b, "ab")
+	case token.Sub:
+		result = builder.CreateSub(a, b, "ab")
+	case token.Mul:
+		result = builder.CreateMul(a, b, "ab")
+	case token.Div:
+		result = builder.CreateSDiv(a, b, "ab")
+	case token.Mod:
+		result = builder.CreateSRem(a, b, "ab")
+	}
+
 	builder.CreateRet(result)
 
 	if ok := llvm.VerifyModule(mod, llvm.ReturnStatusAction); ok != nil {

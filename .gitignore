@@ -1,9 +1,14 @@
 nebula
 *.exe
+
 *.out.wsa
 *.wsx
 *.ast
+
+*.ll
+
 *.dot
 *.png
+
 .vscode
 .DS_Store
