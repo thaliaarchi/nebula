@@ -132,7 +132,10 @@ func foldConstLR(p *ir.Program, expr *ir.ArithExpr, lhs, rhs *big.Int) (*ir.Val,
 	return p.LookupConst(result), true
 }
 
-var bigOne = big.NewInt(1)
+var (
+	bigZero = big.NewInt(0)
+	bigOne  = big.NewInt(1)
+)
 
 func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool) {
 	if lhs.Sign() == 0 {
@@ -168,7 +171,7 @@ func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool)
 		case token.Mul, token.Div:
 			return expr.LHS, true
 		case token.Mod:
-			return p.LookupConst(big.NewInt(0)), true
+			return p.LookupConst(bigZero), true
 		}
 	}
 	return nil, false
@@ -177,10 +180,14 @@ func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool)
 func foldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
 	if ir.ValEq(expr.LHS, expr.RHS) {
 		switch expr.Op {
-		case token.Sub, token.Mod:
-			return p.LookupConst(big.NewInt(0)), true
+		case token.Sub:
+			return p.LookupConst(bigZero), true
+		case token.Mod:
+			// TODO: trap if zero
+			return p.LookupConst(bigZero), true
 		case token.Div:
-			return p.LookupConst(big.NewInt(1)), true
+			// TODO: trap if zero
+			return p.LookupConst(bigOne), true
 		}
 	}
 	return nil, false

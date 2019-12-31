@@ -119,7 +119,7 @@ func lexSigned(p *Lexer) (*big.Int, error) {
 	panic(invalidToken(t))
 }
 
-var bigOne = new(big.Int).SetInt64(1)
+var bigOne = big.NewInt(1)
 
 func lexUnsigned(p *Lexer) (*big.Int, error) {
 	num := new(big.Int)
