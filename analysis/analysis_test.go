@@ -65,6 +65,10 @@ func TestTransforms(t *testing.T) {
 	vC := ir.Val(&ir.ConstVal{Val: big.NewInt('C')})
 	va := ir.Val(&ir.ConstVal{Val: big.NewInt('a')})
 	vABC123 := ir.Val(&ir.StringVal{Val: "ABC123"})
+	s0 := ir.Val(&ir.StackVal{Val: 0})
+	s1 := ir.Val(&ir.StackVal{Val: 1})
+	s2 := ir.Val(&ir.StackVal{Val: 2})
+	s3 := ir.Val(&ir.StackVal{Val: 3})
 
 	var stack ir.Stack
 	stack.Push(&v1)   // 0
@@ -73,22 +77,22 @@ func TestTransforms(t *testing.T) {
 	stack.Push(&v2)   // 3
 	stack.Pop()       // 4
 	stack.Pop()       // 4
-	stack.Push(&v20)  // 4
+	stack.Push(&s0)   // 4
 	stack.Pop()       // 5
 	stack.Pop()       // 5
-	stack.Push(&v23)  // 5
+	stack.Push(&s1)   // 5
 	stack.Swap()      // 6
 	stack.Push(&vC)   // 7
 	stack.Dup()       // 8
 	stack.Copy(2)     // 9
 	stack.Pop()       // 10
 	stack.Pop()       // 10
-	stack.Push(&vB)   // 10
+	stack.Push(&s2)   // 10
 	stack.Push(&vn32) // 11
 	stack.Push(&va)   // 12
 	stack.Pop()       // 13
 	stack.Pop()       // 13
-	stack.Push(&vA)   // 13
+	stack.Push(&s3)   // 13
 	stack.Pop()       // 14
 	stack.Pop()       // 15
 	stack.Pop()       // 16
@@ -104,13 +108,44 @@ func TestTransforms(t *testing.T) {
 	constVals.Put(big.NewInt(3), &v3)
 	constVals.Put(big.NewInt(10), &v10)
 	constVals.Put(big.NewInt(2), &v2)
-	constVals.Put(big.NewInt(20), &v20)
-	constVals.Put(big.NewInt(23), &v23)
 	constVals.Put(big.NewInt('C'), &vC)
-	constVals.Put(big.NewInt('B'), &vB)
+	constVals.Put(big.NewInt(2), &v2)
 	constVals.Put(big.NewInt(-32), &vn32)
 	constVals.Put(big.NewInt('a'), &va)
-	constVals.Put(big.NewInt('A'), &vA)
+
+	blockStart := &ir.BasicBlock{
+		Stack: stack,
+		Nodes: []ir.Node{
+			&ir.AssignStmt{Assign: &s0, Expr: &ir.ArithExpr{Op: token.Mul, LHS: &v10, RHS: &v2}},
+			&ir.AssignStmt{Assign: &s1, Expr: &ir.ArithExpr{Op: token.Add, LHS: &v3, RHS: &s0}},
+			&ir.AssignStmt{Assign: &s2, Expr: &ir.ArithExpr{Op: token.Sub, LHS: &vC, RHS: &v1}},
+			&ir.AssignStmt{Assign: &s3, Expr: &ir.ArithExpr{Op: token.Add, LHS: &vn32, RHS: &va}},
+			&ir.PrintStmt{Op: token.Printc, Val: &s3},
+			&ir.PrintStmt{Op: token.Printc, Val: &s2},
+			&ir.PrintStmt{Op: token.Printc, Val: &vC},
+			&ir.PrintStmt{Op: token.Printi, Val: &v1},
+			&ir.PrintStmt{Op: token.Printi, Val: &s1},
+		},
+		Terminator: &ir.EndStmt{},
+		Entries:    []*ir.BasicBlock{ir.EntryBlock},
+		Callers:    []*ir.BasicBlock{ir.EntryBlock},
+	}
+	programStart := &ir.Program{
+		Name:        "test",
+		Blocks:      []*ir.BasicBlock{blockStart},
+		Entry:       blockStart,
+		ConstVals:   *constVals,
+		NextBlockID: 1,
+		NextStackID: 4,
+	}
+
+	program, err := ir.Parse(tokens, nil, "test")
+	if err != nil {
+		t.Errorf("unexpected parse error: %v", err)
+	}
+	if !reflect.DeepEqual(program, programStart) {
+		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", program, programStart)
+	}
 
 	blockConst := &ir.BasicBlock{
 		Stack: stack,
@@ -131,13 +166,15 @@ func TestTransforms(t *testing.T) {
 		Entry:       blockConst,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
-		NextStackID: 0,
+		NextStackID: 4,
 	}
 
-	program, err := ir.Parse(tokens, nil, "test")
-	if err != nil {
-		t.Errorf("unexpected parse error: %v", err)
-	}
+	FoldConstArith(program)
+	constVals.Put(big.NewInt('A'), &vA)
+	constVals.Put(big.NewInt('B'), &vB)
+	constVals.Put(big.NewInt(20), &v20)
+	constVals.Put(big.NewInt(23), &v23)
+
 	if !reflect.DeepEqual(program, programConst) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
@@ -157,7 +194,7 @@ func TestTransforms(t *testing.T) {
 		Entry:       blockStr,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
-		NextStackID: 0,
+		NextStackID: 4,
 	}
 
 	ConcatStrings(program)
