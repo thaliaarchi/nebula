@@ -18,14 +18,16 @@ func EmitLLVMIR() {
 	block := llvm.AddBasicBlock(mod.NamedFunction("main"), "entry")
 	builder.SetInsertPoint(block, block.FirstInstruction())
 
-	fortyTwo := llvm.ConstInt(llvm.Int64Type(), 42, false)
-	stack := builder.CreateArrayAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), fortyTwo, "stack") // should be global
+	one := llvm.ConstInt(llvm.Int64Type(), 1, false)
+	stack := builder.CreateArrayAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), one, "stack") // should be global
 
 	zero := llvm.ConstInt(llvm.Int64Type(), 0, false)
 	aIdx := llvm.ConstInt(llvm.Int64Type(), 5, false)
 	bIdx := llvm.ConstInt(llvm.Int64Type(), 4, false)
 	aGep := builder.CreateInBoundsGEP(stack, []llvm.Value{zero, aIdx}, "a.gep")
 	bGep := builder.CreateInBoundsGEP(stack, []llvm.Value{zero, bIdx}, "b.gep")
+	builder.CreateStore(llvm.ConstInt(llvm.Int64Type(), 16, false), aGep)
+	builder.CreateStore(llvm.ConstInt(llvm.Int64Type(), 42, false), bGep)
 	a := builder.CreateLoad(aGep, "a")
 	b := builder.CreateLoad(bGep, "b")
 
