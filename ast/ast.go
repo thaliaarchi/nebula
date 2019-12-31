@@ -11,6 +11,7 @@ import (
 
 // AST is a set of interconnected basic blocks.
 type AST struct {
+	Name        string
 	Blocks      []*BasicBlock
 	Entry       *BasicBlock
 	ConstVals   bigint.Map // map[*big.Int]*Val
@@ -144,11 +145,11 @@ type ErrorRetUnderflow struct {
 }
 
 // Parse parses tokens into an AST of basic blocks.
-func Parse(tokens []token.Token, labelNames *bigint.Map) (*AST, error) {
+func Parse(tokens []token.Token, labelNames *bigint.Map, name string) (*AST, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
-	ast, branches, labels, err := parseBlocks(tokens, labelNames)
+	ast, branches, labels, err := parseBlocks(tokens, labelNames, name)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +170,11 @@ func needsImplicitEnd(tokens []token.Token) bool {
 	return true
 }
 
-func parseBlocks(tokens []token.Token, labelNames *bigint.Map) (*AST, []*big.Int, *bigint.Map, error) {
-	ast := &AST{ConstVals: *bigint.NewMap(nil)}
+func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*AST, []*big.Int, *bigint.Map, error) {
+	ast := &AST{
+		Name:      strings.TrimSuffix(name, ".ws"),
+		ConstVals: *bigint.NewMap(nil),
+	}
 	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
 	prevLabel := "entry"

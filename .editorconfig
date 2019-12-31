@@ -8,11 +8,15 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 
+[*.go]
+indent_style = tab
+trim_trailing_whitespace = false
+
 [*.ws]
 indent_style = tab
 indent_size = 4
 trim_trailing_whitespace = false
 insert_final_newline = false
 
-[*.wsa]
+[*.{wsa,ast}]
 indent_size = 4

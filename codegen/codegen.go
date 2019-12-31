@@ -3,23 +3,23 @@ package codegen
 import (
 	"fmt"
 
+	"github.com/andrewarchi/nebula/ast"
 	"github.com/andrewarchi/nebula/token"
 	"llvm.org/llvm/bindings/go/llvm"
 )
 
 const maxStackSize = 1024
 
-func EmitLLVMIR() {
+func EmitLLVMIR(ast *ast.AST) {
 	builder := llvm.NewBuilder()
-	mod := llvm.NewModule("module")
+	mod := llvm.NewModule(ast.Name)
 
 	main := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	llvm.AddFunction(mod, "main", main)
 	block := llvm.AddBasicBlock(mod.NamedFunction("main"), "entry")
 	builder.SetInsertPoint(block, block.FirstInstruction())
 
-	one := llvm.ConstInt(llvm.Int64Type(), 1, false)
-	stack := builder.CreateArrayAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), one, "stack") // should be global
+	stack := builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack") // should be global
 
 	zero := llvm.ConstInt(llvm.Int64Type(), 0, false)
 	aIdx := llvm.ConstInt(llvm.Int64Type(), 5, false)

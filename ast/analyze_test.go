@@ -125,6 +125,7 @@ func TestTransforms(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astConst := &AST{
+		Name:        "test",
 		Blocks:      []*BasicBlock{blockConst},
 		Entry:       blockConst,
 		ConstVals:   *constVals,
@@ -132,7 +133,7 @@ func TestTransforms(t *testing.T) {
 		NextStackID: 0,
 	}
 
-	ast, err := Parse(tokens, nil)
+	ast, err := Parse(tokens, nil, "test")
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
@@ -150,6 +151,7 @@ func TestTransforms(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astStr := &AST{
+		Name:        "test",
 		Blocks:      []*BasicBlock{blockStr},
 		Entry:       blockStr,
 		ConstVals:   *constVals,

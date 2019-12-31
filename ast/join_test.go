@@ -20,7 +20,7 @@ func TestJoinSimpleEntries(t *testing.T) {
 		{Type: token.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
-	ast, err := Parse(tokens, nil)
+	ast, err := Parse(tokens, nil, "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -62,6 +62,7 @@ func TestJoinSimpleEntries(t *testing.T) {
 		Callers:    []*BasicBlock{entryBlock},
 	}
 	astJoined := &AST{
+		Name:        "test",
 		Blocks:      []*BasicBlock{blockJoined},
 		Entry:       blockJoined,
 		ConstVals:   *constVals,

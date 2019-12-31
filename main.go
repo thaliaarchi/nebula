@@ -28,13 +28,7 @@ func main() {
 		return
 	}
 
-	if mode == "llvm" {
-		codegen.EmitLLVMIR()
-		return
-	}
-
 	filename := os.Args[2]
-
 	f, err := os.Open(filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -58,7 +52,7 @@ func main() {
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	a, err := ast.Parse(tokens, labelNames)
+	a, err := ast.Parse(tokens, labelNames, filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if _, ok := err.(*ast.ErrorRetUnderflow); !ok {
@@ -66,9 +60,11 @@ func main() {
 		}
 	}
 
-	// a.JoinSimpleEntries()
-	a.FoldConstArith()
-	// a.ConcatStrings()
+	// a.JoinSimpleEntries() // incorrect
+	if mode != "llvm" {
+		a.FoldConstArith()
+	}
+	// a.ConcatStrings() // not general
 
 	switch mode {
 	case "ast":
@@ -77,6 +73,8 @@ func main() {
 		fmt.Print(graph.FormatMatrix(a.ControlFlowGraph()))
 	case "dot":
 		fmt.Print(a.DotDigraph())
+	case "llvm":
+		codegen.EmitLLVMIR(a)
 	}
 
 	// vm, err := ws.NewVM(ast)
