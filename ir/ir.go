@@ -569,17 +569,48 @@ func (block *BasicBlock) String() string {
 		b.WriteString(label.String())
 		b.WriteString(":\n")
 	}
+
 	fmt.Fprintf(&b, "    ; entries: %s\n", formatBlockList(block.Entries))
 	fmt.Fprintf(&b, "    ; callers: %s\n", formatBlockList(block.Callers))
 	if len(block.Returns) != 0 {
 		fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockList(block.Returns))
 	}
-	fmt.Fprintf(&b, "    ; stack: %s\n", &block.Stack)
+
+	if block.Stack.Access > 0 {
+		fmt.Fprintf(&b, "    access %d [", block.Stack.Access)
+		first := true
+		for _, val := range block.Stack.Under {
+			if val != nil {
+				if !first {
+					b.WriteByte(' ')
+				}
+				b.WriteString((*val).String())
+				first = false
+			}
+		}
+		b.WriteString("]\n")
+	}
+
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
 		b.WriteString(node.String())
 		b.WriteByte('\n')
 	}
+
+	if block.Stack.Pops > 0 {
+		fmt.Fprintf(&b, "    pop %d\n", block.Stack.Pops)
+	}
+	if len(block.Stack.Vals) != 0 {
+		b.WriteString("    push [")
+		for i, val := range block.Stack.Vals {
+			if i != 0 {
+				b.WriteByte(' ')
+			}
+			b.WriteString((*val).String())
+		}
+		b.WriteString("]\n")
+	}
+
 	b.WriteString("    ")
 	b.WriteString(block.Terminator.String())
 	b.WriteByte('\n')
