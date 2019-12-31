@@ -9,8 +9,8 @@ import (
 	"github.com/andrewarchi/nebula/token"
 )
 
-// AST is a set of interconnected basic blocks.
-type AST struct {
+// Program is a set of interconnected basic blocks.
+type Program struct {
 	Name        string
 	Blocks      []*BasicBlock
 	Entry       *BasicBlock
@@ -144,19 +144,19 @@ type ErrorRetUnderflow struct {
 	Traces [][]*BasicBlock
 }
 
-// Parse parses tokens into an AST of basic blocks.
-func Parse(tokens []token.Token, labelNames *bigint.Map, name string) (*AST, error) {
+// Parse parses tokens into basic blocks.
+func Parse(tokens []token.Token, labelNames *bigint.Map, name string) (*Program, error) {
 	if needsImplicitEnd(tokens) {
 		tokens = append(tokens, token.Token{Type: token.End})
 	}
-	ast, branches, labels, err := parseBlocks(tokens, labelNames, name)
+	p, branches, labels, err := parseBlocks(tokens, labelNames, name)
 	if err != nil {
 		return nil, err
 	}
-	if err := ast.connectEdges(branches, labels); err != nil {
-		return ast, err
+	if err := p.connectEdges(branches, labels); err != nil {
+		return p, err
 	}
-	return ast, nil
+	return p, nil
 }
 
 func needsImplicitEnd(tokens []token.Token) bool {
@@ -170,8 +170,8 @@ func needsImplicitEnd(tokens []token.Token) bool {
 	return true
 }
 
-func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*AST, []*big.Int, *bigint.Map, error) {
-	ast := &AST{
+func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Program, []*big.Int, *bigint.Map, error) {
+	p := &Program{
 		Name:      strings.TrimSuffix(name, ".ws"),
 		ConstVals: *bigint.NewMap(nil),
 	}
@@ -182,9 +182,9 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*AS
 
 	for i := 0; i < len(tokens); i++ {
 		var block BasicBlock
-		block.ID = len(ast.Blocks)
-		if len(ast.Blocks) > 0 {
-			prev := ast.Blocks[len(ast.Blocks)-1]
+		block.ID = len(p.Blocks)
+		if len(p.Blocks) > 0 {
+			prev := p.Blocks[len(p.Blocks)-1]
 			prev.Next = &block
 			block.Prev = prev
 		}
@@ -195,8 +195,8 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*AS
 		}
 		for tokens[i].Type == token.Label {
 			label := tokens[i].Arg
-			if labels.Put(label, len(ast.Blocks)) {
-				return nil, nil, nil, fmt.Errorf("ast: label is not unique: %s", label)
+			if labels.Put(label, len(p.Blocks)) {
+				return nil, nil, nil, fmt.Errorf("ir: label is not unique: %s", label)
 			}
 			var name string
 			if labelNames != nil {
@@ -212,7 +212,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*AS
 
 		var branch *big.Int
 		for ; i < len(tokens); i++ {
-			branch = ast.appendInstruction(&block, tokens[i])
+			branch = p.appendInstruction(&block, tokens[i])
 			if block.Terminator != nil {
 				if tokens[i].Type == token.Label {
 					i--
@@ -221,26 +221,26 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*AS
 			}
 		}
 
-		ast.Blocks = append(ast.Blocks, &block)
+		p.Blocks = append(p.Blocks, &block)
 		branches = append(branches, branch)
 	}
-	ast.Entry = ast.Blocks[0]
-	ast.NextBlockID = len(ast.Blocks)
-	return ast, branches, labels, nil
+	p.Entry = p.Blocks[0]
+	p.NextBlockID = len(p.Blocks)
+	return p, branches, labels, nil
 }
 
-func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
+func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
-		block.Stack.Push(ast.lookupConst(tok.Arg))
+		block.Stack.Push(p.lookupConst(tok.Arg))
 	case token.Dup:
 		block.Stack.Dup()
 	case token.Copy:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ast: copy argument overflow: %v", tok.Arg))
+			panic(fmt.Sprintf("ir: copy argument overflow: %v", tok.Arg))
 		} else if n < 0 {
-			panic(fmt.Sprintf("ast: copy argument negative: %v", tok.Arg))
+			panic(fmt.Sprintf("ir: copy argument negative: %v", tok.Arg))
 		}
 		block.Stack.Copy(n)
 	case token.Swap:
@@ -250,19 +250,19 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 	case token.Slide:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ast: slide argument overflow: %v", tok.Arg))
+			panic(fmt.Sprintf("ir: slide argument overflow: %v", tok.Arg))
 		} else if n < 0 {
-			panic(fmt.Sprintf("ast: slide argument negative: %v", tok.Arg))
+			panic(fmt.Sprintf("ir: slide argument negative: %v", tok.Arg))
 		}
 		block.Stack.Slide(n)
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
 		rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
 		expr := &ArithExpr{Op: tok.Type, LHS: lhs, RHS: rhs}
-		if val, ok := expr.FoldConst(ast); ok {
+		if val, ok := expr.FoldConst(p); ok {
 			block.Stack.Push(val)
 		} else {
-			assign := ast.nextVal()
+			assign := p.nextVal()
 			block.Stack.Push(assign)
 			block.assign(assign, expr)
 		}
@@ -274,7 +274,7 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 			Val:  val,
 		})
 	case token.Retrieve:
-		addr, assign := block.Stack.Pop(), ast.nextVal()
+		addr, assign := block.Stack.Pop(), p.nextVal()
 		block.Stack.Push(assign)
 		block.assign(assign, &RetrieveExpr{
 			Addr: addr,
@@ -306,7 +306,7 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 			Val: block.Stack.Pop(),
 		})
 	case token.Readc, token.Readi:
-		addr, assign := block.Stack.Pop(), ast.nextVal()
+		addr, assign := block.Stack.Pop(), p.nextVal()
 		block.assign(assign, &ReadExpr{
 			Op: tok.Type,
 		})
@@ -316,7 +316,7 @@ func (ast *AST) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 		})
 
 	default:
-		panic(fmt.Sprintf("ast: illegal token: %v", tok.Type))
+		panic(fmt.Sprintf("ir: illegal token: %v", tok.Type))
 	}
 	return nil
 }
@@ -328,16 +328,16 @@ func (block *BasicBlock) assign(assign *Val, expr Val) {
 	})
 }
 
-func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
-	ast.Entry.Entries = append(ast.Entry.Entries, entryBlock)
-	for i, block := range ast.Blocks {
+func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
+	p.Entry.Entries = append(p.Entry.Entries, entryBlock)
+	for i, block := range p.Blocks {
 		branch := branches[i]
 		if branch != nil {
 			label, ok := labels.Get(branch)
 			if !ok {
-				return fmt.Errorf("ast: block %s jumps to non-existant label: %v", block.Name(), branch)
+				return fmt.Errorf("ir: block %s jumps to non-existant label: %v", block.Name(), branch)
 			}
-			callee := ast.Blocks[label.(int)]
+			callee := p.Blocks[label.(int)]
 			callee.Entries = append(callee.Entries, block)
 
 			switch term := block.Terminator.(type) {
@@ -352,10 +352,10 @@ func (ast *AST) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 			}
 		}
 	}
-	if err := ast.Entry.connectCaller(entryBlock); err != nil {
+	if err := p.Entry.connectCaller(entryBlock); err != nil {
 		return err
 	}
-	ast.trimUnreachable()
+	p.trimUnreachable()
 	return nil
 }
 
@@ -388,7 +388,7 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 }
 
 // Disconnect removes incoming edges to a basic block. The block is not
-// removed from the AST block slice and callers are not updated.
+// removed from the program block slice and callers are not updated.
 func (block *BasicBlock) Disconnect() {
 	if block.Prev != nil {
 		block.Prev.Next = block.Next
@@ -408,31 +408,31 @@ func (block *BasicBlock) Disconnect() {
 	}
 }
 
-func (ast *AST) trimUnreachable() {
+func (p *Program) trimUnreachable() {
 	i := 0
-	for _, block := range ast.Blocks {
+	for _, block := range p.Blocks {
 		if len(block.Callers) == 0 {
 			block.Disconnect()
 		} else {
-			ast.Blocks[i] = block
+			p.Blocks[i] = block
 			i++
 		}
 	}
-	ast.Blocks = ast.Blocks[:i]
+	p.Blocks = p.Blocks[:i]
 }
 
 // RenumberIDs cleans up block IDs to match the block index.
-func (ast *AST) RenumberIDs() {
-	for i, block := range ast.Blocks {
+func (p *Program) RenumberIDs() {
+	for i, block := range p.Blocks {
 		block.ID = i
 	}
-	ast.NextBlockID = len(ast.Blocks)
+	p.NextBlockID = len(p.Blocks)
 }
 
 // Digraph constructs a digraph representing control flow.
-func (ast *AST) Digraph() Digraph {
-	g := make(Digraph, ast.NextBlockID)
-	for _, block := range ast.Blocks {
+func (p *Program) Digraph() Digraph {
+	g := make(Digraph, p.NextBlockID)
+	for _, block := range p.Blocks {
 		for _, edge := range block.Exits() {
 			g.AddEdge(block.ID, edge.ID)
 		}
@@ -440,18 +440,18 @@ func (ast *AST) Digraph() Digraph {
 	return g
 }
 
-func (ast *AST) lookupConst(c *big.Int) *Val {
-	if val, ok := ast.ConstVals.Get(c); ok {
+func (p *Program) lookupConst(c *big.Int) *Val {
+	if val, ok := p.ConstVals.Get(c); ok {
 		return val.(*Val)
 	}
 	val := Val(&ConstVal{c})
-	ast.ConstVals.Put(c, &val)
+	p.ConstVals.Put(c, &val)
 	return &val
 }
 
-func (ast *AST) nextVal() *Val {
-	val := Val(&StackVal{ast.NextStackID})
-	ast.NextStackID++
+func (p *Program) nextVal() *Val {
+	val := Val(&StackVal{p.NextStackID})
+	p.NextStackID++
 	return &val
 }
 
@@ -478,7 +478,7 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 	case *EndStmt:
 		return nil
 	}
-	panic(fmt.Errorf("ast: invalid terminator type: %T", block.Terminator))
+	panic(fmt.Errorf("ir: invalid terminator type: %T", block.Terminator))
 }
 
 // Name returns the name of the basic block from either the first label
@@ -497,15 +497,15 @@ func (block *BasicBlock) Name() string {
 }
 
 // DotDigraph creates a control flow graph in the Graphviz DOT format.
-func (ast *AST) DotDigraph() string {
+func (p *Program) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
 	b.WriteString("  entry[shape=point];\n")
-	ast.RenumberIDs()
-	for i, scc := range ast.Digraph().SCCs() {
+	p.RenumberIDs()
+	for i, scc := range p.Digraph().SCCs() {
 		fmt.Fprintf(&b, "  subgraph cluster_%d {\n", i)
 		for _, node := range scc {
-			block := ast.Blocks[node]
+			block := p.Blocks[node]
 			fmt.Fprintf(&b, "    block_%d[label=\"%s\\n", block.ID, block.Name())
 			if block.Stack.Len() != 0 {
 				fmt.Fprintf(&b, " +%d", block.Stack.Len())
@@ -528,8 +528,8 @@ func (ast *AST) DotDigraph() string {
 		b.WriteString("  }\n")
 	}
 	b.WriteByte('\n')
-	fmt.Fprintf(&b, "  entry -> block_%d;\n", ast.Entry.ID)
-	for _, block := range ast.Blocks {
+	fmt.Fprintf(&b, "  entry -> block_%d;\n", p.Entry.ID)
+	for _, block := range p.Blocks {
 		switch stmt := block.Terminator.(type) {
 		case *CallStmt:
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, stmt.Callee.ID)
@@ -548,9 +548,9 @@ func (ast *AST) DotDigraph() string {
 	return b.String()
 }
 
-func (ast *AST) String() string {
+func (p *Program) String() string {
 	var b strings.Builder
-	for i, block := range ast.Blocks {
+	for i, block := range p.Blocks {
 		if i != 0 {
 			b.WriteByte('\n')
 		}

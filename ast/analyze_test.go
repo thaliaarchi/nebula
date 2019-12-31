@@ -124,7 +124,7 @@ func TestTransforms(t *testing.T) {
 		Entries:    []*BasicBlock{entryBlock},
 		Callers:    []*BasicBlock{entryBlock},
 	}
-	astConst := &AST{
+	programConst := &Program{
 		Name:        "test",
 		Blocks:      []*BasicBlock{blockConst},
 		Entry:       blockConst,
@@ -133,12 +133,12 @@ func TestTransforms(t *testing.T) {
 		NextStackID: 0,
 	}
 
-	ast, err := Parse(tokens, nil, "test")
+	program, err := Parse(tokens, nil, "test")
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
-	if !reflect.DeepEqual(ast, astConst) {
-		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", ast, astConst)
+	if !reflect.DeepEqual(program, programConst) {
+		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
 
 	blockStr := &BasicBlock{
@@ -150,7 +150,7 @@ func TestTransforms(t *testing.T) {
 		Entries:    []*BasicBlock{entryBlock},
 		Callers:    []*BasicBlock{entryBlock},
 	}
-	astStr := &AST{
+	programStr := &Program{
 		Name:        "test",
 		Blocks:      []*BasicBlock{blockStr},
 		Entry:       blockStr,
@@ -159,8 +159,8 @@ func TestTransforms(t *testing.T) {
 		NextStackID: 0,
 	}
 
-	ast.ConcatStrings()
-	if !reflect.DeepEqual(ast, astStr) {
-		t.Errorf("string concat not equal\ngot:\n%v\nwant:\n%v", ast, astStr)
+	program.ConcatStrings()
+	if !reflect.DeepEqual(program, programStr) {
+		t.Errorf("string concat not equal\ngot:\n%v\nwant:\n%v", program, programStr)
 	}
 }

@@ -7,13 +7,13 @@ import (
 
 // ControlFlowGraph creates a directed graph with edges representing the
 // connections between basic blocks.
-func (ast *AST) ControlFlowGraph() graph.Graph {
+func (p *Program) ControlFlowGraph() graph.Graph {
 	ids := make(map[*BasicBlock]int)
-	for _, block := range ast.Blocks {
+	for _, block := range p.Blocks {
 		ids[block] = block.ID
 	}
-	g := graph.NewGraph(uint(len(ast.Blocks)))
-	for i, block := range ast.Blocks {
+	g := graph.NewGraph(uint(len(p.Blocks)))
+	for i, block := range p.Blocks {
 		for _, exit := range block.Exits() {
 			g.Add(uint(i), uint(ids[exit]))
 		}

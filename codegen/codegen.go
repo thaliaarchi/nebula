@@ -10,9 +10,9 @@ import (
 
 const maxStackSize = 1024
 
-func EmitLLVMIR(ast *ast.AST) {
+func EmitLLVMIR(p *ast.Program) {
 	builder := llvm.NewBuilder()
-	mod := llvm.NewModule(ast.Name)
+	mod := llvm.NewModule(p.Name)
 
 	main := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	llvm.AddFunction(mod, "main", main)

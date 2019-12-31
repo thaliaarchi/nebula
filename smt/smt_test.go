@@ -6,7 +6,7 @@ import (
 	"github.com/mitchellh/go-z3"
 )
 
-func TestASTAdd(t *testing.T) {
+func TestSMTSolve(t *testing.T) {
 	config := z3.NewConfig()
 	defer config.Close()
 

@@ -3,26 +3,26 @@ package ast // import "github.com/andrewarchi/nebula/ast"
 // JoinSimpleEntries joins blocks that have only one entry with their
 // entry block.
 // TODO: this does not repect the graph dependency ordering.
-func (ast *AST) JoinSimpleEntries() {
+func (p *Program) JoinSimpleEntries() {
 	j := 0
-	for i, block := range ast.Blocks {
+	for i, block := range p.Blocks {
 		if len(block.Entries) == 1 {
 			entry := block.Entries[0]
 			if _, ok := entry.Terminator.(*JmpStmt); ok {
-				ast.Join(entry, block)
+				p.Join(entry, block)
 				continue
 			} else {
 				block.Stack.LookupUnderflow(&entry.Stack)
 			}
 		}
-		ast.Blocks[j] = ast.Blocks[i]
+		p.Blocks[j] = p.Blocks[i]
 		j++
 	}
-	ast.Blocks = ast.Blocks[:j]
+	p.Blocks = p.Blocks[:j]
 }
 
 // Join concatenates two basic blocks.
-func (ast *AST) Join(prev, next *BasicBlock) {
+func (p *Program) Join(prev, next *BasicBlock) {
 	prev.Stack.Concat(&next.Stack)
 	prev.Nodes = append(prev.Nodes, next.Nodes...)
 	prev.Terminator = next.Terminator
@@ -36,7 +36,7 @@ func (ast *AST) Join(prev, next *BasicBlock) {
 	for _, exit := range next.Exits() {
 		replaceUnique(exit.Entries, next, prev)
 	}
-	for _, block := range ast.Blocks {
+	for _, block := range p.Blocks {
 		replaceUnique(block.Callers, next, prev)
 	}
 }

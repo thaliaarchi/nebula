@@ -15,7 +15,7 @@ go get https://github.com/andrewarchi/nebula
 cd nebula
 go get ./...
 go build
-./nebula ast programs/interpret.out.ws
+./nebula ir programs/interpret.out.ws
 ./nebula dot programs/interpret.out.ws | dot -Tpng > graph.png
 ```
 

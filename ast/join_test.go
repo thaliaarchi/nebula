@@ -20,7 +20,7 @@ func TestJoinSimpleEntries(t *testing.T) {
 		{Type: token.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
-	ast, err := Parse(tokens, nil, "test")
+	program, err := Parse(tokens, nil, "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestJoinSimpleEntries(t *testing.T) {
 		Entries:    []*BasicBlock{entryBlock},
 		Callers:    []*BasicBlock{entryBlock},
 	}
-	astJoined := &AST{
+	programJoined := &Program{
 		Name:        "test",
 		Blocks:      []*BasicBlock{blockJoined},
 		Entry:       blockJoined,
@@ -70,8 +70,8 @@ func TestJoinSimpleEntries(t *testing.T) {
 		NextStackID: 3,
 	}
 
-	ast.JoinSimpleEntries()
-	if !reflect.DeepEqual(ast, astJoined) {
-		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", ast, astJoined)
+	program.JoinSimpleEntries()
+	if !reflect.DeepEqual(program, programJoined) {
+		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", program, programJoined)
 	}
 }

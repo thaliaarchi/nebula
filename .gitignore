@@ -3,7 +3,7 @@ nebula
 
 *.out.wsa
 *.wsx
-*.ast
+*.ir
 
 *.ll
 

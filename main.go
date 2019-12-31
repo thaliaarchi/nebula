@@ -12,7 +12,7 @@ import (
 	"github.com/andrewarchi/nebula/ws"
 )
 
-const usage = `nebula ast <file>
+const usage = `nebula ir <file>
 nebula matrix <file>
 nebula dot <file> | dot -Tpng > graph.png`
 
@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 	mode := os.Args[1]
-	if mode != "ast" && mode != "dot" && mode != "matrix" && mode != "llvm" {
+	if mode != "ir" && mode != "dot" && mode != "matrix" && mode != "llvm" {
 		fmt.Fprintf(os.Stderr, "Unrecognized mode: %s\n", mode)
 		fmt.Fprintln(os.Stderr, usage)
 		return
@@ -52,7 +52,7 @@ func main() {
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	a, err := ast.Parse(tokens, labelNames, filename)
+	program, err := ast.Parse(tokens, labelNames, filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if _, ok := err.(*ast.ErrorRetUnderflow); !ok {
@@ -60,24 +60,27 @@ func main() {
 		}
 	}
 
-	// a.JoinSimpleEntries() // incorrect
+	// program.JoinSimpleEntries() // incorrect
 	if mode != "llvm" {
-		a.FoldConstArith()
+		program.FoldConstArith()
 	}
-	// a.ConcatStrings() // not general
+	// program.ConcatStrings() // not general
 
 	switch mode {
-	case "ast":
-		fmt.Print(a.String())
-	case "matrix":
-		fmt.Print(graph.FormatMatrix(a.ControlFlowGraph()))
+	case "ir":
+		fmt.Print(program.String())
 	case "dot":
-		fmt.Print(a.DotDigraph())
+		fmt.Print(program.DotDigraph())
+	case "matrix":
+		fmt.Print(graph.FormatMatrix(program.ControlFlowGraph()))
 	case "llvm":
-		codegen.EmitLLVMIR(a)
+		fmt.Println("LLVM IR:")
+		codegen.EmitLLVMIR(program)
+		fmt.Println("Nebula IR:")
+		fmt.Print(program.String())
 	}
 
-	// vm, err := ws.NewVM(ast)
+	// vm, err := ws.NewVM(program)
 	// if err != nil {
 	// 	fmt.Println(err)
 	// 	return
