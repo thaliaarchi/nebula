@@ -53,18 +53,18 @@ func TestTransforms(t *testing.T) {
 		{Type: token.Printi},                     // 18
 	}
 
-	v1 := ir.Val(&ir.ConstVal{big.NewInt(1)})
-	v2 := ir.Val(&ir.ConstVal{big.NewInt(2)})
-	v3 := ir.Val(&ir.ConstVal{big.NewInt(3)})
-	v10 := ir.Val(&ir.ConstVal{big.NewInt(10)})
-	v20 := ir.Val(&ir.ConstVal{big.NewInt(20)})
-	v23 := ir.Val(&ir.ConstVal{big.NewInt(23)})
-	vn32 := ir.Val(&ir.ConstVal{big.NewInt(-32)})
-	vA := ir.Val(&ir.ConstVal{big.NewInt('A')})
-	vB := ir.Val(&ir.ConstVal{big.NewInt('B')})
-	vC := ir.Val(&ir.ConstVal{big.NewInt('C')})
-	va := ir.Val(&ir.ConstVal{big.NewInt('a')})
-	vABC123 := ir.Val(&ir.StringVal{"ABC123"})
+	v1 := ir.Val(&ir.ConstVal{Val: big.NewInt(1)})
+	v2 := ir.Val(&ir.ConstVal{Val: big.NewInt(2)})
+	v3 := ir.Val(&ir.ConstVal{Val: big.NewInt(3)})
+	v10 := ir.Val(&ir.ConstVal{Val: big.NewInt(10)})
+	v20 := ir.Val(&ir.ConstVal{Val: big.NewInt(20)})
+	v23 := ir.Val(&ir.ConstVal{Val: big.NewInt(23)})
+	vn32 := ir.Val(&ir.ConstVal{Val: big.NewInt(-32)})
+	vA := ir.Val(&ir.ConstVal{Val: big.NewInt('A')})
+	vB := ir.Val(&ir.ConstVal{Val: big.NewInt('B')})
+	vC := ir.Val(&ir.ConstVal{Val: big.NewInt('C')})
+	va := ir.Val(&ir.ConstVal{Val: big.NewInt('a')})
+	vABC123 := ir.Val(&ir.StringVal{Val: "ABC123"})
 
 	var stack ir.Stack
 	stack.Push(&v1)   // 0

@@ -47,7 +47,7 @@ func ConcatStrings(p *ir.Program) {
 		ReduceBlock(block, func(acc, curr ir.Node, i int) (ir.Node, bool) {
 			if str, ok := checkPrint(curr); ok {
 				if acc == nil {
-					val := ir.Val(&ir.StringVal{str})
+					val := ir.Val(&ir.StringVal{Val: str})
 					return &ir.PrintStmt{
 						Op:  token.Prints,
 						Val: &val,
