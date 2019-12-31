@@ -1,4 +1,4 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package analysis // import "github.com/andrewarchi/nebula/analysis"
 
 import (
 	"math/big"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 )
 
@@ -52,20 +53,20 @@ func TestTransforms(t *testing.T) {
 		{Type: token.Printi},                     // 18
 	}
 
-	v1 := Val(&ConstVal{big.NewInt(1)})
-	v2 := Val(&ConstVal{big.NewInt(2)})
-	v3 := Val(&ConstVal{big.NewInt(3)})
-	v10 := Val(&ConstVal{big.NewInt(10)})
-	v20 := Val(&ConstVal{big.NewInt(20)})
-	v23 := Val(&ConstVal{big.NewInt(23)})
-	vn32 := Val(&ConstVal{big.NewInt(-32)})
-	vA := Val(&ConstVal{big.NewInt('A')})
-	vB := Val(&ConstVal{big.NewInt('B')})
-	vC := Val(&ConstVal{big.NewInt('C')})
-	va := Val(&ConstVal{big.NewInt('a')})
-	vABC123 := Val(&StringVal{"ABC123"})
+	v1 := ir.Val(&ir.ConstVal{big.NewInt(1)})
+	v2 := ir.Val(&ir.ConstVal{big.NewInt(2)})
+	v3 := ir.Val(&ir.ConstVal{big.NewInt(3)})
+	v10 := ir.Val(&ir.ConstVal{big.NewInt(10)})
+	v20 := ir.Val(&ir.ConstVal{big.NewInt(20)})
+	v23 := ir.Val(&ir.ConstVal{big.NewInt(23)})
+	vn32 := ir.Val(&ir.ConstVal{big.NewInt(-32)})
+	vA := ir.Val(&ir.ConstVal{big.NewInt('A')})
+	vB := ir.Val(&ir.ConstVal{big.NewInt('B')})
+	vC := ir.Val(&ir.ConstVal{big.NewInt('C')})
+	va := ir.Val(&ir.ConstVal{big.NewInt('a')})
+	vABC123 := ir.Val(&ir.StringVal{"ABC123"})
 
-	var stack Stack
+	var stack ir.Stack
 	stack.Push(&v1)   // 0
 	stack.Push(&v3)   // 1
 	stack.Push(&v10)  // 2
@@ -111,29 +112,29 @@ func TestTransforms(t *testing.T) {
 	constVals.Put(big.NewInt('a'), &va)
 	constVals.Put(big.NewInt('A'), &vA)
 
-	blockConst := &BasicBlock{
+	blockConst := &ir.BasicBlock{
 		Stack: stack,
-		Nodes: []Node{
-			&PrintStmt{Op: token.Printc, Val: &vA},
-			&PrintStmt{Op: token.Printc, Val: &vB},
-			&PrintStmt{Op: token.Printc, Val: &vC},
-			&PrintStmt{Op: token.Printi, Val: &v1},
-			&PrintStmt{Op: token.Printi, Val: &v23},
+		Nodes: []ir.Node{
+			&ir.PrintStmt{Op: token.Printc, Val: &vA},
+			&ir.PrintStmt{Op: token.Printc, Val: &vB},
+			&ir.PrintStmt{Op: token.Printc, Val: &vC},
+			&ir.PrintStmt{Op: token.Printi, Val: &v1},
+			&ir.PrintStmt{Op: token.Printi, Val: &v23},
 		},
-		Terminator: &EndStmt{},
-		Entries:    []*BasicBlock{entryBlock},
-		Callers:    []*BasicBlock{entryBlock},
+		Terminator: &ir.EndStmt{},
+		Entries:    []*ir.BasicBlock{ir.EntryBlock},
+		Callers:    []*ir.BasicBlock{ir.EntryBlock},
 	}
-	programConst := &Program{
+	programConst := &ir.Program{
 		Name:        "test",
-		Blocks:      []*BasicBlock{blockConst},
+		Blocks:      []*ir.BasicBlock{blockConst},
 		Entry:       blockConst,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
 		NextStackID: 0,
 	}
 
-	program, err := Parse(tokens, nil, "test")
+	program, err := ir.Parse(tokens, nil, "test")
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
@@ -141,25 +142,25 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
 
-	blockStr := &BasicBlock{
-		Nodes: []Node{
-			&PrintStmt{Op: token.Prints, Val: &vABC123},
+	blockStr := &ir.BasicBlock{
+		Nodes: []ir.Node{
+			&ir.PrintStmt{Op: token.Prints, Val: &vABC123},
 		},
-		Terminator: &EndStmt{},
+		Terminator: &ir.EndStmt{},
 		Stack:      stack,
-		Entries:    []*BasicBlock{entryBlock},
-		Callers:    []*BasicBlock{entryBlock},
+		Entries:    []*ir.BasicBlock{ir.EntryBlock},
+		Callers:    []*ir.BasicBlock{ir.EntryBlock},
 	}
-	programStr := &Program{
+	programStr := &ir.Program{
 		Name:        "test",
-		Blocks:      []*BasicBlock{blockStr},
+		Blocks:      []*ir.BasicBlock{blockStr},
 		Entry:       blockStr,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
 		NextStackID: 0,
 	}
 
-	program.ConcatStrings()
+	ConcatStrings(program)
 	if !reflect.DeepEqual(program, programStr) {
 		t.Errorf("string concat not equal\ngot:\n%v\nwant:\n%v", program, programStr)
 	}

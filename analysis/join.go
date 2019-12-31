@@ -1,15 +1,17 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package analysis // import "github.com/andrewarchi/nebula/analysis"
+
+import "github.com/andrewarchi/nebula/ir"
 
 // JoinSimpleEntries joins blocks that have only one entry with their
 // entry block.
 // TODO: this does not repect the graph dependency ordering.
-func (p *Program) JoinSimpleEntries() {
+func JoinSimpleEntries(p *ir.Program) {
 	j := 0
 	for i, block := range p.Blocks {
 		if len(block.Entries) == 1 {
 			entry := block.Entries[0]
-			if _, ok := entry.Terminator.(*JmpStmt); ok {
-				p.Join(entry, block)
+			if _, ok := entry.Terminator.(*ir.JmpStmt); ok {
+				Join(p, entry, block)
 				continue
 			} else {
 				block.Stack.LookupUnderflow(&entry.Stack)
@@ -22,7 +24,7 @@ func (p *Program) JoinSimpleEntries() {
 }
 
 // Join concatenates two basic blocks.
-func (p *Program) Join(prev, next *BasicBlock) {
+func Join(p *ir.Program, prev, next *ir.BasicBlock) {
 	prev.Stack.Concat(&next.Stack)
 	prev.Nodes = append(prev.Nodes, next.Nodes...)
 	prev.Terminator = next.Terminator
@@ -38,5 +40,14 @@ func (p *Program) Join(prev, next *BasicBlock) {
 	}
 	for _, block := range p.Blocks {
 		replaceUnique(block.Callers, next, prev)
+	}
+}
+
+func replaceUnique(blocks []*ir.BasicBlock, block, replace *ir.BasicBlock) {
+	for i := range blocks {
+		if blocks[i] == block {
+			blocks[i] = replace
+			break
+		}
 	}
 }

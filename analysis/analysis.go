@@ -1,15 +1,16 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package analysis // import "github.com/andrewarchi/nebula/analysis"
 
 import (
 	"math/big"
 
 	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 )
 
-// Reduce accumulates sequences of nodes and replaces the starting node
-// with the accumulation. A sequence of one node is not replaced.
-func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
+// ReduceBlock accumulates sequences of nodes and replaces the starting
+// node with the accumulation. A sequence of one node is not replaced.
+func ReduceBlock(block *ir.BasicBlock, fn func(acc, curr ir.Node, i int) (ir.Node, bool)) {
 	k := 0
 	for i := 0; i < len(block.Nodes); i++ {
 		if acc, ok := fn(nil, block.Nodes[i], i); ok {
@@ -41,18 +42,18 @@ func (block *BasicBlock) Reduce(fn func(acc, curr Node, i int) (Node, bool)) {
 }
 
 // ConcatStrings joins consecutive constant print expressions.
-func (p *Program) ConcatStrings() {
+func ConcatStrings(p *ir.Program) {
 	for _, block := range p.Blocks {
-		block.Reduce(func(acc, curr Node, i int) (Node, bool) {
+		ReduceBlock(block, func(acc, curr ir.Node, i int) (ir.Node, bool) {
 			if str, ok := checkPrint(curr); ok {
 				if acc == nil {
-					val := Val(&StringVal{str})
-					return &PrintStmt{
+					val := ir.Val(&ir.StringVal{str})
+					return &ir.PrintStmt{
 						Op:  token.Prints,
 						Val: &val,
 					}, true
 				}
-				val := (*acc.(*PrintStmt).Val).(*StringVal)
+				val := (*acc.(*ir.PrintStmt).Val).(*ir.StringVal)
 				val.Val += str
 				return acc, true
 			}
@@ -61,9 +62,9 @@ func (p *Program) ConcatStrings() {
 	}
 }
 
-func checkPrint(node Node) (string, bool) {
-	if p, ok := node.(*PrintStmt); ok {
-		if val, ok := (*p.Val).(*ConstVal); ok {
+func checkPrint(node ir.Node) (string, bool) {
+	if p, ok := node.(*ir.PrintStmt); ok {
+		if val, ok := (*p.Val).(*ir.ConstVal); ok {
 			switch p.Op {
 			case token.Printc:
 				return string(bigint.ToRune(val.Val)), true
@@ -71,7 +72,7 @@ func checkPrint(node Node) (string, bool) {
 				return val.Val.String(), true
 			}
 		}
-		if val, ok := (*p.Val).(*StringVal); ok {
+		if val, ok := (*p.Val).(*ir.StringVal); ok {
 			if p.Op == token.Prints {
 				return val.Val, true
 			}
@@ -82,13 +83,13 @@ func checkPrint(node Node) (string, bool) {
 
 // FoldConstArith folds and propagates constant arithmetic expressions
 // or identities.
-func (p *Program) FoldConstArith() {
+func FoldConstArith(p *ir.Program) {
 	for _, block := range p.Blocks {
 		j := 0
 		for i := 0; i < len(block.Nodes); i++ {
-			if assign, ok := block.Nodes[i].(*AssignStmt); ok {
-				if expr, ok := assign.Expr.(*ArithExpr); ok {
-					if val, ok := expr.FoldConst(p); ok {
+			if assign, ok := block.Nodes[i].(*ir.AssignStmt); ok {
+				if expr, ok := assign.Expr.(*ir.ArithExpr); ok {
+					if val, ok := FoldConst(p, expr); ok {
 						*assign.Assign = *val
 						continue
 					}
@@ -102,19 +103,19 @@ func (p *Program) FoldConstArith() {
 }
 
 // FoldConst reduces constant arithmetic expressions or identities.
-func (expr *ArithExpr) FoldConst(p *Program) (*Val, bool) {
-	if lhs, ok := (*expr.LHS).(*ConstVal); ok {
-		if rhs, ok := (*expr.RHS).(*ConstVal); ok {
-			return expr.foldConstLR(p, lhs.Val, rhs.Val)
+func FoldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
+	if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
+		if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
+			return foldConstLR(p, expr, lhs.Val, rhs.Val)
 		}
-		return expr.foldConstL(p, lhs.Val)
-	} else if rhs, ok := (*expr.RHS).(*ConstVal); ok {
-		return expr.foldConstR(p, rhs.Val)
+		return foldConstL(p, expr, lhs.Val)
+	} else if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
+		return foldConstR(p, expr, rhs.Val)
 	}
-	return expr.foldConst(p)
+	return foldConst(p, expr)
 }
 
-func (expr *ArithExpr) foldConstLR(p *Program, lhs, rhs *big.Int) (*Val, bool) {
+func foldConstLR(p *ir.Program, expr *ir.ArithExpr, lhs, rhs *big.Int) (*ir.Val, bool) {
 	result := new(big.Int)
 	switch expr.Op {
 	case token.Add:
@@ -128,12 +129,12 @@ func (expr *ArithExpr) foldConstLR(p *Program, lhs, rhs *big.Int) (*Val, bool) {
 	case token.Mod:
 		result.Mod(lhs, rhs)
 	}
-	return p.lookupConst(result), true
+	return p.LookupConst(result), true
 }
 
 var bigOne = big.NewInt(1)
 
-func (expr *ArithExpr) foldConstL(p *Program, lhs *big.Int) (*Val, bool) {
+func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool) {
 	if lhs.Sign() == 0 {
 		switch expr.Op {
 		case token.Add:
@@ -152,7 +153,7 @@ func (expr *ArithExpr) foldConstL(p *Program, lhs *big.Int) (*Val, bool) {
 	return nil, false
 }
 
-func (expr *ArithExpr) foldConstR(p *Program, rhs *big.Int) (*Val, bool) {
+func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool) {
 	if rhs.Sign() == 0 {
 		switch expr.Op {
 		case token.Add, token.Sub:
@@ -167,19 +168,19 @@ func (expr *ArithExpr) foldConstR(p *Program, rhs *big.Int) (*Val, bool) {
 		case token.Mul, token.Div:
 			return expr.LHS, true
 		case token.Mod:
-			return p.lookupConst(big.NewInt(0)), true
+			return p.LookupConst(big.NewInt(0)), true
 		}
 	}
 	return nil, false
 }
 
-func (expr *ArithExpr) foldConst(p *Program) (*Val, bool) {
-	if ValEq(expr.LHS, expr.RHS) {
+func foldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
+	if ir.ValEq(expr.LHS, expr.RHS) {
 		switch expr.Op {
 		case token.Sub, token.Mod:
-			return p.lookupConst(big.NewInt(0)), true
+			return p.LookupConst(big.NewInt(0)), true
 		case token.Div:
-			return p.lookupConst(big.NewInt(1)), true
+			return p.LookupConst(big.NewInt(1)), true
 		}
 	}
 	return nil, false

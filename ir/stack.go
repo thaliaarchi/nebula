@@ -1,4 +1,4 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package ir // import "github.com/andrewarchi/nebula/ir"
 
 import (
 	"fmt"

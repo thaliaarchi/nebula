@@ -1,14 +1,15 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package analysis // import "github.com/andrewarchi/nebula/analysis"
 
 import (
 	"github.com/andrewarchi/graph"
+	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 )
 
 // ControlFlowGraph creates a directed graph with edges representing the
 // connections between basic blocks.
-func (p *Program) ControlFlowGraph() graph.Graph {
-	ids := make(map[*BasicBlock]int)
+func ControlFlowGraph(p *ir.Program) graph.Graph {
+	ids := make(map[*ir.BasicBlock]int)
 	for _, block := range p.Blocks {
 		ids[block] = block.ID
 	}
@@ -23,7 +24,7 @@ func (p *Program) ControlFlowGraph() graph.Graph {
 
 // DependenceGraph creates an undirected graph with edges representing
 // dependencies between nodes.
-func (block *BasicBlock) DependenceGraph() graph.Graph {
+func DependenceGraph(block *ir.BasicBlock) graph.Graph {
 	g := graph.NewGraph(uint(len(block.Nodes)))
 	for i := range block.Nodes {
 		for j := i + 1; j < len(block.Nodes); j++ {
@@ -40,16 +41,16 @@ func (block *BasicBlock) DependenceGraph() graph.Graph {
 // when both are I/O instructions, one is I/O and the other can throw,
 // both assign to the same value, or one reads the value assigned to by
 // the other. Dependent is reflexive.
-func Dependent(a, b Node) bool {
+func Dependent(a, b ir.Node) bool {
 	aIO, bIO := isIO(a), isIO(b)
 	return aIO && bIO ||
 		aIO && canThrow(b) || bIO && canThrow(a) ||
 		references(a, b) || references(b, a)
 }
 
-func isIO(node Node) bool {
+func isIO(node ir.Node) bool {
 	switch node.(type) {
-	case *PrintStmt, *ReadExpr:
+	case *ir.PrintStmt, *ir.ReadExpr:
 		return true
 	}
 	return false
@@ -57,9 +58,9 @@ func isIO(node Node) bool {
 
 // canThrow returns whether the node is a division with a non-constant
 // RHS.
-func canThrow(node Node) bool {
-	if n, ok := node.(*ArithExpr); ok && n.Op == token.Div {
-		_, ok := (*n.RHS).(*ConstVal)
+func canThrow(node ir.Node) bool {
+	if n, ok := node.(*ir.ArithExpr); ok && n.Op == token.Div {
+		_, ok := (*n.RHS).(*ir.ConstVal)
 		return !ok
 	}
 	return false
@@ -67,25 +68,25 @@ func canThrow(node Node) bool {
 
 // references returns whether node B references the assignment of
 // node A.
-func references(a, b Node) bool {
-	if assignA, ok := a.(*AssignStmt); ok {
+func references(a, b ir.Node) bool {
+	if assignA, ok := a.(*ir.AssignStmt); ok {
 		assign := assignA.Assign
-		if assignB, ok := b.(*AssignStmt); ok {
+		if assignB, ok := b.(*ir.AssignStmt); ok {
 			if assignB.Assign == assign {
 				return false
 			}
 			b = assignB.Expr
 		}
 		switch expr := b.(type) {
-		case *ArithExpr:
+		case *ir.ArithExpr:
 			return expr.LHS == assign || expr.RHS == assign
-		case *StoreExpr:
+		case *ir.StoreExpr:
 			return expr.Addr == assign || expr.Val == assign
-		case *RetrieveExpr:
+		case *ir.RetrieveExpr:
 			return expr.Addr == assign
-		case *PrintStmt:
+		case *ir.PrintStmt:
 			return expr.Val == assign
-		case *ReadExpr:
+		case *ir.ReadExpr:
 		}
 	}
 	return false

@@ -1,4 +1,4 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package ir // import "github.com/andrewarchi/nebula/ir"
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/digraph"
 	"github.com/andrewarchi/nebula/token"
 )
 
@@ -34,7 +35,7 @@ type BasicBlock struct {
 	Next       *BasicBlock   // Successor block in source
 }
 
-var entryBlock = &BasicBlock{ID: -1, Labels: []Label{{nil, "@entry"}}}
+var EntryBlock = &BasicBlock{ID: -1, Labels: []Label{{nil, "@entry"}}} // TODO: remove
 
 // Node can be any expr or stmt type.
 type Node interface {
@@ -232,7 +233,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Pr
 func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
 	switch tok.Type {
 	case token.Push:
-		block.Stack.Push(p.lookupConst(tok.Arg))
+		block.Stack.Push(p.LookupConst(tok.Arg))
 	case token.Dup:
 		block.Stack.Dup()
 	case token.Copy:
@@ -259,13 +260,9 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
 		rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
 		expr := &ArithExpr{Op: tok.Type, LHS: lhs, RHS: rhs}
-		if val, ok := expr.FoldConst(p); ok {
-			block.Stack.Push(val)
-		} else {
-			assign := p.nextVal()
-			block.Stack.Push(assign)
-			block.assign(assign, expr)
-		}
+		assign := p.nextVal()
+		block.Stack.Push(assign)
+		block.assign(assign, expr)
 
 	case token.Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
@@ -329,7 +326,7 @@ func (block *BasicBlock) assign(assign *Val, expr Val) {
 }
 
 func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
-	p.Entry.Entries = append(p.Entry.Entries, entryBlock)
+	p.Entry.Entries = append(p.Entry.Entries, EntryBlock)
 	for i, block := range p.Blocks {
 		branch := branches[i]
 		if branch != nil {
@@ -352,7 +349,7 @@ func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 			}
 		}
 	}
-	if err := p.Entry.connectCaller(entryBlock); err != nil {
+	if err := p.Entry.connectCaller(EntryBlock); err != nil {
 		return err
 	}
 	p.trimUnreachable()
@@ -378,7 +375,7 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		errs = errs.addTrace(term.TrueBlock.connectCaller(caller), block)
 		errs = errs.addTrace(term.FalseBlock.connectCaller(caller), caller)
 	case *RetStmt:
-		if caller == entryBlock {
+		if caller == EntryBlock {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
 		}
 		caller.Returns = append(caller.Returns, block)
@@ -430,8 +427,8 @@ func (p *Program) RenumberIDs() {
 }
 
 // Digraph constructs a digraph representing control flow.
-func (p *Program) Digraph() Digraph {
-	g := make(Digraph, p.NextBlockID)
+func (p *Program) Digraph() digraph.Digraph {
+	g := make(digraph.Digraph, p.NextBlockID)
 	for _, block := range p.Blocks {
 		for _, edge := range block.Exits() {
 			g.AddEdge(block.ID, edge.ID)
@@ -440,7 +437,7 @@ func (p *Program) Digraph() Digraph {
 	return g
 }
 
-func (p *Program) lookupConst(c *big.Int) *Val {
+func (p *Program) LookupConst(c *big.Int) *Val {
 	if val, ok := p.ConstVals.Get(c); ok {
 		return val.(*Val)
 	}
@@ -678,15 +675,6 @@ outer:
 		slice = append(slice, block)
 	}
 	return slice
-}
-
-func replaceUnique(blocks []*BasicBlock, block, replace *BasicBlock) {
-	for i := range blocks {
-		if blocks[i] == block {
-			blocks[i] = replace
-			break
-		}
-	}
 }
 
 func formatValSlice(vals []*Val) string {

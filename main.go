@@ -5,9 +5,10 @@ import (
 	"os"
 
 	"github.com/andrewarchi/graph"
-	"github.com/andrewarchi/nebula/ast"
+	"github.com/andrewarchi/nebula/analysis"
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/codegen"
+	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 	"github.com/andrewarchi/nebula/ws"
 )
@@ -52,17 +53,17 @@ func main() {
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	program, err := ast.Parse(tokens, labelNames, filename)
+	program, err := ir.Parse(tokens, labelNames, filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		if _, ok := err.(*ast.ErrorRetUnderflow); !ok {
+		if _, ok := err.(*ir.ErrorRetUnderflow); !ok {
 			return
 		}
 	}
 
 	// program.JoinSimpleEntries() // incorrect
 	if mode != "llvm" {
-		program.FoldConstArith()
+		analysis.FoldConstArith(program)
 	}
 	// program.ConcatStrings() // not general
 
@@ -72,7 +73,7 @@ func main() {
 	case "dot":
 		fmt.Print(program.DotDigraph())
 	case "matrix":
-		fmt.Print(graph.FormatMatrix(program.ControlFlowGraph()))
+		fmt.Print(graph.FormatMatrix(analysis.ControlFlowGraph(program)))
 	case "llvm":
 		fmt.Println("LLVM IR:")
 		codegen.EmitLLVMIR(program)

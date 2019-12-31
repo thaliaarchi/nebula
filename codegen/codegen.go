@@ -3,14 +3,14 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/andrewarchi/nebula/ast"
+	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 	"llvm.org/llvm/bindings/go/llvm"
 )
 
 const maxStackSize = 1024
 
-func EmitLLVMIR(p *ast.Program) {
+func EmitLLVMIR(p *ir.Program) {
 	builder := llvm.NewBuilder()
 	mod := llvm.NewModule(p.Name)
 

@@ -1,4 +1,4 @@
-package ast // import "github.com/andrewarchi/nebula/ast"
+package analysis // import "github.com/andrewarchi/nebula/analysis"
 
 import (
 	"math/big"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 )
 
@@ -20,20 +21,20 @@ func TestJoinSimpleEntries(t *testing.T) {
 		{Type: token.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
-	program, err := Parse(tokens, nil, "test")
+	program, err := ir.Parse(tokens, nil, "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	v1 := Val(&ConstVal{big.NewInt(1)})
-	s0 := Val(&StackVal{0})
-	s1 := Val(&StackVal{1})
-	s2 := Val(&StackVal{2})
-	sn1 := Val(&StackVal{-1})
-	sn2 := Val(&StackVal{-2})
-	sn7 := Val(&StackVal{-7})
+	v1 := ir.Val(&ir.ConstVal{big.NewInt(1)})
+	s0 := ir.Val(&ir.StackVal{0})
+	s1 := ir.Val(&ir.StackVal{1})
+	s2 := ir.Val(&ir.StackVal{2})
+	sn1 := ir.Val(&ir.StackVal{-1})
+	sn2 := ir.Val(&ir.StackVal{-2})
+	sn7 := ir.Val(&ir.StackVal{-7})
 
-	var stack Stack
+	var stack ir.Stack
 	stack.Push(&v1) // 0
 	stack.Pop()     // 1
 	stack.Pop()     // 1
@@ -50,27 +51,27 @@ func TestJoinSimpleEntries(t *testing.T) {
 	constVals := bigint.NewMap(nil)
 	constVals.Put(big.NewInt(1), &v1)
 
-	blockJoined := &BasicBlock{
+	blockJoined := &ir.BasicBlock{
 		Stack: stack,
-		Nodes: []Node{
-			&AssignStmt{Assign: &s0, Expr: &ArithExpr{Op: token.Add, LHS: &sn1, RHS: &v1}},
-			&AssignStmt{Assign: &s1, Expr: &ArithExpr{Op: token.Mul, LHS: &sn2, RHS: &s0}},
-			&AssignStmt{Assign: &s2, Expr: &ArithExpr{Op: token.Mod, LHS: &s1, RHS: &sn7}},
+		Nodes: []ir.Node{
+			&ir.AssignStmt{Assign: &s0, Expr: &ir.ArithExpr{Op: token.Add, LHS: &sn1, RHS: &v1}},
+			&ir.AssignStmt{Assign: &s1, Expr: &ir.ArithExpr{Op: token.Mul, LHS: &sn2, RHS: &s0}},
+			&ir.AssignStmt{Assign: &s2, Expr: &ir.ArithExpr{Op: token.Mod, LHS: &s1, RHS: &sn7}},
 		},
-		Terminator: &EndStmt{},
-		Entries:    []*BasicBlock{entryBlock},
-		Callers:    []*BasicBlock{entryBlock},
+		Terminator: &ir.EndStmt{},
+		Entries:    []*ir.BasicBlock{ir.EntryBlock},
+		Callers:    []*ir.BasicBlock{ir.EntryBlock},
 	}
-	programJoined := &Program{
+	programJoined := &ir.Program{
 		Name:        "test",
-		Blocks:      []*BasicBlock{blockJoined},
+		Blocks:      []*ir.BasicBlock{blockJoined},
 		Entry:       blockJoined,
 		ConstVals:   *constVals,
 		NextBlockID: 2,
 		NextStackID: 3,
 	}
 
-	program.JoinSimpleEntries()
+	JoinSimpleEntries(program)
 	if !reflect.DeepEqual(program, programJoined) {
 		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", program, programJoined)
 	}
