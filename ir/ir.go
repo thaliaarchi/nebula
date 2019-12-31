@@ -35,8 +35,6 @@ type BasicBlock struct {
 	Next       *BasicBlock   // Successor block in source
 }
 
-var EntryBlock = &BasicBlock{ID: -1, Labels: []Label{{nil, "@entry"}}} // TODO: remove
-
 // Node can be any expr or stmt type.
 type Node interface {
 	String() string
@@ -326,7 +324,7 @@ func (block *BasicBlock) assign(assign *Val, expr Val) {
 }
 
 func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
-	p.Entry.Entries = append(p.Entry.Entries, EntryBlock)
+	p.Entry.Entries = append(p.Entry.Entries, nil)
 	for i, block := range p.Blocks {
 		branch := branches[i]
 		if branch != nil {
@@ -349,7 +347,7 @@ func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 			}
 		}
 	}
-	if err := p.Entry.connectCaller(EntryBlock); err != nil {
+	if err := p.Entry.connectCaller(nil); err != nil {
 		return err
 	}
 	p.trimUnreachable()
@@ -375,7 +373,7 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		errs = errs.addTrace(term.TrueBlock.connectCaller(caller), block)
 		errs = errs.addTrace(term.FalseBlock.connectCaller(caller), caller)
 	case *RetStmt:
-		if caller == EntryBlock {
+		if caller == nil {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
 		}
 		caller.Returns = append(caller.Returns, block)

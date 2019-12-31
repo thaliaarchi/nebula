@@ -59,8 +59,8 @@ func TestJoinSimpleEntries(t *testing.T) {
 			&ir.AssignStmt{Assign: &s2, Expr: &ir.ArithExpr{Op: token.Mod, LHS: &s1, RHS: &sn7}},
 		},
 		Terminator: &ir.EndStmt{},
-		Entries:    []*ir.BasicBlock{ir.EntryBlock},
-		Callers:    []*ir.BasicBlock{ir.EntryBlock},
+		Entries:    []*ir.BasicBlock{nil},
+		Callers:    []*ir.BasicBlock{nil},
 	}
 	programJoined := &ir.Program{
 		Name:        "test",

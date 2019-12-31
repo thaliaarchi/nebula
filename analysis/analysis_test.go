@@ -127,8 +127,8 @@ func TestTransforms(t *testing.T) {
 			&ir.PrintStmt{Op: token.Printi, Val: &s1},
 		},
 		Terminator: &ir.EndStmt{},
-		Entries:    []*ir.BasicBlock{ir.EntryBlock},
-		Callers:    []*ir.BasicBlock{ir.EntryBlock},
+		Entries:    []*ir.BasicBlock{nil},
+		Callers:    []*ir.BasicBlock{nil},
 	}
 	programStart := &ir.Program{
 		Name:        "test",
@@ -157,8 +157,8 @@ func TestTransforms(t *testing.T) {
 			&ir.PrintStmt{Op: token.Printi, Val: &v23},
 		},
 		Terminator: &ir.EndStmt{},
-		Entries:    []*ir.BasicBlock{ir.EntryBlock},
-		Callers:    []*ir.BasicBlock{ir.EntryBlock},
+		Entries:    []*ir.BasicBlock{nil},
+		Callers:    []*ir.BasicBlock{nil},
 	}
 	programConst := &ir.Program{
 		Name:        "test",
@@ -185,8 +185,8 @@ func TestTransforms(t *testing.T) {
 		},
 		Terminator: &ir.EndStmt{},
 		Stack:      stack,
-		Entries:    []*ir.BasicBlock{ir.EntryBlock},
-		Callers:    []*ir.BasicBlock{ir.EntryBlock},
+		Entries:    []*ir.BasicBlock{nil},
+		Callers:    []*ir.BasicBlock{nil},
 	}
 	programStr := &ir.Program{
 		Name:        "test",
