@@ -10,8 +10,8 @@ import (
 
 type builder struct {
 	Program  *ir.Program
-	Builder  llvm.Builder
 	Ctx      llvm.Context
+	Builder  llvm.Builder
 	Mod      llvm.Module
 	Main     llvm.Value
 	Entry    llvm.BasicBlock
@@ -25,10 +25,12 @@ const maxStackSize = 1024
 var zero = llvm.ConstInt(llvm.Int64Type(), 0, false)
 
 func EmitLLVMIR(program *ir.Program) {
-	var b builder
-	b.Program = program
-	b.Builder = llvm.NewBuilder()
-	b.Mod = llvm.NewModule(program.Name)
+	ctx := llvm.GlobalContext()
+	b := builder{
+		Program: program,
+		Builder: ctx.NewBuilder(),
+		Mod:     ctx.NewModule(program.Name),
+	}
 
 	mainType := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	b.Main = llvm.AddFunction(b.Mod, "main", mainType)

@@ -23,28 +23,40 @@ go build
 
 ### Compilation
 
-- Static single assignment form
-  - [x] Stack access converted to indexed variables
-  - [x] Connected graph of basic blocks
-  - [x] Minimize stack pointer updates to once per block
-- Intraprocedural analysis
-  - [x] Constant stack folding and propagation
-  - [x] Constant stack string concatenation
-- Interprocedural analysis
-  - [x] Dead code elimination
-  - [x] Call stack underflow detection
-  - [ ] Register allocation
-  - [ ] Reduction of arbitrary precision integers to fixed width
-  - [ ] Tail call optimization
-  - [ ] Heap access analysis
-    - [ ] Lifetime analysis
-    - [ ] Constant folding and propagation
-  - [ ] Contract assertions
-    - [ ] Using an SMT solver
-    - [ ] Abstract interpretation
-- Targets
-  - [ ] LLVM IR
-  - [ ] WebAssembly
+- Nebula IR
+  - Operations
+    - Arithmetic - add, sub, mul, div, mod
+    - Stack - push registers, pop length
+    - Heap - load, store
+    - I/O - read, print
+    - Control flow - jmp, conditional jmp, call, ret
+    - Assertions - zero divisor, stack underflow, ret underflow
+  - Memory
+    - Stack
+    - Heap - partitioned
+    - Call stack
+  - Static single assignment form
+    - [x] Stack access converted to indexed variables
+    - [x] Connected graph of basic blocks
+    - [x] Minimize stack pointer updates to once per block
+  - Interprocedural analysis
+    - [x] Constant stack folding and propagation
+    - [x] String concatenation
+    - [x] Dead code elimination
+    - [x] Call stack underflow detection
+    - [ ] Trap eliding
+    - [ ] Register allocation
+    - [ ] Reduction of arbitrary precision integers to fixed width
+    - [ ] Tail call optimization
+    - [ ] Heap access analysis
+      - [ ] Lifetime analysis
+      - [ ] Constant folding and propagation
+    - [ ] Contract assertions
+      - [ ] Using an SMT solver
+      - [ ] Abstract interpretation
+  - Targets
+    - [ ] LLVM IR
+    - [ ] WebAssembly via Emscripten
 
 ### Languages
 
