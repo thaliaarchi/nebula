@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 
+	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 	"llvm.org/llvm/bindings/go/llvm"
@@ -28,6 +29,7 @@ func EmitLLVMIR(program *ir.Program) {
 	ctx := llvm.GlobalContext()
 	b := builder{
 		Program: program,
+		Ctx:     ctx,
 		Builder: ctx.NewBuilder(),
 		Mod:     ctx.NewModule(program.Name),
 	}
@@ -48,49 +50,35 @@ func EmitLLVMIR(program *ir.Program) {
 	b.Builder.CreateStore(llvm.ConstInt(llvm.Int64Type(), 42, false), yGep)
 	x := b.Builder.CreateLoad(xGep, "x")
 	y := b.Builder.CreateLoad(yGep, "y")
-
-	op := token.Add
-	var result llvm.Value
-	switch op {
-	case token.Add:
-		result = b.Builder.CreateAdd(x, y, "xy.add")
-	case token.Sub:
-		result = b.Builder.CreateSub(x, y, "xy.sub")
-	case token.Mul:
-		result = b.Builder.CreateMul(x, y, "xy.mul")
-	case token.Div:
-		result = b.Builder.CreateSDiv(x, y, "xy.div")
-	case token.Mod:
-		result = b.Builder.CreateSRem(x, y, "xy.mod")
-	}
+	xy := b.Builder.CreateAdd(x, y, "xy")
+	b.Builder.CreateRet(xy)
 
 	for _, block := range program.Blocks {
 		b.emitBlock(block)
 	}
-
-	b.Builder.CreateRet(result)
 
 	if ok := llvm.VerifyModule(b.Mod, llvm.ReturnStatusAction); ok != nil {
 		fmt.Println(ok.Error())
 	}
 	b.Mod.Dump()
 
-	engine, err := llvm.NewExecutionEngine(b.Mod)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
+	// engine, err := llvm.NewExecutionEngine(b.Mod)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
 
-	funcResult := engine.RunFunction(b.Main, []llvm.GenericValue{})
-	fmt.Printf("%d\n", funcResult.Int(false))
+	// funcResult := engine.RunFunction(b.Main, []llvm.GenericValue{})
+	// fmt.Printf("%d\n", funcResult.Int(false))
 }
 
 func (b *builder) emitBlock(block *ir.BasicBlock) {
-	// lb := b.Ctx.AddBasicBlock(b.Main, block.Name()) // how to create unattached basic block?
+	lb := b.Ctx.AddBasicBlock(b.Main, block.Name())
+	b.Builder.SetInsertPoint(lb, lb.FirstInstruction())
 	idents := make(map[*ir.Val]llvm.Value)
 	if block.Stack.Access > 0 {
 		b.callStackCheck(block.Stack.Access)
 	}
-	stackLen := b.Builder.CreateLoad(b.StackLen, "stack_len_"+block.Name())
+	stackLen := b.Builder.CreateLoad(b.StackLen, "stack_len")
 	for _, val := range block.Stack.Under {
 		if val != nil {
 			if v, ok := (*val).(*ir.StackVal); !ok || v.Val < 0 {
@@ -102,10 +90,58 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 			}
 		}
 	}
-	// return lb
+	for _, node := range block.Nodes {
+		switch n := node.(type) {
+		case *ir.AssignStmt:
+			var val llvm.Value
+			switch expr := n.Expr.(type) {
+			case *ir.ArithExpr:
+				lhs := valLookup(idents, expr.LHS)
+				rhs := valLookup(idents, expr.RHS)
+				switch expr.Op {
+				case token.Add:
+					val = b.Builder.CreateAdd(lhs, rhs, "")
+				case token.Sub:
+					val = b.Builder.CreateSub(lhs, rhs, "")
+				case token.Mul:
+					val = b.Builder.CreateMul(lhs, rhs, "")
+				case token.Div:
+					val = b.Builder.CreateSDiv(lhs, rhs, "")
+				case token.Mod:
+					val = b.Builder.CreateSRem(lhs, rhs, "")
+				}
+			case *ir.RetrieveExpr:
+				val = b.Builder.CreateAlloca(llvm.Int64Type(), "retrieve") // TODO
+			case *ir.ReadExpr:
+				val = b.Builder.CreateAlloca(llvm.Int64Type(), "read") // TODO
+			}
+			idents[n.Assign] = val
+		case *ir.StoreExpr:
+			b.Builder.CreateAlloca(llvm.Int64Type(), "store") // TODO
+		case *ir.PrintStmt:
+			b.Builder.CreateAlloca(llvm.Int64Type(), "print") // TODO
+		}
+	}
 }
 
 func (b *builder) callStackCheck(access int) {
 	// accessConst := llvm.ConstInt(llvm.Int64Type(), uint64(access), false)
 	// b.StackLen
+}
+
+func valLookup(idents map[*ir.Val]llvm.Value, val *ir.Val) llvm.Value {
+	switch v := (*val).(type) {
+	case *ir.StackVal:
+		if v, ok := idents[val]; ok {
+			return v
+		}
+		panic(fmt.Sprintf("codegen: val not found: %v", val))
+	case *ir.ConstVal:
+		if i64, ok := bigint.ToInt64(v.Val); ok {
+			return llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
+		}
+		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", val))
+	default:
+		panic(fmt.Sprintf("codegen: val type not supported: %v", val))
+	}
 }
