@@ -19,9 +19,13 @@ type builder struct {
 	Blocks   map[*ir.BasicBlock]llvm.BasicBlock
 	Stack    llvm.Value
 	StackLen llvm.Value
+	Heap     llvm.Value
 }
 
-const maxStackSize = 1024
+const (
+	maxStackSize = 1024
+	heapSize     = 4096
+)
 
 var zero = llvm.ConstInt(llvm.Int64Type(), 0, false)
 
@@ -39,8 +43,10 @@ func EmitLLVMIR(program *ir.Program) {
 	b.Entry = llvm.AddBasicBlock(b.Main, "entry")
 	b.Builder.SetInsertPoint(b.Entry, b.Entry.FirstInstruction())
 
-	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack") // should be global
-	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")                        // should be global
+	// should be global:
+	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack")
+	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")
+	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
 
 	xIdx := llvm.ConstInt(llvm.Int64Type(), 5, false)
 	yIdx := llvm.ConstInt(llvm.Int64Type(), 4, false)
@@ -72,11 +78,11 @@ func EmitLLVMIR(program *ir.Program) {
 }
 
 func (b *builder) emitBlock(block *ir.BasicBlock) {
-	lb := b.Ctx.AddBasicBlock(b.Main, block.Name())
-	b.Builder.SetInsertPoint(lb, lb.FirstInstruction())
+	llvmBlock := b.Ctx.AddBasicBlock(b.Main, block.Name())
+	b.Builder.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
 	idents := make(map[*ir.Val]llvm.Value)
 	if block.Stack.Access > 0 {
-		b.callStackCheck(block.Stack.Access)
+		b.checkStack(block.Stack.Access)
 	}
 	stackLen := b.Builder.CreateLoad(b.StackLen, "stack_len")
 	for _, val := range block.Stack.Under {
@@ -91,45 +97,51 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 		}
 	}
 	for _, node := range block.Nodes {
-		switch n := node.(type) {
+		switch inst := node.(type) {
 		case *ir.AssignStmt:
 			var val llvm.Value
-			switch expr := n.Expr.(type) {
+			switch expr := inst.Expr.(type) {
 			case *ir.ArithExpr:
-				lhs := valLookup(idents, expr.LHS)
-				rhs := valLookup(idents, expr.RHS)
+				lhs := lookupVal(expr.LHS, idents)
+				rhs := lookupVal(expr.RHS, idents)
 				switch expr.Op {
 				case token.Add:
-					val = b.Builder.CreateAdd(lhs, rhs, "")
+					val = b.Builder.CreateAdd(lhs, rhs, "add")
 				case token.Sub:
-					val = b.Builder.CreateSub(lhs, rhs, "")
+					val = b.Builder.CreateSub(lhs, rhs, "sub")
 				case token.Mul:
-					val = b.Builder.CreateMul(lhs, rhs, "")
+					val = b.Builder.CreateMul(lhs, rhs, "mul")
 				case token.Div:
-					val = b.Builder.CreateSDiv(lhs, rhs, "")
+					val = b.Builder.CreateSDiv(lhs, rhs, "div")
 				case token.Mod:
-					val = b.Builder.CreateSRem(lhs, rhs, "")
+					val = b.Builder.CreateSRem(lhs, rhs, "mod")
 				}
 			case *ir.RetrieveExpr:
-				val = b.Builder.CreateAlloca(llvm.Int64Type(), "retrieve") // TODO
-			case *ir.ReadExpr:
-				val = b.Builder.CreateAlloca(llvm.Int64Type(), "read") // TODO
+				val = b.Builder.CreateLoad(b.heapAddr(expr.Addr, idents), "retrieve")
+			case *ir.ReadExpr: // TODO
+				alloc := b.Builder.CreateAlloca(llvm.Int64Type(), "read")
+				val = b.Builder.CreateLoad(alloc, "read")
 			}
-			idents[n.Assign] = val
+			idents[inst.Assign] = val
 		case *ir.StoreExpr:
-			b.Builder.CreateAlloca(llvm.Int64Type(), "store") // TODO
+			b.Builder.CreateStore(lookupVal(inst.Val, idents), b.heapAddr(inst.Addr, idents))
 		case *ir.PrintStmt:
 			b.Builder.CreateAlloca(llvm.Int64Type(), "print") // TODO
 		}
 	}
 }
 
-func (b *builder) callStackCheck(access int) {
+func (b *builder) checkStack(access int) {
 	// accessConst := llvm.ConstInt(llvm.Int64Type(), uint64(access), false)
 	// b.StackLen
 }
 
-func valLookup(idents map[*ir.Val]llvm.Value, val *ir.Val) llvm.Value {
+func (b *builder) heapAddr(val *ir.Val, idents map[*ir.Val]llvm.Value) llvm.Value {
+	addr := lookupVal(val, idents)
+	return b.Builder.CreateInBoundsGEP(b.Heap, []llvm.Value{zero, addr}, "gep")
+}
+
+func lookupVal(val *ir.Val, idents map[*ir.Val]llvm.Value) llvm.Value {
 	switch v := (*val).(type) {
 	case *ir.StackVal:
 		if v, ok := idents[val]; ok {

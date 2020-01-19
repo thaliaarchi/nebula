@@ -171,7 +171,7 @@ func needsImplicitEnd(tokens []token.Token) bool {
 
 func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Program, []*big.Int, *bigint.Map, error) {
 	p := &Program{
-		Name:      strings.TrimSuffix(name, ".ws"),
+		Name:      name,
 		ConstVals: *bigint.NewMap(nil),
 	}
 	var branches []*big.Int
