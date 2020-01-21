@@ -16,10 +16,15 @@ type builder struct {
 	Mod      llvm.Module
 	Main     llvm.Value
 	Entry    llvm.BasicBlock
-	Blocks   map[*ir.BasicBlock]llvm.BasicBlock
+	Blocks   map[*ir.BasicBlock]basicBlockData
 	Stack    llvm.Value
 	StackLen llvm.Value
 	Heap     llvm.Value
+}
+
+type basicBlockData struct {
+	Block  llvm.BasicBlock
+	Idents map[ir.Val]llvm.Value
 }
 
 const (
@@ -36,6 +41,7 @@ func EmitLLVMIR(program *ir.Program) {
 		Ctx:     ctx,
 		Builder: ctx.NewBuilder(),
 		Mod:     ctx.NewModule(program.Name),
+		Blocks:  make(map[*ir.BasicBlock]basicBlockData),
 	}
 
 	mainType := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
@@ -62,6 +68,7 @@ func EmitLLVMIR(program *ir.Program) {
 	for _, block := range program.Blocks {
 		b.emitBlock(block)
 	}
+	b.connectBlocks()
 
 	if ok := llvm.VerifyModule(b.Mod, llvm.ReturnStatusAction); ok != nil {
 		fmt.Println(ok.Error())
@@ -80,7 +87,8 @@ func EmitLLVMIR(program *ir.Program) {
 func (b *builder) emitBlock(block *ir.BasicBlock) {
 	llvmBlock := b.Ctx.AddBasicBlock(b.Main, block.Name())
 	b.Builder.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
-	idents := make(map[*ir.Val]llvm.Value)
+	idents := make(map[ir.Val]llvm.Value)
+	b.Blocks[block] = basicBlockData{llvmBlock, idents}
 	if block.Stack.Access > 0 {
 		b.checkStack(block.Stack.Access)
 	}
@@ -92,7 +100,7 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 				n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Val), false)
 				idx := b.Builder.CreateSub(stackLen, n, name+".idx")
 				gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
-				idents[val] = b.Builder.CreateLoad(gep, name)
+				idents[v] = b.Builder.CreateLoad(gep, name)
 			}
 		}
 	}
@@ -102,8 +110,8 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 			var val llvm.Value
 			switch expr := inst.Expr.(type) {
 			case *ir.ArithExpr:
-				lhs := lookupVal(expr.LHS, idents)
-				rhs := lookupVal(expr.RHS, idents)
+				lhs := lookupVal(*expr.LHS, idents)
+				rhs := lookupVal(*expr.RHS, idents)
 				switch expr.Op {
 				case token.Add:
 					val = b.Builder.CreateAdd(lhs, rhs, "add")
@@ -117,16 +125,35 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 					val = b.Builder.CreateSRem(lhs, rhs, "mod")
 				}
 			case *ir.RetrieveExpr:
-				val = b.Builder.CreateLoad(b.heapAddr(expr.Addr, idents), "retrieve")
+				val = b.Builder.CreateLoad(b.heapAddr(*expr.Addr, idents), "retrieve")
 			case *ir.ReadExpr: // TODO
 				alloc := b.Builder.CreateAlloca(llvm.Int64Type(), "read")
 				val = b.Builder.CreateLoad(alloc, "read")
 			}
-			idents[inst.Assign] = val
+			idents[*inst.Assign] = val
 		case *ir.StoreExpr:
-			b.Builder.CreateStore(lookupVal(inst.Val, idents), b.heapAddr(inst.Addr, idents))
+			b.Builder.CreateStore(lookupVal(*inst.Val, idents), b.heapAddr(*inst.Addr, idents))
 		case *ir.PrintStmt:
 			b.Builder.CreateAlloca(llvm.Int64Type(), "print") // TODO
+		}
+	}
+}
+
+func (b *builder) connectBlocks() {
+	for _, block := range b.Program.Blocks {
+		blockData := b.Blocks[block]
+		b.Builder.SetInsertPoint(blockData.Block, llvm.NextInstruction(blockData.Block.LastInstruction()))
+		switch term := block.Terminator.(type) {
+		case *ir.CallStmt:
+			// TODO term.Callee
+		case *ir.JmpStmt:
+			b.Builder.CreateBr(b.Blocks[term.Block].Block)
+		case *ir.JmpCondStmt:
+			val := blockData.Idents[*term.Cond]
+			cond := b.Builder.CreateICmp(llvm.IntNE, val, zero, "cmp")
+			b.Builder.CreateCondBr(cond, b.Blocks[term.ThenBlock].Block, b.Blocks[term.ElseBlock].Block)
+		case *ir.RetStmt:
+			// TODO
 		}
 	}
 }
@@ -136,13 +163,13 @@ func (b *builder) checkStack(access int) {
 	// b.StackLen
 }
 
-func (b *builder) heapAddr(val *ir.Val, idents map[*ir.Val]llvm.Value) llvm.Value {
+func (b *builder) heapAddr(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
 	addr := lookupVal(val, idents)
 	return b.Builder.CreateInBoundsGEP(b.Heap, []llvm.Value{zero, addr}, "gep")
 }
 
-func lookupVal(val *ir.Val, idents map[*ir.Val]llvm.Value) llvm.Value {
-	switch v := (*val).(type) {
+func lookupVal(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
+	switch v := val.(type) {
 	case *ir.StackVal:
 		if v, ok := idents[val]; ok {
 			return v
