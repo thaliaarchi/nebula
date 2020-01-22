@@ -10,16 +10,18 @@ import (
 )
 
 type builder struct {
-	Program  *ir.Program
-	Ctx      llvm.Context
-	Builder  llvm.Builder
-	Mod      llvm.Module
-	Main     llvm.Value
-	Entry    llvm.BasicBlock
-	Blocks   map[*ir.BasicBlock]basicBlockData
-	Stack    llvm.Value
-	StackLen llvm.Value
-	Heap     llvm.Value
+	Program      *ir.Program
+	Ctx          llvm.Context
+	Builder      llvm.Builder
+	Mod          llvm.Module
+	Main         llvm.Value
+	Entry        llvm.BasicBlock
+	Blocks       map[*ir.BasicBlock]basicBlockData
+	Stack        llvm.Value
+	StackLen     llvm.Value
+	CallStack    llvm.Value
+	CallStackLen llvm.Value
+	Heap         llvm.Value
 }
 
 type basicBlockData struct {
@@ -28,8 +30,9 @@ type basicBlockData struct {
 }
 
 const (
-	maxStackSize = 1024
-	heapSize     = 4096
+	maxStackSize     = 1024
+	maxCallStackSize = 256
+	heapSize         = 4096
 )
 
 var zero = llvm.ConstInt(llvm.Int64Type(), 0, false)
@@ -52,18 +55,11 @@ func EmitLLVMIR(program *ir.Program) {
 	// should be global:
 	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack")
 	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")
+	b.CallStack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxCallStackSize), "call_stack")
+	b.CallStackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "call_stack_len")
 	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
-
-	xIdx := llvm.ConstInt(llvm.Int64Type(), 5, false)
-	yIdx := llvm.ConstInt(llvm.Int64Type(), 4, false)
-	xGep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, xIdx}, "x.gep")
-	yGep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, yIdx}, "y.gep")
-	b.Builder.CreateStore(llvm.ConstInt(llvm.Int64Type(), 16, false), xGep)
-	b.Builder.CreateStore(llvm.ConstInt(llvm.Int64Type(), 42, false), yGep)
-	x := b.Builder.CreateLoad(xGep, "x")
-	y := b.Builder.CreateLoad(yGep, "y")
-	xy := b.Builder.CreateAdd(x, y, "xy")
-	b.Builder.CreateRet(xy)
+	b.Builder.CreateStore(zero, b.StackLen)
+	b.Builder.CreateStore(zero, b.CallStackLen)
 
 	for _, block := range program.Blocks {
 		b.emitBlock(block)
@@ -90,20 +86,31 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 	idents := make(map[ir.Val]llvm.Value)
 	b.Blocks[block] = basicBlockData{llvmBlock, idents}
 	if block.Stack.Access > 0 {
-		b.checkStack(block.Stack.Access)
+		// TODO check stack underflow
 	}
 	stackLen := b.Builder.CreateLoad(b.StackLen, "stack_len")
+
 	for _, val := range block.Stack.Under {
-		if val != nil {
-			if v, ok := (*val).(*ir.StackVal); !ok || v.Val < 0 {
+		switch v := (*val).(type) {
+		case *ir.StackVal:
+			if v.Val < 0 {
 				name := fmt.Sprintf("s%d", v.Val)
 				n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Val), false)
 				idx := b.Builder.CreateSub(stackLen, n, name+".idx")
 				gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
 				idents[v] = b.Builder.CreateLoad(gep, name)
+			} else {
+				panic(fmt.Sprintf("codegen: non-negative stack vals not currently supported: %v", v)) // TODO
+			}
+		case *ir.ConstVal:
+			if i64, ok := bigint.ToInt64(v.Val); ok {
+				idents[v] = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
+			} else {
+				panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
 			}
 		}
 	}
+
 	for _, node := range block.Nodes {
 		switch inst := node.(type) {
 		case *ir.AssignStmt:
@@ -137,6 +144,26 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 			b.Builder.CreateAlloca(llvm.Int64Type(), "print") // TODO
 		}
 	}
+
+	if pop := block.Stack.Pops; pop > 0 {
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(pop), false)
+		stackLen = b.Builder.CreateSub(stackLen, n, "stack_len_pop")
+	}
+	for i, val := range block.Stack.Vals {
+		if ident, ok := idents[*val]; ok {
+			name := fmt.Sprintf("s%d", i)
+			n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
+			idx := b.Builder.CreateAdd(stackLen, n, name+"idx")
+			gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
+			b.Builder.CreateStore(ident, gep)
+		} else {
+			panic(fmt.Sprintf("codegen: val not in current scope: %v", *val))
+		}
+	}
+	if push := len(block.Stack.Vals); push > 0 {
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
+		stackLen = b.Builder.CreateAdd(stackLen, n, "stack_len_push")
+	}
 }
 
 func (b *builder) connectBlocks() {
@@ -156,11 +183,6 @@ func (b *builder) connectBlocks() {
 			// TODO
 		}
 	}
-}
-
-func (b *builder) checkStack(access int) {
-	// accessConst := llvm.ConstInt(llvm.Int64Type(), uint64(access), false)
-	// b.StackLen
 }
 
 func (b *builder) heapAddr(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
