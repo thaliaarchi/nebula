@@ -67,7 +67,7 @@ clang -o collatz collatz.o.s
       - [ ] Using an SMT solver
       - [ ] Abstract interpretation
   - Targets
-    - [ ] LLVM IR
+    - [x] LLVM IR
     - [ ] WebAssembly via Emscripten
 
 ### Languages

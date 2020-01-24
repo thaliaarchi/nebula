@@ -11,6 +11,7 @@ import (
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/token"
 	"github.com/andrewarchi/nebula/ws"
+	"llvm.org/llvm/bindings/go/llvm"
 )
 
 const usage = `Usage:
@@ -77,26 +78,10 @@ func main() {
 		fmt.Print(program.String())
 	}
 	if _, ok := modes["llvm"]; ok {
-		codegen.EmitLLVMIR(program)
+		mod := codegen.EmitLLVMIR(program)
+		if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
+			fmt.Fprintln(os.Stdout, err)
+		}
+		fmt.Print(mod.String())
 	}
-
-	// vm, err := ws.NewVM(program)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		fmt.Printf("Error: %v\n", r)
-	// 		vm.PrintStackTrace()
-	// 		os.Exit(1)
-	// 	}
-	// }()
-
-	// if mode == "run" {
-	// 	vm.Run()
-	// } else {
-	// 	vm.Debug()
-	// }
 }

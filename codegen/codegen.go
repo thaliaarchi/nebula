@@ -45,7 +45,7 @@ var (
 	one  = llvm.ConstInt(llvm.Int64Type(), 1, false)
 )
 
-func EmitLLVMIR(program *ir.Program) {
+func EmitLLVMIR(program *ir.Program) llvm.Module {
 	ctx := llvm.GlobalContext()
 	b := builder{
 		Program: program,
@@ -74,19 +74,7 @@ func EmitLLVMIR(program *ir.Program) {
 		b.emitBlock(block)
 	}
 	b.connectBlocks()
-
-	if ok := llvm.VerifyModule(b.Mod, llvm.ReturnStatusAction); ok != nil {
-		fmt.Println(ok.Error())
-	}
-	b.Mod.Dump()
-
-	// engine, err := llvm.NewExecutionEngine(b.Mod)
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// }
-
-	// funcResult := engine.RunFunction(b.Main, []llvm.GenericValue{})
-	// fmt.Printf("%d\n", funcResult.Int(false))
+	return b.Mod
 }
 
 func (b *builder) declareExtFuncs() {
@@ -100,6 +88,11 @@ func (b *builder) declareExtFuncs() {
 	b.ReadcFunc = llvm.AddFunction(b.Mod, "readc", readcTyp)
 	b.ReadiFunc = llvm.AddFunction(b.Mod, "readi", readiTyp)
 	b.FlushFunc = llvm.AddFunction(b.Mod, "flush", flushTyp)
+	b.PrintcFunc.SetLinkage(llvm.ExternalLinkage)
+	b.PrintiFunc.SetLinkage(llvm.ExternalLinkage)
+	b.ReadcFunc.SetLinkage(llvm.ExternalLinkage)
+	b.ReadiFunc.SetLinkage(llvm.ExternalLinkage)
+	b.FlushFunc.SetLinkage(llvm.ExternalLinkage)
 }
 
 func (b *builder) emitBlock(block *ir.BasicBlock) {
