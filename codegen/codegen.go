@@ -58,7 +58,7 @@ func EmitLLVMIR(program *ir.Program) {
 	// should be global:
 	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack")
 	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")
-	b.CallStack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxCallStackSize), "call_stack")
+	b.CallStack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackSize), "call_stack")
 	b.CallStackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "call_stack_len")
 	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
 	b.Builder.CreateStore(zero, b.StackLen)
@@ -190,9 +190,12 @@ func (b *builder) connectBlocks() {
 		switch term := block.Terminator.(type) {
 		case *ir.CallStmt:
 			callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
+			gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 			callStackLen = b.Builder.CreateAdd(callStackLen, one, "call_stack_len")
 			b.Builder.CreateStore(callStackLen, b.CallStackLen)
-			// addr := llvm.BlockAddress(b.Main, b.Blocks[term.Callee].Block)
+			addr := llvm.BlockAddress(b.Main, b.Blocks[block.Next].Block)
+			b.Builder.CreateStore(addr, gep)
+			b.Builder.CreateBr(b.Blocks[term.Callee].Block)
 		case *ir.JmpStmt:
 			b.Builder.CreateBr(b.Blocks[term.Block].Block)
 		case *ir.JmpCondStmt:
@@ -205,9 +208,12 @@ func (b *builder) connectBlocks() {
 			// TODO check call stack underflow
 			b.Builder.CreateStore(callStackLen, b.CallStackLen)
 			gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
-			/*addr := */ b.Builder.CreateLoad(gep, "ret_addr")
-			// numDests := 999 // TODO
-			// b.Builder.CreateIndirectBr(addr, numDests)
+			addr := b.Builder.CreateLoad(gep, "ret_addr")
+			dests := block.Exits()
+			br := b.Builder.CreateIndirectBr(addr, len(dests))
+			for _, dest := range dests {
+				br.AddDest(b.Blocks[dest].Block)
+			}
 		}
 	}
 }

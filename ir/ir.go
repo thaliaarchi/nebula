@@ -42,7 +42,9 @@ type Node interface {
 
 // Val can be StackVal, HeapVal, ConstVal, or AddrVal. Two vals can be
 // compared by address for equality.
-type Val = Node
+type Val interface {
+	String() string
+}
 
 // StackVal is a position on the stack.
 type StackVal struct{ Val int }
