@@ -10,21 +10,20 @@ import (
 )
 
 type builder struct {
-	Program      *ir.Program
-	Ctx          llvm.Context
-	Builder      llvm.Builder
-	Mod          llvm.Module
-	Main         llvm.Value
+	Builder llvm.Builder
+
 	Stack        llvm.Value
 	StackLen     llvm.Value
 	CallStack    llvm.Value
 	CallStackLen llvm.Value
 	Heap         llvm.Value
-	PrintcFunc   llvm.Value
-	PrintiFunc   llvm.Value
-	ReadcFunc    llvm.Value
-	ReadiFunc    llvm.Value
-	FlushFunc    llvm.Value
+
+	MainFunc   llvm.Value
+	PrintcFunc llvm.Value
+	PrintiFunc llvm.Value
+	ReadcFunc  llvm.Value
+	ReadiFunc  llvm.Value
+	FlushFunc  llvm.Value
 }
 
 const (
@@ -40,22 +39,19 @@ var (
 
 func EmitLLVMIR(program *ir.Program) llvm.Module {
 	ctx := llvm.GlobalContext()
-	b := builder{
-		Program: program,
-		Ctx:     ctx,
-		Builder: ctx.NewBuilder(),
-		Mod:     ctx.NewModule(program.Name),
-	}
+	b := builder{Builder: ctx.NewBuilder()}
 
-	b.declareFuncs()
-	entry := b.Ctx.AddBasicBlock(b.Main, "entry")
+	module := ctx.NewModule(program.Name)
+	b.declareFuncs(module)
+
+	entry := ctx.AddBasicBlock(b.MainFunc, "entry")
 	blocks := make(map[*ir.BasicBlock]llvm.BasicBlock)
 	for _, block := range program.Blocks {
-		blocks[block] = b.Ctx.AddBasicBlock(b.Main, block.Name())
+		blocks[block] = ctx.AddBasicBlock(b.MainFunc, block.Name())
 	}
 
 	b.Builder.SetInsertPoint(entry, entry.FirstInstruction())
-	b.emitEntry(blocks[b.Program.Entry])
+	b.emitEntry(blocks[program.Entry])
 	for _, block := range program.Blocks {
 		llvmBlock := blocks[block]
 		b.Builder.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
@@ -66,22 +62,22 @@ func EmitLLVMIR(program *ir.Program) llvm.Module {
 		b.updateStack(block, idents, stackLen)
 		b.emitTerminator(block, idents, blocks)
 	}
-	return b.Mod
+	return module
 }
 
-func (b *builder) declareFuncs() {
+func (b *builder) declareFuncs(module llvm.Module) {
 	mainTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
 	printcTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
 	printiTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
 	readcTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	readiTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	flushTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
-	b.Main = llvm.AddFunction(b.Mod, "main", mainTyp)
-	b.PrintcFunc = llvm.AddFunction(b.Mod, "printc", printcTyp)
-	b.PrintiFunc = llvm.AddFunction(b.Mod, "printi", printiTyp)
-	b.ReadcFunc = llvm.AddFunction(b.Mod, "readc", readcTyp)
-	b.ReadiFunc = llvm.AddFunction(b.Mod, "readi", readiTyp)
-	b.FlushFunc = llvm.AddFunction(b.Mod, "flush", flushTyp)
+	b.MainFunc = llvm.AddFunction(module, "main", mainTyp)
+	b.PrintcFunc = llvm.AddFunction(module, "printc", printcTyp)
+	b.PrintiFunc = llvm.AddFunction(module, "printi", printiTyp)
+	b.ReadcFunc = llvm.AddFunction(module, "readc", readcTyp)
+	b.ReadiFunc = llvm.AddFunction(module, "readi", readiTyp)
+	b.FlushFunc = llvm.AddFunction(module, "flush", flushTyp)
 	b.PrintcFunc.SetLinkage(llvm.ExternalLinkage)
 	b.PrintiFunc.SetLinkage(llvm.ExternalLinkage)
 	b.ReadcFunc.SetLinkage(llvm.ExternalLinkage)
@@ -223,7 +219,7 @@ func (b *builder) emitTerminator(block *ir.BasicBlock, idents map[ir.Val]llvm.Va
 		gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 		callStackLen = b.Builder.CreateAdd(callStackLen, one, "call_stack_len")
 		b.Builder.CreateStore(callStackLen, b.CallStackLen)
-		addr := llvm.BlockAddress(b.Main, blocks[block.Next])
+		addr := llvm.BlockAddress(b.MainFunc, blocks[block.Next])
 		b.Builder.CreateStore(addr, gep)
 		b.Builder.CreateBr(blocks[term.Callee])
 	case *ir.JmpStmt:
