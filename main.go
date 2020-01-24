@@ -13,23 +13,18 @@ import (
 	"github.com/andrewarchi/nebula/ws"
 )
 
-const usage = `nebula ir <file>
-nebula matrix <file>
-nebula dot <file> | dot -Tpng > graph.png`
+const usage = `Usage:
+	nebula [file] [modes...]
+For example:
+	nebula programs/interpret.out.ws dot | dot -Tpng > graph.png`
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, usage)
-		return
-	}
-	mode := os.Args[1]
-	if mode != "ir" && mode != "dot" && mode != "matrix" && mode != "llvm" {
-		fmt.Fprintf(os.Stderr, "Unrecognized mode: %s\n", mode)
+	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, usage)
 		return
 	}
 
-	filename := os.Args[2]
+	filename := os.Args[1]
 	f, err := os.Open(filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -62,23 +57,27 @@ func main() {
 	}
 
 	// program.JoinSimpleEntries() // incorrect
-	if mode != "llvm" {
-		analysis.FoldConstArith(program)
-	}
+	// if mode != "llvm" {
+	// 	analysis.FoldConstArith(program)
+	// }
 	// program.ConcatStrings() // not general
 
-	switch mode {
-	case "ir":
-		fmt.Print(program.String())
-	case "dot":
+	modes := make(map[string]struct{})
+	for _, mode := range os.Args[2:] {
+		modes[mode] = struct{}{}
+	}
+
+	if _, ok := modes["dot"]; ok {
 		fmt.Print(program.DotDigraph())
-	case "matrix":
+	}
+	if _, ok := modes["matrix"]; ok {
 		fmt.Print(graph.FormatMatrix(analysis.ControlFlowGraph(program)))
-	case "llvm":
-		fmt.Println("LLVM IR:")
-		codegen.EmitLLVMIR(program)
-		fmt.Println("Nebula IR:")
+	}
+	if _, ok := modes["ir"]; ok {
 		fmt.Print(program.String())
+	}
+	if _, ok := modes["llvm"]; ok {
+		codegen.EmitLLVMIR(program)
 	}
 
 	// vm, err := ws.NewVM(program)

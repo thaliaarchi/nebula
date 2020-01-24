@@ -7,16 +7,17 @@ This project is evolving very rapidly.
 
 ## Usage
 
-Building Nebula requires Go to be installed. Graphviz can be optionally
-used to render generated DOT graphs.
+Building Nebula requires Go and the LLVM source. Graphviz can be
+optionally used to render generated DOT graphs.
 
 ```sh
 go get https://github.com/andrewarchi/nebula
 cd nebula
 go get ./...
 go build
-./nebula ir programs/interpret.out.ws
-./nebula dot programs/interpret.out.ws | dot -Tpng > graph.png
+./nebula programs/interpret.out.ws ir
+./nebula programs/interpret.out.ws llvm
+./nebula programs/interpret.out.ws dot | dot -Tpng > graph.png
 ```
 
 ## Project Goals

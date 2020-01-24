@@ -35,7 +35,10 @@ const (
 	heapSize         = 4096
 )
 
-var zero = llvm.ConstInt(llvm.Int64Type(), 0, false)
+var (
+	zero = llvm.ConstInt(llvm.Int64Type(), 0, false)
+	one  = llvm.ConstInt(llvm.Int64Type(), 1, false)
+)
 
 func EmitLLVMIR(program *ir.Program) {
 	ctx := llvm.GlobalContext()
@@ -150,20 +153,34 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 		stackLen = b.Builder.CreateSub(stackLen, n, "stack_len_pop")
 	}
 	for i, val := range block.Stack.Vals {
-		if ident, ok := idents[*val]; ok {
-			name := fmt.Sprintf("s%d", i)
-			n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
-			idx := b.Builder.CreateAdd(stackLen, n, name+"idx")
-			gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
-			b.Builder.CreateStore(ident, gep)
-		} else {
-			panic(fmt.Sprintf("codegen: val not in current scope: %v", *val))
+		var s llvm.Value
+		switch v := (*val).(type) {
+		case *ir.StackVal:
+			if ident, ok := idents[v]; ok {
+				s = ident
+			} else {
+				panic(fmt.Sprintf("codegen: val not in scope of %s: %v", block.Name(), *val))
+			}
+		case *ir.ConstVal:
+			if i64, ok := bigint.ToInt64(v.Val); ok {
+				s = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
+			} else {
+				panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
+			}
+		default:
+			panic(fmt.Sprintf("codegen: unsupported type %T", v))
 		}
+		name := fmt.Sprintf("s%d", i)
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
+		idx := b.Builder.CreateAdd(stackLen, n, name+"idx")
+		gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
+		b.Builder.CreateStore(s, gep)
 	}
 	if push := len(block.Stack.Vals); push > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
 		stackLen = b.Builder.CreateAdd(stackLen, n, "stack_len_push")
 	}
+	b.Builder.CreateStore(stackLen, b.StackLen)
 }
 
 func (b *builder) connectBlocks() {
@@ -172,7 +189,10 @@ func (b *builder) connectBlocks() {
 		b.Builder.SetInsertPoint(blockData.Block, llvm.NextInstruction(blockData.Block.LastInstruction()))
 		switch term := block.Terminator.(type) {
 		case *ir.CallStmt:
-			// TODO term.Callee
+			callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
+			callStackLen = b.Builder.CreateAdd(callStackLen, one, "call_stack_len")
+			b.Builder.CreateStore(callStackLen, b.CallStackLen)
+			// addr := llvm.BlockAddress(b.Main, b.Blocks[term.Callee].Block)
 		case *ir.JmpStmt:
 			b.Builder.CreateBr(b.Blocks[term.Block].Block)
 		case *ir.JmpCondStmt:
@@ -180,7 +200,14 @@ func (b *builder) connectBlocks() {
 			cond := b.Builder.CreateICmp(llvm.IntNE, val, zero, "cmp")
 			b.Builder.CreateCondBr(cond, b.Blocks[term.ThenBlock].Block, b.Blocks[term.ElseBlock].Block)
 		case *ir.RetStmt:
-			// TODO
+			callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
+			callStackLen = b.Builder.CreateSub(callStackLen, one, "call_stack_len")
+			// TODO check call stack underflow
+			b.Builder.CreateStore(callStackLen, b.CallStackLen)
+			gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
+			/*addr := */ b.Builder.CreateLoad(gep, "ret_addr")
+			// numDests := 999 // TODO
+			// b.Builder.CreateIndirectBr(addr, numDests)
 		}
 	}
 }
