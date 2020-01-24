@@ -235,7 +235,13 @@ func (b *builder) connectBlocks() {
 			b.Builder.CreateBr(b.Blocks[term.Block].Block)
 		case *ir.JmpCondStmt:
 			val := blockData.Idents[*term.Cond]
-			cond := b.Builder.CreateICmp(llvm.IntNE, val, zero, "cmp")
+			var cond llvm.Value
+			switch term.Op {
+			case token.Jz:
+				cond = b.Builder.CreateICmp(llvm.IntEQ, val, zero, "cmp")
+			case token.Jn:
+				cond = b.Builder.CreateICmp(llvm.IntSLT, val, zero, "cmp")
+			}
 			b.Builder.CreateCondBr(cond, b.Blocks[term.ThenBlock].Block, b.Blocks[term.ElseBlock].Block)
 		case *ir.RetStmt:
 			callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
