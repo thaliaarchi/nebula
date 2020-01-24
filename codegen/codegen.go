@@ -15,7 +15,6 @@ type builder struct {
 	Builder      llvm.Builder
 	Mod          llvm.Module
 	Main         llvm.Value
-	Blocks       map[*ir.BasicBlock]llvm.BasicBlock
 	Stack        llvm.Value
 	StackLen     llvm.Value
 	CallStack    llvm.Value
@@ -49,15 +48,23 @@ func EmitLLVMIR(program *ir.Program) llvm.Module {
 	}
 
 	b.declareFuncs()
-	b.Blocks = make(map[*ir.BasicBlock]llvm.BasicBlock)
 	entry := b.Ctx.AddBasicBlock(b.Main, "entry")
+	blocks := make(map[*ir.BasicBlock]llvm.BasicBlock)
 	for _, block := range program.Blocks {
-		b.Blocks[block] = b.Ctx.AddBasicBlock(b.Main, block.Name())
+		blocks[block] = b.Ctx.AddBasicBlock(b.Main, block.Name())
 	}
 
-	b.emitEntry(entry)
+	b.Builder.SetInsertPoint(entry, entry.FirstInstruction())
+	b.emitEntry(blocks[b.Program.Entry])
 	for _, block := range program.Blocks {
-		b.emitBlock(block, b.Blocks[block])
+		llvmBlock := blocks[block]
+		b.Builder.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
+		idents, stackLen := b.loadStack(block)
+		for _, node := range block.Nodes {
+			b.emitNode(node, idents)
+		}
+		b.updateStack(block, idents, stackLen)
+		b.emitTerminator(block, idents, blocks)
 	}
 	return b.Mod
 }
@@ -83,7 +90,6 @@ func (b *builder) declareFuncs() {
 }
 
 func (b *builder) emitEntry(entry llvm.BasicBlock) {
-	b.Builder.SetInsertPoint(entry, entry.FirstInstruction())
 	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack")
 	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")
 	b.CallStack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackSize), "call_stack")
@@ -91,11 +97,10 @@ func (b *builder) emitEntry(entry llvm.BasicBlock) {
 	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
 	b.Builder.CreateStore(zero, b.StackLen)
 	b.Builder.CreateStore(zero, b.CallStackLen)
-	b.Builder.CreateBr(b.Blocks[b.Program.Entry])
+	b.Builder.CreateBr(entry)
 }
 
-func (b *builder) emitBlock(block *ir.BasicBlock, llvmBlock llvm.BasicBlock) {
-	b.Builder.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
+func (b *builder) loadStack(block *ir.BasicBlock) (map[ir.Val]llvm.Value, llvm.Value) {
 	idents := make(map[ir.Val]llvm.Value)
 	if block.Stack.Access > 0 {
 		// TODO check stack underflow
@@ -124,55 +129,58 @@ func (b *builder) emitBlock(block *ir.BasicBlock, llvmBlock llvm.BasicBlock) {
 			}
 		}
 	}
+	return idents, stackLen
+}
 
-	for _, node := range block.Nodes {
-		switch inst := node.(type) {
-		case *ir.AssignStmt:
-			var val llvm.Value
-			switch expr := inst.Expr.(type) {
-			case *ir.ArithExpr:
-				lhs := lookupVal(*expr.LHS, idents)
-				rhs := lookupVal(*expr.RHS, idents)
-				switch expr.Op {
-				case token.Add:
-					val = b.Builder.CreateAdd(lhs, rhs, "add")
-				case token.Sub:
-					val = b.Builder.CreateSub(lhs, rhs, "sub")
-				case token.Mul:
-					val = b.Builder.CreateMul(lhs, rhs, "mul")
-				case token.Div:
-					val = b.Builder.CreateSDiv(lhs, rhs, "div")
-				case token.Mod:
-					val = b.Builder.CreateSRem(lhs, rhs, "mod")
-				}
-			case *ir.RetrieveExpr:
-				val = b.Builder.CreateLoad(b.heapAddr(*expr.Addr, idents), "retrieve")
-			case *ir.ReadExpr:
-				var f llvm.Value
-				switch expr.Op {
-				case token.Readc:
-					f = b.ReadcFunc
-				case token.Readi:
-					f = b.ReadiFunc
-				}
-				val = b.Builder.CreateCall(f, []llvm.Value{}, "")
+func (b *builder) emitNode(node ir.Node, idents map[ir.Val]llvm.Value) {
+	switch inst := node.(type) {
+	case *ir.AssignStmt:
+		var val llvm.Value
+		switch expr := inst.Expr.(type) {
+		case *ir.ArithExpr:
+			lhs := lookupVal(*expr.LHS, idents)
+			rhs := lookupVal(*expr.RHS, idents)
+			switch expr.Op {
+			case token.Add:
+				val = b.Builder.CreateAdd(lhs, rhs, "add")
+			case token.Sub:
+				val = b.Builder.CreateSub(lhs, rhs, "sub")
+			case token.Mul:
+				val = b.Builder.CreateMul(lhs, rhs, "mul")
+			case token.Div:
+				val = b.Builder.CreateSDiv(lhs, rhs, "div")
+			case token.Mod:
+				val = b.Builder.CreateSRem(lhs, rhs, "mod")
 			}
-			idents[*inst.Assign] = val
-		case *ir.StoreExpr:
-			b.Builder.CreateStore(lookupVal(*inst.Val, idents), b.heapAddr(*inst.Addr, idents))
-		case *ir.PrintStmt:
+		case *ir.RetrieveExpr:
+			val = b.Builder.CreateLoad(b.heapAddr(*expr.Addr, idents), "retrieve")
+		case *ir.ReadExpr:
 			var f llvm.Value
-			switch inst.Op {
-			case token.Printc:
-				f = b.PrintcFunc
-			case token.Printi:
-				f = b.PrintiFunc
+			switch expr.Op {
+			case token.Readc:
+				f = b.ReadcFunc
+			case token.Readi:
+				f = b.ReadiFunc
 			}
-			val := lookupVal(*inst.Val, idents)
-			b.Builder.CreateCall(f, []llvm.Value{val}, "")
+			val = b.Builder.CreateCall(f, []llvm.Value{}, "")
 		}
+		idents[*inst.Assign] = val
+	case *ir.StoreExpr:
+		b.Builder.CreateStore(lookupVal(*inst.Val, idents), b.heapAddr(*inst.Addr, idents))
+	case *ir.PrintStmt:
+		var f llvm.Value
+		switch inst.Op {
+		case token.Printc:
+			f = b.PrintcFunc
+		case token.Printi:
+			f = b.PrintiFunc
+		}
+		val := lookupVal(*inst.Val, idents)
+		b.Builder.CreateCall(f, []llvm.Value{val}, "")
 	}
+}
 
+func (b *builder) updateStack(block *ir.BasicBlock, idents map[ir.Val]llvm.Value, stackLen llvm.Value) {
 	if pop := block.Stack.Pops; pop > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(pop), false)
 		stackLen = b.Builder.CreateSub(stackLen, n, "stack_len_pop")
@@ -206,21 +214,20 @@ func (b *builder) emitBlock(block *ir.BasicBlock, llvmBlock llvm.BasicBlock) {
 		stackLen = b.Builder.CreateAdd(stackLen, n, "stack_len_push")
 	}
 	b.Builder.CreateStore(stackLen, b.StackLen)
-	b.emitTerminator(block, idents)
 }
 
-func (b *builder) emitTerminator(block *ir.BasicBlock, idents map[ir.Val]llvm.Value) {
+func (b *builder) emitTerminator(block *ir.BasicBlock, idents map[ir.Val]llvm.Value, blocks map[*ir.BasicBlock]llvm.BasicBlock) {
 	switch term := block.Terminator.(type) {
 	case *ir.CallStmt:
 		callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
 		gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 		callStackLen = b.Builder.CreateAdd(callStackLen, one, "call_stack_len")
 		b.Builder.CreateStore(callStackLen, b.CallStackLen)
-		addr := llvm.BlockAddress(b.Main, b.Blocks[block.Next])
+		addr := llvm.BlockAddress(b.Main, blocks[block.Next])
 		b.Builder.CreateStore(addr, gep)
-		b.Builder.CreateBr(b.Blocks[term.Callee])
+		b.Builder.CreateBr(blocks[term.Callee])
 	case *ir.JmpStmt:
-		b.Builder.CreateBr(b.Blocks[term.Block])
+		b.Builder.CreateBr(blocks[term.Block])
 	case *ir.JmpCondStmt:
 		val := idents[*term.Cond]
 		var cond llvm.Value
@@ -230,7 +237,7 @@ func (b *builder) emitTerminator(block *ir.BasicBlock, idents map[ir.Val]llvm.Va
 		case token.Jn:
 			cond = b.Builder.CreateICmp(llvm.IntSLT, val, zero, "cmp")
 		}
-		b.Builder.CreateCondBr(cond, b.Blocks[term.ThenBlock], b.Blocks[term.ElseBlock])
+		b.Builder.CreateCondBr(cond, blocks[term.ThenBlock], blocks[term.ElseBlock])
 	case *ir.RetStmt:
 		callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
 		callStackLen = b.Builder.CreateSub(callStackLen, one, "call_stack_len")
@@ -241,7 +248,7 @@ func (b *builder) emitTerminator(block *ir.BasicBlock, idents map[ir.Val]llvm.Va
 		dests := block.Exits()
 		br := b.Builder.CreateIndirectBr(addr, len(dests))
 		for _, dest := range dests {
-			br.AddDest(b.Blocks[dest])
+			br.AddDest(blocks[dest])
 		}
 	case *ir.EndStmt:
 		b.Builder.CreateRetVoid()
