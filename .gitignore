@@ -6,6 +6,8 @@ nebula
 *.ir
 
 *.ll
+*.o
+*.s
 
 *.dot
 *.png

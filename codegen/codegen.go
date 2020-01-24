@@ -56,7 +56,7 @@ func EmitLLVMIR(program *ir.Program) {
 	}
 
 	b.declareExtFuncs()
-	mainType := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
+	mainType := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
 	b.Main = llvm.AddFunction(b.Mod, "main", mainType)
 	b.Entry = llvm.AddBasicBlock(b.Main, "entry")
 	b.Builder.SetInsertPoint(b.Entry, b.Entry.FirstInstruction())
@@ -69,7 +69,6 @@ func EmitLLVMIR(program *ir.Program) {
 	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
 	b.Builder.CreateStore(zero, b.StackLen)
 	b.Builder.CreateStore(zero, b.CallStackLen)
-	b.Builder.CreateRetVoid()
 
 	for _, block := range program.Blocks {
 		b.emitBlock(block)
@@ -218,6 +217,8 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 }
 
 func (b *builder) connectBlocks() {
+	b.Builder.SetInsertPoint(b.Entry, llvm.NextInstruction(b.Entry.LastInstruction()))
+	b.Builder.CreateBr(b.Blocks[b.Program.Entry].Block)
 	for _, block := range b.Program.Blocks {
 		blockData := b.Blocks[block]
 		b.Builder.SetInsertPoint(blockData.Block, llvm.NextInstruction(blockData.Block.LastInstruction()))
@@ -248,6 +249,8 @@ func (b *builder) connectBlocks() {
 			for _, dest := range dests {
 				br.AddDest(b.Blocks[dest].Block)
 			}
+		case *ir.EndStmt:
+			b.Builder.CreateRetVoid()
 		}
 	}
 }

@@ -16,8 +16,17 @@ cd nebula
 go get ./...
 go build
 ./nebula programs/interpret.out.ws ir
-./nebula programs/interpret.out.ws llvm
 ./nebula programs/interpret.out.ws dot | dot -Tpng > graph.png
+```
+
+### Compiling using Nebula
+
+```sh
+./nebula programs/collatz.out.ws llvm 2> collatz.ll
+clang -S -emit-llvm codegen/lib/io.c
+llvm-link -o collatz.o collatz.ll io.ll
+llc collatz.o
+clang collatz.o.s
 ```
 
 ## Project Goals
