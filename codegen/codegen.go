@@ -15,8 +15,7 @@ type builder struct {
 	Builder      llvm.Builder
 	Mod          llvm.Module
 	Main         llvm.Value
-	Entry        llvm.BasicBlock
-	Blocks       map[*ir.BasicBlock]basicBlockData
+	Blocks       map[*ir.BasicBlock]llvm.BasicBlock
 	Stack        llvm.Value
 	StackLen     llvm.Value
 	CallStack    llvm.Value
@@ -27,11 +26,6 @@ type builder struct {
 	ReadcFunc    llvm.Value
 	ReadiFunc    llvm.Value
 	FlushFunc    llvm.Value
-}
-
-type basicBlockData struct {
-	Block  llvm.BasicBlock
-	Idents map[ir.Val]llvm.Value
 }
 
 const (
@@ -52,37 +46,30 @@ func EmitLLVMIR(program *ir.Program) llvm.Module {
 		Ctx:     ctx,
 		Builder: ctx.NewBuilder(),
 		Mod:     ctx.NewModule(program.Name),
-		Blocks:  make(map[*ir.BasicBlock]basicBlockData),
 	}
 
-	b.declareExtFuncs()
-	mainType := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
-	b.Main = llvm.AddFunction(b.Mod, "main", mainType)
-	b.Entry = llvm.AddBasicBlock(b.Main, "entry")
-	b.Builder.SetInsertPoint(b.Entry, b.Entry.FirstInstruction())
-
-	// should be global:
-	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack")
-	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")
-	b.CallStack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackSize), "call_stack")
-	b.CallStackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "call_stack_len")
-	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
-	b.Builder.CreateStore(zero, b.StackLen)
-	b.Builder.CreateStore(zero, b.CallStackLen)
-
+	b.declareFuncs()
+	b.Blocks = make(map[*ir.BasicBlock]llvm.BasicBlock)
+	entry := b.Ctx.AddBasicBlock(b.Main, "entry")
 	for _, block := range program.Blocks {
-		b.emitBlock(block)
+		b.Blocks[block] = b.Ctx.AddBasicBlock(b.Main, block.Name())
 	}
-	b.connectBlocks()
+
+	b.emitEntry(entry)
+	for _, block := range program.Blocks {
+		b.emitBlock(block, b.Blocks[block])
+	}
 	return b.Mod
 }
 
-func (b *builder) declareExtFuncs() {
+func (b *builder) declareFuncs() {
+	mainTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
 	printcTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
 	printiTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
 	readcTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	readiTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	flushTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
+	b.Main = llvm.AddFunction(b.Mod, "main", mainTyp)
 	b.PrintcFunc = llvm.AddFunction(b.Mod, "printc", printcTyp)
 	b.PrintiFunc = llvm.AddFunction(b.Mod, "printi", printiTyp)
 	b.ReadcFunc = llvm.AddFunction(b.Mod, "readc", readcTyp)
@@ -95,11 +82,21 @@ func (b *builder) declareExtFuncs() {
 	b.FlushFunc.SetLinkage(llvm.ExternalLinkage)
 }
 
-func (b *builder) emitBlock(block *ir.BasicBlock) {
-	llvmBlock := b.Ctx.AddBasicBlock(b.Main, block.Name())
+func (b *builder) emitEntry(entry llvm.BasicBlock) {
+	b.Builder.SetInsertPoint(entry, entry.FirstInstruction())
+	b.Stack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), maxStackSize), "stack")
+	b.StackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "stack_len")
+	b.CallStack = b.Builder.CreateAlloca(llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackSize), "call_stack")
+	b.CallStackLen = b.Builder.CreateAlloca(llvm.Int64Type(), "call_stack_len")
+	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
+	b.Builder.CreateStore(zero, b.StackLen)
+	b.Builder.CreateStore(zero, b.CallStackLen)
+	b.Builder.CreateBr(b.Blocks[b.Program.Entry])
+}
+
+func (b *builder) emitBlock(block *ir.BasicBlock, llvmBlock llvm.BasicBlock) {
 	b.Builder.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
 	idents := make(map[ir.Val]llvm.Value)
-	b.Blocks[block] = basicBlockData{llvmBlock, idents}
 	if block.Stack.Access > 0 {
 		// TODO check stack underflow
 	}
@@ -209,50 +206,45 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 		stackLen = b.Builder.CreateAdd(stackLen, n, "stack_len_push")
 	}
 	b.Builder.CreateStore(stackLen, b.StackLen)
+	b.emitTerminator(block, idents)
 }
 
-func (b *builder) connectBlocks() {
-	b.Builder.SetInsertPoint(b.Entry, llvm.NextInstruction(b.Entry.LastInstruction()))
-	b.Builder.CreateBr(b.Blocks[b.Program.Entry].Block)
-	for _, block := range b.Program.Blocks {
-		blockData := b.Blocks[block]
-		b.Builder.SetInsertPoint(blockData.Block, llvm.NextInstruction(blockData.Block.LastInstruction()))
-		switch term := block.Terminator.(type) {
-		case *ir.CallStmt:
-			callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
-			gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
-			callStackLen = b.Builder.CreateAdd(callStackLen, one, "call_stack_len")
-			b.Builder.CreateStore(callStackLen, b.CallStackLen)
-			addr := llvm.BlockAddress(b.Main, b.Blocks[block.Next].Block)
-			b.Builder.CreateStore(addr, gep)
-			b.Builder.CreateBr(b.Blocks[term.Callee].Block)
-		case *ir.JmpStmt:
-			b.Builder.CreateBr(b.Blocks[term.Block].Block)
-		case *ir.JmpCondStmt:
-			val := blockData.Idents[*term.Cond]
-			var cond llvm.Value
-			switch term.Op {
-			case token.Jz:
-				cond = b.Builder.CreateICmp(llvm.IntEQ, val, zero, "cmp")
-			case token.Jn:
-				cond = b.Builder.CreateICmp(llvm.IntSLT, val, zero, "cmp")
-			}
-			b.Builder.CreateCondBr(cond, b.Blocks[term.ThenBlock].Block, b.Blocks[term.ElseBlock].Block)
-		case *ir.RetStmt:
-			callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
-			callStackLen = b.Builder.CreateSub(callStackLen, one, "call_stack_len")
-			// TODO check call stack underflow
-			b.Builder.CreateStore(callStackLen, b.CallStackLen)
-			gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
-			addr := b.Builder.CreateLoad(gep, "ret_addr")
-			dests := block.Exits()
-			br := b.Builder.CreateIndirectBr(addr, len(dests))
-			for _, dest := range dests {
-				br.AddDest(b.Blocks[dest].Block)
-			}
-		case *ir.EndStmt:
-			b.Builder.CreateRetVoid()
+func (b *builder) emitTerminator(block *ir.BasicBlock, idents map[ir.Val]llvm.Value) {
+	switch term := block.Terminator.(type) {
+	case *ir.CallStmt:
+		callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
+		gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
+		callStackLen = b.Builder.CreateAdd(callStackLen, one, "call_stack_len")
+		b.Builder.CreateStore(callStackLen, b.CallStackLen)
+		addr := llvm.BlockAddress(b.Main, b.Blocks[block.Next])
+		b.Builder.CreateStore(addr, gep)
+		b.Builder.CreateBr(b.Blocks[term.Callee])
+	case *ir.JmpStmt:
+		b.Builder.CreateBr(b.Blocks[term.Block])
+	case *ir.JmpCondStmt:
+		val := idents[*term.Cond]
+		var cond llvm.Value
+		switch term.Op {
+		case token.Jz:
+			cond = b.Builder.CreateICmp(llvm.IntEQ, val, zero, "cmp")
+		case token.Jn:
+			cond = b.Builder.CreateICmp(llvm.IntSLT, val, zero, "cmp")
 		}
+		b.Builder.CreateCondBr(cond, b.Blocks[term.ThenBlock], b.Blocks[term.ElseBlock])
+	case *ir.RetStmt:
+		callStackLen := b.Builder.CreateLoad(b.CallStackLen, "call_stack_len")
+		callStackLen = b.Builder.CreateSub(callStackLen, one, "call_stack_len")
+		// TODO check call stack underflow
+		b.Builder.CreateStore(callStackLen, b.CallStackLen)
+		gep := b.Builder.CreateInBoundsGEP(b.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
+		addr := b.Builder.CreateLoad(gep, "ret_addr")
+		dests := block.Exits()
+		br := b.Builder.CreateIndirectBr(addr, len(dests))
+		for _, dest := range dests {
+			br.AddDest(b.Blocks[dest])
+		}
+	case *ir.EndStmt:
+		b.Builder.CreateRetVoid()
 	}
 }
 
