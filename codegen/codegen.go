@@ -22,6 +22,11 @@ type builder struct {
 	CallStack    llvm.Value
 	CallStackLen llvm.Value
 	Heap         llvm.Value
+	PrintcFunc   llvm.Value
+	PrintiFunc   llvm.Value
+	ReadcFunc    llvm.Value
+	ReadiFunc    llvm.Value
+	FlushFunc    llvm.Value
 }
 
 type basicBlockData struct {
@@ -50,6 +55,7 @@ func EmitLLVMIR(program *ir.Program) {
 		Blocks:  make(map[*ir.BasicBlock]basicBlockData),
 	}
 
+	b.declareExtFuncs()
 	mainType := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	b.Main = llvm.AddFunction(b.Mod, "main", mainType)
 	b.Entry = llvm.AddBasicBlock(b.Main, "entry")
@@ -63,6 +69,7 @@ func EmitLLVMIR(program *ir.Program) {
 	b.Heap = b.Builder.CreateAlloca(llvm.ArrayType(llvm.Int64Type(), heapSize), "heap")
 	b.Builder.CreateStore(zero, b.StackLen)
 	b.Builder.CreateStore(zero, b.CallStackLen)
+	b.Builder.CreateRetVoid()
 
 	for _, block := range program.Blocks {
 		b.emitBlock(block)
@@ -81,6 +88,19 @@ func EmitLLVMIR(program *ir.Program) {
 
 	// funcResult := engine.RunFunction(b.Main, []llvm.GenericValue{})
 	// fmt.Printf("%d\n", funcResult.Int(false))
+}
+
+func (b *builder) declareExtFuncs() {
+	printcTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
+	printiTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
+	readcTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
+	readiTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
+	flushTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
+	b.PrintcFunc = llvm.AddFunction(b.Mod, "printc", printcTyp)
+	b.PrintiFunc = llvm.AddFunction(b.Mod, "printi", printiTyp)
+	b.ReadcFunc = llvm.AddFunction(b.Mod, "readc", readcTyp)
+	b.ReadiFunc = llvm.AddFunction(b.Mod, "readi", readiTyp)
+	b.FlushFunc = llvm.AddFunction(b.Mod, "flush", flushTyp)
 }
 
 func (b *builder) emitBlock(block *ir.BasicBlock) {
@@ -136,15 +156,29 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 				}
 			case *ir.RetrieveExpr:
 				val = b.Builder.CreateLoad(b.heapAddr(*expr.Addr, idents), "retrieve")
-			case *ir.ReadExpr: // TODO
-				alloc := b.Builder.CreateAlloca(llvm.Int64Type(), "read")
-				val = b.Builder.CreateLoad(alloc, "read")
+			case *ir.ReadExpr:
+				var f llvm.Value
+				switch expr.Op {
+				case token.Readc:
+					f = b.ReadcFunc
+				case token.Readi:
+					f = b.ReadiFunc
+				}
+				val = b.Builder.CreateCall(f, []llvm.Value{}, "")
 			}
 			idents[*inst.Assign] = val
 		case *ir.StoreExpr:
 			b.Builder.CreateStore(lookupVal(*inst.Val, idents), b.heapAddr(*inst.Addr, idents))
 		case *ir.PrintStmt:
-			b.Builder.CreateAlloca(llvm.Int64Type(), "print") // TODO
+			var f llvm.Value
+			switch inst.Op {
+			case token.Printc:
+				f = b.PrintcFunc
+			case token.Printi:
+				f = b.PrintiFunc
+			}
+			val := lookupVal(*inst.Val, idents)
+			b.Builder.CreateCall(f, []llvm.Value{val}, "")
 		}
 	}
 
