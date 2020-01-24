@@ -5,6 +5,8 @@ nebula
 *.wsx
 *.ir
 
+/build/*
+!/build/compile.sh
 *.ll
 *.o
 *.s

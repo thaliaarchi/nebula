@@ -22,11 +22,13 @@ go build
 ### Compiling using Nebula
 
 ```sh
-./nebula programs/collatz.out.ws llvm 2> collatz.ll
-clang -S -emit-llvm codegen/lib/io.c
+mkdir build
+cd build
+../nebula ../programs/collatz.out.ws llvm 2> collatz.ll
+clang -S -emit-llvm ../codegen/lib/io.c
 llvm-link -o collatz.o collatz.ll io.ll
 llc collatz.o
-clang collatz.o.s
+clang -o collatz collatz.o.s
 ```
 
 ## Project Goals

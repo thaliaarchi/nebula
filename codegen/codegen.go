@@ -113,22 +113,24 @@ func (b *builder) emitBlock(block *ir.BasicBlock) {
 	stackLen := b.Builder.CreateLoad(b.StackLen, "stack_len")
 
 	for _, val := range block.Stack.Under {
-		switch v := (*val).(type) {
-		case *ir.StackVal:
-			if v.Val < 0 {
-				name := fmt.Sprintf("s%d", v.Val)
-				n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Val), false)
-				idx := b.Builder.CreateSub(stackLen, n, name+".idx")
-				gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
-				idents[v] = b.Builder.CreateLoad(gep, name)
-			} else {
-				panic(fmt.Sprintf("codegen: non-negative stack vals not currently supported: %v", v)) // TODO
-			}
-		case *ir.ConstVal:
-			if i64, ok := bigint.ToInt64(v.Val); ok {
-				idents[v] = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
-			} else {
-				panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
+		if val != nil {
+			switch v := (*val).(type) {
+			case *ir.StackVal:
+				if v.Val < 0 {
+					name := fmt.Sprintf("s%d", v.Val)
+					n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Val), false)
+					idx := b.Builder.CreateSub(stackLen, n, name+".idx")
+					gep := b.Builder.CreateInBoundsGEP(b.Stack, []llvm.Value{zero, idx}, name+".gep")
+					idents[v] = b.Builder.CreateLoad(gep, name)
+				} else {
+					panic(fmt.Sprintf("codegen: non-negative stack vals not currently supported: %v", v)) // TODO
+				}
+			case *ir.ConstVal:
+				if i64, ok := bigint.ToInt64(v.Val); ok {
+					idents[v] = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
+				} else {
+					panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
+				}
 			}
 		}
 	}
