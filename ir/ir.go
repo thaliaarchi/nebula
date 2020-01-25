@@ -437,6 +437,8 @@ func (p *Program) Digraph() digraph.Digraph {
 	return g
 }
 
+// LookupConst creates a val for a constant with matching constants
+// having the same val.
 func (p *Program) LookupConst(c *big.Int) *Val {
 	if val, ok := p.ConstVals.Get(c); ok {
 		return val.(*Val)

@@ -45,7 +45,7 @@ func EmitLLVMIR(program *ir.Program) llvm.Module {
 	d.declareFuncs(module)
 	d.declareGlobals(module)
 
-	entry := ctx.AddBasicBlock(d.MainFunc, "entry")
+	entry := ctx.AddBasicBlock(d.MainFunc, "")
 	blocks := make(map[*ir.BasicBlock]llvm.BasicBlock)
 	for _, block := range program.Blocks {
 		blocks[block] = ctx.AddBasicBlock(d.MainFunc, block.Name())
@@ -173,7 +173,7 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			case token.Readi:
 				f = d.ReadiFunc
 			}
-			val = b.CreateCall(f, []llvm.Value{}, "")
+			val = b.CreateCall(f, []llvm.Value{}, "read")
 		}
 		idents[*inst.Assign] = val
 	case *ir.StoreExpr:
