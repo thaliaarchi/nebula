@@ -31,11 +31,13 @@ func main() {
 		return
 	}
 
-	var bitPacked, emitWs, emitWsa, emitDot, emitMatrix, emitIR, emitLLVM bool
+	var bitPacked, fold, emitWs, emitWsa, emitDot, emitMatrix, emitIR, emitLLVM bool
 	for _, mode := range os.Args[2:] {
 		switch mode {
 		case "bit":
 			bitPacked = true
+		case "fold":
+			fold = true
 		case "ws":
 			emitWs = true
 		case "wsa":
@@ -90,9 +92,9 @@ func main() {
 	}
 
 	// program.JoinSimpleEntries() // incorrect
-	// if mode != "llvm" {
-	// 	analysis.FoldConstArith(program)
-	// }
+	if fold {
+		analysis.FoldConstArith(program)
+	}
 	// program.ConcatStrings() // not general
 
 	if emitDot {

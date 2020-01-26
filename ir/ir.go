@@ -84,8 +84,8 @@ type Branch interface {
 	termNode()
 }
 
-// ArithExpr evalutates a binary arithmetic operation. Valid operations
-// are add, sub, mul, div, and mod.
+// ArithExpr evaluates an arithmetic operation. Valid operations are
+// add, sub, mul, div, mod, and neg.
 type ArithExpr struct {
 	Op     OpType
 	Assign *Val
@@ -157,6 +157,7 @@ const (
 	Mul
 	Div
 	Mod
+	Neg
 
 	Printc
 	Printi
@@ -516,6 +517,9 @@ func (v *StringVal) String() string { return fmt.Sprintf("%q", v.Val) }
 func (v *ArrayVal) String() string  { return bigint.FormatSlice(v.Val) }
 func (v *PhiVal) String() string    { return fmt.Sprintf("phi(%s)", formatValSlice(v.Vals)) }
 func (e *ArithExpr) String() string {
+	if e.Op == Neg {
+		return fmt.Sprintf("%v = neg %v", *e.Assign, *e.LHS)
+	}
 	return fmt.Sprintf("%v = %v %v %v", *e.Assign, e.Op, *e.LHS, *e.RHS)
 }
 func (e *LoadExpr) String() string  { return fmt.Sprintf("%v = load *%v", *e.Assign, *e.Addr) }
@@ -542,6 +546,8 @@ func (op OpType) String() string {
 		return "div"
 	case Mod:
 		return "mod"
+	case Neg:
+		return "neg"
 	case Printc:
 		return "printc"
 	case Printi:

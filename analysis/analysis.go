@@ -101,6 +101,12 @@ func FoldConstArith(p *ir.Program) {
 
 // FoldConst reduces constant arithmetic expressions or identities.
 func FoldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
+	if expr.Op == ir.Neg {
+		if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
+			return p.LookupConst(new(big.Int).Neg(lhs.Val)), true
+		}
+		return nil, false
+	}
 	if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
 		if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
 			return foldConstLR(p, expr, lhs.Val, rhs.Val)
@@ -130,8 +136,9 @@ func foldConstLR(p *ir.Program, expr *ir.ArithExpr, lhs, rhs *big.Int) (*ir.Val,
 }
 
 var (
-	bigZero = big.NewInt(0)
-	bigOne  = big.NewInt(1)
+	bigZero   = big.NewInt(0)
+	bigOne    = big.NewInt(1)
+	bigNegOne = big.NewInt(-1)
 )
 
 func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool) {
@@ -140,7 +147,7 @@ func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool)
 		case ir.Add:
 			return expr.RHS, true
 		case ir.Sub:
-			// negation
+			expr.Op, expr.LHS, expr.RHS = ir.Neg, expr.RHS, nil
 		case ir.Mul, ir.Div, ir.Mod:
 			return expr.LHS, true
 		}
@@ -149,6 +156,8 @@ func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool)
 		case ir.Mul, ir.Div:
 			return expr.RHS, true
 		}
+	} else if expr.Op == ir.Mul && lhs.Cmp(bigNegOne) == 0 {
+		expr.Op, expr.LHS, expr.RHS = ir.Neg, expr.RHS, nil
 	}
 	return nil, false
 }
@@ -169,6 +178,11 @@ func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool)
 			return expr.LHS, true
 		case ir.Mod:
 			return p.LookupConst(bigZero), true
+		}
+	} else if rhs.Cmp(bigNegOne) == 0 {
+		switch expr.Op {
+		case ir.Mul, ir.Div:
+			expr.Op, expr.RHS = ir.Neg, nil
 		}
 	}
 	return nil, false

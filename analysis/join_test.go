@@ -21,7 +21,8 @@ func TestJoinSimpleEntries(t *testing.T) {
 		{Type: ws.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
-	program, err := ir.Parse(tokens, nil, "test")
+	p := &ws.Program{Name: "test", Tokens: tokens, LabelNames: nil}
+	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

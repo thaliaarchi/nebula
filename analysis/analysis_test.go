@@ -139,7 +139,8 @@ func TestTransforms(t *testing.T) {
 		NextStackID: 4,
 	}
 
-	program, err := ir.Parse(tokens, nil, "test")
+	p := &ws.Program{Name: "test", Tokens: tokens, LabelNames: nil}
+	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}

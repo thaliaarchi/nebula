@@ -158,6 +158,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			val = b.CreateSDiv(lhs, rhs, "div")
 		case ir.Mod:
 			val = b.CreateSRem(lhs, rhs, "mod")
+		case ir.Neg:
+			val = b.CreateSub(zero, lhs, "neg")
 		}
 		idents[*inst.Assign] = val
 	case *ir.LoadExpr:
