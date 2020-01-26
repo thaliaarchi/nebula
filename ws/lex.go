@@ -7,13 +7,14 @@ import (
 	"math/big"
 )
 
-type Lexer struct {
+type lexer struct {
 	l      SpaceReader
 	instrs chan Token
 }
 
+// Lex lexically analyzes a Whitespace source to produce tokens.
 func Lex(l SpaceReader) <-chan Token {
-	p := &Lexer{
+	p := &lexer{
 		l:      l,
 		instrs: make(chan Token),
 	}
@@ -21,7 +22,7 @@ func Lex(l SpaceReader) <-chan Token {
 	return p.instrs
 }
 
-func (p *Lexer) run() error {
+func (p *lexer) run() error {
 	defer close(p.instrs)
 	var err error
 	for state := lexInstr; state != nil; {
@@ -33,7 +34,7 @@ func (p *Lexer) run() error {
 	return nil
 }
 
-type stateFn func(*Lexer) (stateFn, error)
+type stateFn func(*lexer) (stateFn, error)
 
 type states struct {
 	Space stateFn
@@ -43,7 +44,7 @@ type states struct {
 }
 
 func transition(s states) stateFn {
-	return func(p *Lexer) (stateFn, error) {
+	return func(p *lexer) (stateFn, error) {
 		t, err := p.l.Next()
 		if err != nil {
 			return nil, err
@@ -66,14 +67,14 @@ func transition(s states) stateFn {
 }
 
 func emitInstr(typ Type) stateFn {
-	return func(p *Lexer) (stateFn, error) {
+	return func(p *lexer) (stateFn, error) {
 		p.instrs <- Token{typ, nil}
 		return lexInstr, nil
 	}
 }
 
 func lexInstrNumber(typ Type) stateFn {
-	return func(p *Lexer) (stateFn, error) {
+	return func(p *lexer) (stateFn, error) {
 		arg, err := lexSigned(p)
 		if err != nil {
 			return nil, err
@@ -84,7 +85,7 @@ func lexInstrNumber(typ Type) stateFn {
 }
 
 func lexInstrLabel(typ Type) stateFn {
-	return func(p *Lexer) (stateFn, error) {
+	return func(p *lexer) (stateFn, error) {
 		arg, err := lexUnsigned(p)
 		if err != nil {
 			return nil, err
@@ -94,7 +95,7 @@ func lexInstrLabel(typ Type) stateFn {
 	}
 }
 
-func lexSigned(p *Lexer) (*big.Int, error) {
+func lexSigned(p *lexer) (*big.Int, error) {
 	t, err := p.l.Next()
 	if err != nil {
 		return nil, err
@@ -119,7 +120,7 @@ func lexSigned(p *Lexer) (*big.Int, error) {
 
 var bigOne = big.NewInt(1)
 
-func lexUnsigned(p *Lexer) (*big.Int, error) {
+func lexUnsigned(p *lexer) (*big.Int, error) {
 	num := new(big.Int)
 	for {
 		t, err := p.l.Next()
