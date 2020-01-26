@@ -1,4 +1,4 @@
-package smt
+package smt // import "github.com/andrewarchi/nebula/smt"
 
 import (
 	"testing"

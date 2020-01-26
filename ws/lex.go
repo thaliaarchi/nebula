@@ -8,30 +8,25 @@ import (
 )
 
 type lexer struct {
-	l      SpaceReader
-	instrs chan Token
+	r      SpaceReader
+	tokens []Token
 }
 
 // Lex lexically analyzes a Whitespace source to produce tokens.
-func Lex(l SpaceReader) <-chan Token {
-	p := &lexer{
-		l:      l,
-		instrs: make(chan Token),
-	}
-	go p.run()
-	return p.instrs
-}
-
-func (p *lexer) run() error {
-	defer close(p.instrs)
+func Lex(r SpaceReader) ([]Token, error) {
+	l := &lexer{r: r}
 	var err error
 	for state := lexInstr; state != nil; {
-		state, err = state(p)
+		state, err = state(l)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return l.tokens, nil
+}
+
+func (l *lexer) appendToken(tok Token) {
+	l.tokens = append(l.tokens, tok)
 }
 
 type stateFn func(*lexer) (stateFn, error)
@@ -45,11 +40,11 @@ type states struct {
 
 func transition(s states) stateFn {
 	return func(p *lexer) (stateFn, error) {
-		t, err := p.l.Next()
+		tok, err := p.r.Next()
 		if err != nil {
 			return nil, err
 		}
-		switch t {
+		switch tok {
 		case Space:
 			return s.Space, nil
 		case Tab:
@@ -62,49 +57,49 @@ func transition(s states) stateFn {
 			}
 			return nil, nil
 		}
-		panic(invalidToken(t))
+		panic(invalidToken(tok))
 	}
 }
 
 func emitInstr(typ Type) stateFn {
-	return func(p *lexer) (stateFn, error) {
-		p.instrs <- Token{typ, nil}
+	return func(l *lexer) (stateFn, error) {
+		l.appendToken(Token{typ, nil})
 		return lexInstr, nil
 	}
 }
 
 func lexInstrNumber(typ Type) stateFn {
-	return func(p *lexer) (stateFn, error) {
-		arg, err := lexSigned(p)
+	return func(l *lexer) (stateFn, error) {
+		arg, err := lexSigned(l)
 		if err != nil {
 			return nil, err
 		}
-		p.instrs <- Token{typ, arg}
+		l.appendToken(Token{typ, arg})
 		return lexInstr, nil
 	}
 }
 
 func lexInstrLabel(typ Type) stateFn {
-	return func(p *lexer) (stateFn, error) {
-		arg, err := lexUnsigned(p)
+	return func(l *lexer) (stateFn, error) {
+		arg, err := lexUnsigned(l)
 		if err != nil {
 			return nil, err
 		}
-		p.instrs <- Token{typ, arg}
+		l.appendToken(Token{typ, arg})
 		return lexInstr, nil
 	}
 }
 
-func lexSigned(p *lexer) (*big.Int, error) {
-	t, err := p.l.Next()
+func lexSigned(l *lexer) (*big.Int, error) {
+	tok, err := l.r.Next()
 	if err != nil {
 		return nil, err
 	}
-	switch t {
+	switch tok {
 	case Space:
-		return lexUnsigned(p)
+		return lexUnsigned(l)
 	case Tab:
-		num, err := lexUnsigned(p)
+		num, err := lexUnsigned(l)
 		if err != nil {
 			return nil, err
 		}
@@ -115,19 +110,19 @@ func lexSigned(p *lexer) (*big.Int, error) {
 	case EOF:
 		return nil, errors.New("unterminated number")
 	}
-	panic(invalidToken(t))
+	panic(invalidToken(tok))
 }
 
 var bigOne = big.NewInt(1)
 
-func lexUnsigned(p *lexer) (*big.Int, error) {
+func lexUnsigned(l *lexer) (*big.Int, error) {
 	num := new(big.Int)
 	for {
-		t, err := p.l.Next()
+		tok, err := l.r.Next()
 		if err != nil {
 			return nil, err
 		}
-		switch t {
+		switch tok {
 		case Space:
 			num.Lsh(num, 1)
 		case Tab:
@@ -137,13 +132,13 @@ func lexUnsigned(p *lexer) (*big.Int, error) {
 		case EOF:
 			return nil, fmt.Errorf("unterminated number: %d", num)
 		default:
-			panic(invalidToken(t))
+			panic(invalidToken(tok))
 		}
 	}
 }
 
-func invalidToken(t SpaceToken) string {
-	return fmt.Sprintf("invalid token: %d", t)
+func invalidToken(tok SpaceToken) string {
+	return fmt.Sprintf("invalid token: %d", tok)
 }
 
 func init() {

@@ -31,11 +31,32 @@ func main() {
 		return
 	}
 
-	r := ws.NewTextReader(f)
-	tokenChan := ws.Lex(r)
-	var tokens []ws.Token
-	for tok := range tokenChan {
-		tokens = append(tokens, tok)
+	var flagBit, flagDot, flagMatrix, flagIR, flagLLVM bool
+	for _, mode := range os.Args[2:] {
+		switch mode {
+		case "bit":
+			flagBit = true
+		case "dot":
+			flagDot = true
+		case "matrix":
+			flagMatrix = true
+		case "ir":
+			flagIR = true
+		case "llvm":
+			flagLLVM = true
+		}
+	}
+
+	var r ws.SpaceReader
+	if flagBit {
+		r = ws.NewBitReader(f)
+	} else {
+		r = ws.NewTextReader(f)
+	}
+	tokens, err := ws.Lex(r)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
 	}
 
 	var labelNames *bigint.Map
@@ -63,21 +84,16 @@ func main() {
 	// }
 	// program.ConcatStrings() // not general
 
-	modes := make(map[string]struct{})
-	for _, mode := range os.Args[2:] {
-		modes[mode] = struct{}{}
-	}
-
-	if _, ok := modes["dot"]; ok {
+	if flagDot {
 		fmt.Print(program.DotDigraph())
 	}
-	if _, ok := modes["matrix"]; ok {
+	if flagMatrix {
 		fmt.Print(graph.FormatMatrix(analysis.ControlFlowGraph(program)))
 	}
-	if _, ok := modes["ir"]; ok {
+	if flagIR {
 		fmt.Print(program.String())
 	}
-	if _, ok := modes["llvm"]; ok {
+	if flagLLVM {
 		mod := codegen.EmitLLVMIR(program)
 		if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
 			fmt.Fprintln(os.Stdout, err)
