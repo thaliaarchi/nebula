@@ -81,11 +81,11 @@ func (vm *VM) StepBlock() {
 func (vm *VM) StepDebug() {
 	if vm.inst < len(vm.block.Tokens) {
 		switch vm.block.Tokens[vm.inst].Type {
-		case token.Printc, token.Printi:
+		case Printc, Printi:
 			vm.out.WriteString(">> ")
 			vm.Exec()
 			vm.out.WriteByte('\n')
-		case token.Readc, token.Readi:
+		case Readc, Readi:
 			vm.out.WriteString("<< ")
 			vm.Exec()
 			vm.out.WriteByte('\n')
@@ -98,7 +98,7 @@ func (vm *VM) StepDebug() {
 }
 
 func (vm *VM) Next() {
-	if vm.inst >= len(vm.block.Tokens) && vm.block.Flow.Type == token.Call {
+	if vm.inst >= len(vm.block.Tokens) && vm.block.Flow.Type == Call {
 		l := len(vm.calls)
 		vm.StepBlock()
 		for len(vm.calls) > l {
@@ -208,52 +208,52 @@ func (vm *VM) Help() {
 func (vm *VM) Exec() {
 	inst := vm.block.Tokens[vm.inst]
 	switch inst.Type {
-	case token.Push:
+	case Push:
 		vm.stack.Push(inst.Arg)
-	case token.Dup:
+	case Dup:
 		vm.stack.Push(vm.stack.Top())
-	case token.Copy:
+	case Copy:
 		n, ok := bigint.ToInt(inst.Arg)
 		if !ok {
 			panic(fmt.Sprintf("copy argument overflow: %s", inst.Arg))
 		}
 		vm.stack.Push(vm.stack.Get(n))
-	case token.Swap:
+	case Swap:
 		vm.stack.Swap()
-	case token.Drop:
+	case Drop:
 		vm.stack.Pop()
-	case token.Slide:
+	case Slide:
 		n, ok := bigint.ToInt(inst.Arg)
 		if !ok {
 			panic(fmt.Sprintf("slide argument overflow: %s", inst.Arg))
 		}
 		vm.stack.Slide(n)
 
-	case token.Add:
+	case Add:
 		vm.arith((*big.Int).Add)
-	case token.Sub:
+	case Sub:
 		vm.arith((*big.Int).Sub)
-	case token.Mul:
+	case Mul:
 		vm.arith((*big.Int).Mul)
-	case token.Div:
+	case Div:
 		vm.arith((*big.Int).Div)
-	case token.Mod:
+	case Mod:
 		vm.arith((*big.Int).Mod)
 
-	case token.Store:
+	case Store:
 		val, addr := vm.stack.Pop(), vm.stack.Pop()
 		vm.heap.Retrieve(addr).(*big.Int).Set(val)
-	case token.Retrieve:
+	case Retrieve:
 		top := vm.stack.Top()
 		top.Set(vm.heap.Retrieve(top).(*big.Int))
 
-	case token.Printc:
+	case Printc:
 		vm.out.WriteRune(bigint.ToRune(vm.stack.Pop()))
-	case token.Printi:
+	case Printi:
 		vm.out.WriteString(vm.stack.Pop().String())
-	case token.Readc:
+	case Readc:
 		vm.readRune(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
-	case token.Readi:
+	case Readi:
 		vm.readInt(vm.heap.Retrieve(vm.stack.Pop()).(*big.Int))
 
 	default:
@@ -264,22 +264,22 @@ func (vm *VM) Exec() {
 
 func (vm *VM) ExecFlow() {
 	switch vm.block.Flow.Type {
-	case token.Call:
+	case Call:
 		vm.calls = append(vm.calls, vm.block.Next)
 		vm.block = vm.block.Branch
-	case token.Jmp:
+	case Jmp:
 		vm.block = vm.block.Branch
-	case token.Jz:
+	case Jz:
 		vm.block = vm.jmpSign(0)
-	case token.Jn:
+	case Jn:
 		vm.block = vm.jmpSign(-1)
-	case token.Ret:
+	case Ret:
 		if len(vm.calls) == 0 {
 			panic("call stack underflow: ret")
 		}
 		vm.block = vm.calls[len(vm.calls)-1]
 		vm.calls = vm.calls[:len(vm.calls)-1]
-	case token.End:
+	case End:
 		vm.block = nil
 		vm.out.Flush()
 	}

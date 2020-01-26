@@ -7,18 +7,18 @@ import (
 
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/token"
+	"github.com/andrewarchi/nebula/ws"
 )
 
 func TestJoinSimpleEntries(t *testing.T) {
-	tokens := []token.Token{
-		{Type: token.Push, Arg: big.NewInt(1)},  // 0
-		{Type: token.Add},                       // 1
-		{Type: token.Mul},                       // 2
-		{Type: token.Label, Arg: big.NewInt(1)}, // 3
-		{Type: token.Copy, Arg: big.NewInt(5)},  // 4
-		{Type: token.Mod},                       // 5
-		{Type: token.Slide, Arg: big.NewInt(2)}, // 6
+	tokens := []ws.Token{
+		{Type: ws.Push, Arg: big.NewInt(1)},  // 0
+		{Type: ws.Add},                       // 1
+		{Type: ws.Mul},                       // 2
+		{Type: ws.Label, Arg: big.NewInt(1)}, // 3
+		{Type: ws.Copy, Arg: big.NewInt(5)},  // 4
+		{Type: ws.Mod},                       // 5
+		{Type: ws.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
 	program, err := ir.Parse(tokens, nil, "test")

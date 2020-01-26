@@ -9,7 +9,6 @@ import (
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/codegen"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/token"
 	"github.com/andrewarchi/nebula/ws"
 	"llvm.org/llvm/bindings/go/llvm"
 )
@@ -34,7 +33,7 @@ func main() {
 
 	r := ws.NewTextReader(f)
 	tokenChan := ws.Lex(r)
-	var tokens []token.Token
+	var tokens []ws.Token
 	for tok := range tokenChan {
 		tokens = append(tokens, tok)
 	}

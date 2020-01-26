@@ -7,7 +7,7 @@ import (
 
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/digraph"
-	"github.com/andrewarchi/nebula/token"
+	"github.com/andrewarchi/nebula/ws"
 )
 
 // Program is a set of interconnected basic blocks.
@@ -186,9 +186,9 @@ type ErrorRetUnderflow struct {
 }
 
 // Parse parses tokens into basic blocks.
-func Parse(tokens []token.Token, labelNames *bigint.Map, name string) (*Program, error) {
+func Parse(tokens []ws.Token, labelNames *bigint.Map, name string) (*Program, error) {
 	if needsImplicitEnd(tokens) {
-		tokens = append(tokens, token.Token{Type: token.End})
+		tokens = append(tokens, ws.Token{Type: ws.End})
 	}
 	p, branches, labels, err := parseBlocks(tokens, labelNames, name)
 	if err != nil {
@@ -200,18 +200,18 @@ func Parse(tokens []token.Token, labelNames *bigint.Map, name string) (*Program,
 	return p, nil
 }
 
-func needsImplicitEnd(tokens []token.Token) bool {
+func needsImplicitEnd(tokens []ws.Token) bool {
 	if len(tokens) == 0 {
 		return true
 	}
 	switch tokens[len(tokens)-1].Type {
-	case token.Call, token.Jmp, token.Ret, token.End:
+	case ws.Call, ws.Jmp, ws.Ret, ws.End:
 		return false
 	}
 	return true
 }
 
-func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Program, []*big.Int, *bigint.Map, error) {
+func parseBlocks(tokens []ws.Token, labelNames *bigint.Map, name string) (*Program, []*big.Int, *bigint.Map, error) {
 	p := &Program{
 		Name:      name,
 		ConstVals: *bigint.NewMap(nil),
@@ -230,11 +230,11 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Pr
 			block.Prev = prev
 		}
 
-		if tokens[i].Type != token.Label && i != 0 && prevLabel != "" {
+		if tokens[i].Type != ws.Label && i != 0 && prevLabel != "" {
 			labelIndex++
 			block.Labels = append(block.Labels, Label{nil, fmt.Sprintf("%s@%d", prevLabel, labelIndex)})
 		}
-		for tokens[i].Type == token.Label {
+		for tokens[i].Type == ws.Label {
 			label := tokens[i].Arg
 			if labels.Put(label, len(p.Blocks)) {
 				return nil, nil, nil, fmt.Errorf("ir: label is not unique: %s", label)
@@ -255,7 +255,7 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Pr
 		for ; i < len(tokens); i++ {
 			branch = p.appendInstruction(&block, tokens[i])
 			if block.Terminator != nil {
-				if tokens[i].Type == token.Label {
+				if tokens[i].Type == ws.Label {
 					i--
 				}
 				break
@@ -270,13 +270,13 @@ func parseBlocks(tokens []token.Token, labelNames *bigint.Map, name string) (*Pr
 	return p, branches, labels, nil
 }
 
-func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int {
+func (p *Program) appendInstruction(block *BasicBlock, tok ws.Token) *big.Int {
 	switch tok.Type {
-	case token.Push:
+	case ws.Push:
 		block.Stack.Push(p.LookupConst(tok.Arg))
-	case token.Dup:
+	case ws.Dup:
 		block.Stack.Dup()
-	case token.Copy:
+	case ws.Copy:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
 			panic(fmt.Sprintf("ir: copy argument overflow: %v", tok.Arg))
@@ -284,11 +284,11 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 			panic(fmt.Sprintf("ir: copy argument negative: %v", tok.Arg))
 		}
 		block.Stack.Copy(n)
-	case token.Swap:
+	case ws.Swap:
 		block.Stack.Swap()
-	case token.Drop:
+	case ws.Drop:
 		block.Stack.Drop()
-	case token.Slide:
+	case ws.Slide:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
 			panic(fmt.Sprintf("ir: slide argument overflow: %v", tok.Arg))
@@ -297,52 +297,52 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 		}
 		block.Stack.Slide(n)
 
-	case token.Add:
+	case ws.Add:
 		p.appendArith(block, Add)
-	case token.Sub:
+	case ws.Sub:
 		p.appendArith(block, Sub)
-	case token.Mul:
+	case ws.Mul:
 		p.appendArith(block, Mul)
-	case token.Div:
+	case ws.Div:
 		p.appendArith(block, Div)
-	case token.Mod:
+	case ws.Mod:
 		p.appendArith(block, Mod)
 
-	case token.Store:
+	case ws.Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
 		block.Nodes = append(block.Nodes, &StoreStmt{Addr: addr, Val: val})
-	case token.Retrieve:
+	case ws.Retrieve:
 		addr, assign := block.Stack.Pop(), p.nextVal()
 		block.Stack.Push(assign)
 		block.Nodes = append(block.Nodes, &LoadExpr{Assign: assign, Addr: addr})
 
-	case token.Label:
+	case ws.Label:
 		block.Terminator = &JmpStmt{Op: Fallthrough}
 		return tok.Arg
-	case token.Call:
+	case ws.Call:
 		block.Terminator = &CallStmt{}
 		return tok.Arg
-	case token.Jmp:
+	case ws.Jmp:
 		block.Terminator = &JmpStmt{Op: Jmp}
 		return tok.Arg
-	case token.Jz:
+	case ws.Jz:
 		block.Terminator = &JmpCondStmt{Op: Jz, Cond: block.Stack.Pop()}
 		return tok.Arg
-	case token.Jn:
+	case ws.Jn:
 		block.Terminator = &JmpCondStmt{Op: Jn, Cond: block.Stack.Pop()}
 		return tok.Arg
-	case token.Ret:
+	case ws.Ret:
 		block.Terminator = &RetStmt{}
-	case token.End:
+	case ws.End:
 		block.Terminator = &ExitStmt{}
 
-	case token.Printc:
+	case ws.Printc:
 		block.Nodes = append(block.Nodes, &PrintStmt{Op: Printc, Val: block.Stack.Pop()})
-	case token.Printi:
+	case ws.Printi:
 		block.Nodes = append(block.Nodes, &PrintStmt{Op: Printi, Val: block.Stack.Pop()})
-	case token.Readc:
+	case ws.Readc:
 		p.appendRead(block, Readc)
-	case token.Readi:
+	case ws.Readi:
 		p.appendRead(block, Readi)
 
 	default:
