@@ -48,7 +48,8 @@ func main() {
 		labelNames, err = ws.ParseSourceMap(sourceMap)
 	}
 
-	program, err := ir.Parse(tokens, labelNames, filename)
+	p := ws.Program{Name: filename, Tokens: tokens, LabelNames: labelNames}
+	program, err := p.ConvertSSA()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if _, ok := err.(*ir.ErrorRetUnderflow); !ok {

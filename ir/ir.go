@@ -7,7 +7,6 @@ import (
 
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/digraph"
-	"github.com/andrewarchi/nebula/ws"
 )
 
 // Program is a set of interconnected basic blocks.
@@ -185,197 +184,8 @@ type ErrorRetUnderflow struct {
 	Traces [][]*BasicBlock
 }
 
-// Parse parses tokens into basic blocks.
-func Parse(tokens []ws.Token, labelNames *bigint.Map, name string) (*Program, error) {
-	if needsImplicitEnd(tokens) {
-		tokens = append(tokens, ws.Token{Type: ws.End})
-	}
-	p, branches, labels, err := parseBlocks(tokens, labelNames, name)
-	if err != nil {
-		return nil, err
-	}
-	if err := p.connectEdges(branches, labels); err != nil {
-		return p, err
-	}
-	return p, nil
-}
-
-func needsImplicitEnd(tokens []ws.Token) bool {
-	if len(tokens) == 0 {
-		return true
-	}
-	switch tokens[len(tokens)-1].Type {
-	case ws.Call, ws.Jmp, ws.Ret, ws.End:
-		return false
-	}
-	return true
-}
-
-func parseBlocks(tokens []ws.Token, labelNames *bigint.Map, name string) (*Program, []*big.Int, *bigint.Map, error) {
-	p := &Program{
-		Name:      name,
-		ConstVals: *bigint.NewMap(nil),
-	}
-	var branches []*big.Int
-	labels := bigint.NewMap(nil) // map[*big.Int]int
-	prevLabel := "entry"
-	labelIndex := 0
-
-	for i := 0; i < len(tokens); i++ {
-		var block BasicBlock
-		block.ID = len(p.Blocks)
-		if len(p.Blocks) > 0 {
-			prev := p.Blocks[len(p.Blocks)-1]
-			prev.Next = &block
-			block.Prev = prev
-		}
-
-		if tokens[i].Type != ws.Label && i != 0 && prevLabel != "" {
-			labelIndex++
-			block.Labels = append(block.Labels, Label{nil, fmt.Sprintf("%s@%d", prevLabel, labelIndex)})
-		}
-		for tokens[i].Type == ws.Label {
-			label := tokens[i].Arg
-			if labels.Put(label, len(p.Blocks)) {
-				return nil, nil, nil, fmt.Errorf("ir: label is not unique: %s", label)
-			}
-			var name string
-			if labelNames != nil {
-				if n, ok := labelNames.Get(label); ok {
-					name = n.(string)
-				}
-			}
-			prevLabel = name
-			labelIndex = 0
-			block.Labels = append(block.Labels, Label{label, name})
-			i++
-		}
-
-		var branch *big.Int
-		for ; i < len(tokens); i++ {
-			branch = p.appendInstruction(&block, tokens[i])
-			if block.Terminator != nil {
-				if tokens[i].Type == ws.Label {
-					i--
-				}
-				break
-			}
-		}
-
-		p.Blocks = append(p.Blocks, &block)
-		branches = append(branches, branch)
-	}
-	p.Entry = p.Blocks[0]
-	p.NextBlockID = len(p.Blocks)
-	return p, branches, labels, nil
-}
-
-func (p *Program) appendInstruction(block *BasicBlock, tok ws.Token) *big.Int {
-	switch tok.Type {
-	case ws.Push:
-		block.Stack.Push(p.LookupConst(tok.Arg))
-	case ws.Dup:
-		block.Stack.Dup()
-	case ws.Copy:
-		n, ok := bigint.ToInt(tok.Arg)
-		if !ok {
-			panic(fmt.Sprintf("ir: copy argument overflow: %v", tok.Arg))
-		} else if n < 0 {
-			panic(fmt.Sprintf("ir: copy argument negative: %v", tok.Arg))
-		}
-		block.Stack.Copy(n)
-	case ws.Swap:
-		block.Stack.Swap()
-	case ws.Drop:
-		block.Stack.Drop()
-	case ws.Slide:
-		n, ok := bigint.ToInt(tok.Arg)
-		if !ok {
-			panic(fmt.Sprintf("ir: slide argument overflow: %v", tok.Arg))
-		} else if n < 0 {
-			panic(fmt.Sprintf("ir: slide argument negative: %v", tok.Arg))
-		}
-		block.Stack.Slide(n)
-
-	case ws.Add:
-		p.appendArith(block, Add)
-	case ws.Sub:
-		p.appendArith(block, Sub)
-	case ws.Mul:
-		p.appendArith(block, Mul)
-	case ws.Div:
-		p.appendArith(block, Div)
-	case ws.Mod:
-		p.appendArith(block, Mod)
-
-	case ws.Store:
-		val, addr := block.Stack.Pop(), block.Stack.Pop()
-		block.Nodes = append(block.Nodes, &StoreStmt{Addr: addr, Val: val})
-	case ws.Retrieve:
-		addr, assign := block.Stack.Pop(), p.nextVal()
-		block.Stack.Push(assign)
-		block.Nodes = append(block.Nodes, &LoadExpr{Assign: assign, Addr: addr})
-
-	case ws.Label:
-		block.Terminator = &JmpStmt{Op: Fallthrough}
-		return tok.Arg
-	case ws.Call:
-		block.Terminator = &CallStmt{}
-		return tok.Arg
-	case ws.Jmp:
-		block.Terminator = &JmpStmt{Op: Jmp}
-		return tok.Arg
-	case ws.Jz:
-		block.Terminator = &JmpCondStmt{Op: Jz, Cond: block.Stack.Pop()}
-		return tok.Arg
-	case ws.Jn:
-		block.Terminator = &JmpCondStmt{Op: Jn, Cond: block.Stack.Pop()}
-		return tok.Arg
-	case ws.Ret:
-		block.Terminator = &RetStmt{}
-	case ws.End:
-		block.Terminator = &ExitStmt{}
-
-	case ws.Printc:
-		block.Nodes = append(block.Nodes, &PrintStmt{Op: Printc, Val: block.Stack.Pop()})
-	case ws.Printi:
-		block.Nodes = append(block.Nodes, &PrintStmt{Op: Printi, Val: block.Stack.Pop()})
-	case ws.Readc:
-		p.appendRead(block, Readc)
-	case ws.Readi:
-		p.appendRead(block, Readi)
-
-	default:
-		panic(fmt.Sprintf("ir: illegal token: %v", tok.Type))
-	}
-	return nil
-}
-
-func (p *Program) appendArith(block *BasicBlock, op OpType) {
-	rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
-	assign := p.nextVal()
-	block.Stack.Push(assign)
-	block.Nodes = append(block.Nodes, &ArithExpr{
-		Op:     op,
-		Assign: assign,
-		LHS:    lhs,
-		RHS:    rhs,
-	})
-}
-
-func (p *Program) appendRead(block *BasicBlock, op OpType) {
-	addr, assign := block.Stack.Pop(), p.nextVal()
-	block.Nodes = append(block.Nodes, &ReadExpr{
-		Op:     op,
-		Assign: assign,
-	})
-	block.Nodes = append(block.Nodes, &StoreStmt{
-		Addr: addr,
-		Val:  assign,
-	})
-}
-
-func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
+// ConnectEdges connects the CFG edges of a program based on the labels in the source.
+func (p *Program) ConnectEdges(branches []*big.Int, labels *bigint.Map /* map[*big.Int]int */) error {
 	p.Entry.Entries = append(p.Entry.Entries, nil)
 	for i, block := range p.Blocks {
 		branch := branches[i]
@@ -498,7 +308,8 @@ func (p *Program) LookupConst(c *big.Int) *Val {
 	return &val
 }
 
-func (p *Program) nextVal() *Val {
+// NextVal creates a unique stack val.
+func (p *Program) NextVal() *Val {
 	val := Val(&StackVal{p.NextStackID})
 	p.NextStackID++
 	return &val
@@ -507,6 +318,11 @@ func (p *Program) nextVal() *Val {
 // ValEq returns whether the two vals reference the same definition.
 func ValEq(a, b *Val) bool {
 	return a != nil && b != nil && *a == *b
+}
+
+// AppendNode appends a node to the block.
+func (block *BasicBlock) AppendNode(node Node) {
+	block.Nodes = append(block.Nodes, node)
 }
 
 // Exits returns all outgoing edges of the block.
