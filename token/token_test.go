@@ -88,9 +88,6 @@ func TestInstrTypeString(t *testing.T) {
 		{Printi, "printi"},
 		{Readc, "readc"},
 		{Readi, "readi"},
-		{Storea, "storea"},
-		{Fallthrough, "fallthrough"},
-		{Prints, "prints"},
 
 		{Illegal, "illegal"},
 		{stackBeg, "illegal"},

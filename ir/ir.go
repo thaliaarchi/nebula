@@ -88,7 +88,7 @@ type Terminator interface {
 // ArithExpr evalutates a binary arithmetic operation. Valid operations
 // are add, sub, mul, div, and mod.
 type ArithExpr struct {
-	Op     token.Type
+	Op     OpType
 	Assign *Val
 	LHS    *Val
 	RHS    *Val
@@ -108,14 +108,14 @@ type StoreStmt struct {
 
 // PrintStmt prints a value. Valid operations are printc and printi.
 type PrintStmt struct {
-	Op  token.Type
+	Op  OpType
 	Val *Val
 }
 
 // ReadExpr reads a value from stdin. Valid operations are readc and
 // readi.
 type ReadExpr struct {
-	Op     token.Type
+	Op     OpType
 	Assign *Val
 }
 
@@ -127,14 +127,14 @@ type CallStmt struct {
 // JmpStmt unconditionally jumps to a block. Valid instructions are jmp
 // and fallthrough.
 type JmpStmt struct {
-	Op    token.Type
+	Op    OpType
 	Block *BasicBlock
 }
 
 // JmpCondStmt conditionally jumps to a block based on a value. Valid
 // instructions are jz and jn.
 type JmpCondStmt struct {
-	Op        token.Type
+	Op        OpType
 	Cond      *Val
 	ThenBlock *BasicBlock
 	ElseBlock *BasicBlock
@@ -145,6 +145,33 @@ type RetStmt struct{}
 
 // ExitStmt represents an end.
 type ExitStmt struct{}
+
+// OpType is the kind of operation of a node.
+type OpType uint8
+
+// Operation types for ArithExpr, PrintExpr, and ReadExpr.
+const (
+	Illegal OpType = iota
+
+	Add
+	Sub
+	Mul
+	Div
+	Mod
+
+	Printc
+	Printi
+	Prints
+
+	Readc
+	Readi
+
+	Jmp
+	Fallthrough
+
+	Jz
+	Jn
+)
 
 // Label is a label with an optional name.
 type Label struct {
@@ -270,71 +297,82 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 		}
 		block.Stack.Slide(n)
 
-	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
-		rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
-		assign := p.nextVal()
-		block.Stack.Push(assign)
-		block.Nodes = append(block.Nodes, &ArithExpr{
-			Op:     tok.Type,
-			Assign: assign,
-			LHS:    lhs,
-			RHS:    rhs,
-		})
+	case token.Add:
+		p.appendArith(block, Add)
+	case token.Sub:
+		p.appendArith(block, Sub)
+	case token.Mul:
+		p.appendArith(block, Mul)
+	case token.Div:
+		p.appendArith(block, Div)
+	case token.Mod:
+		p.appendArith(block, Mod)
 
 	case token.Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
-		block.Nodes = append(block.Nodes, &StoreStmt{
-			Addr: addr,
-			Val:  val,
-		})
+		block.Nodes = append(block.Nodes, &StoreStmt{Addr: addr, Val: val})
 	case token.Retrieve:
 		addr, assign := block.Stack.Pop(), p.nextVal()
 		block.Stack.Push(assign)
-		block.Nodes = append(block.Nodes, &LoadExpr{
-			Assign: assign,
-			Addr:   addr,
-		})
+		block.Nodes = append(block.Nodes, &LoadExpr{Assign: assign, Addr: addr})
 
 	case token.Label:
-		block.Terminator = &JmpStmt{Op: token.Fallthrough}
+		block.Terminator = &JmpStmt{Op: Fallthrough}
 		return tok.Arg
 	case token.Call:
 		block.Terminator = &CallStmt{}
 		return tok.Arg
 	case token.Jmp:
-		block.Terminator = &JmpStmt{Op: tok.Type}
+		block.Terminator = &JmpStmt{Op: Jmp}
 		return tok.Arg
-	case token.Jz, token.Jn:
-		block.Terminator = &JmpCondStmt{
-			Op:   tok.Type,
-			Cond: block.Stack.Pop(),
-		}
+	case token.Jz:
+		block.Terminator = &JmpCondStmt{Op: Jz, Cond: block.Stack.Pop()}
+		return tok.Arg
+	case token.Jn:
+		block.Terminator = &JmpCondStmt{Op: Jn, Cond: block.Stack.Pop()}
 		return tok.Arg
 	case token.Ret:
 		block.Terminator = &RetStmt{}
 	case token.End:
 		block.Terminator = &ExitStmt{}
 
-	case token.Printc, token.Printi:
-		block.Nodes = append(block.Nodes, &PrintStmt{
-			Op:  tok.Type,
-			Val: block.Stack.Pop(),
-		})
-	case token.Readc, token.Readi:
-		addr, assign := block.Stack.Pop(), p.nextVal()
-		block.Nodes = append(block.Nodes, &ReadExpr{
-			Op:     tok.Type,
-			Assign: assign,
-		})
-		block.Nodes = append(block.Nodes, &StoreStmt{
-			Addr: addr,
-			Val:  assign,
-		})
+	case token.Printc:
+		block.Nodes = append(block.Nodes, &PrintStmt{Op: Printc, Val: block.Stack.Pop()})
+	case token.Printi:
+		block.Nodes = append(block.Nodes, &PrintStmt{Op: Printi, Val: block.Stack.Pop()})
+	case token.Readc:
+		p.appendRead(block, Readc)
+	case token.Readi:
+		p.appendRead(block, Readi)
 
 	default:
 		panic(fmt.Sprintf("ir: illegal token: %v", tok.Type))
 	}
 	return nil
+}
+
+func (p *Program) appendArith(block *BasicBlock, op OpType) {
+	rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
+	assign := p.nextVal()
+	block.Stack.Push(assign)
+	block.Nodes = append(block.Nodes, &ArithExpr{
+		Op:     op,
+		Assign: assign,
+		LHS:    lhs,
+		RHS:    rhs,
+	})
+}
+
+func (p *Program) appendRead(block *BasicBlock, op OpType) {
+	addr, assign := block.Stack.Pop(), p.nextVal()
+	block.Nodes = append(block.Nodes, &ReadExpr{
+		Op:     op,
+		Assign: assign,
+	})
+	block.Nodes = append(block.Nodes, &StoreStmt{
+		Addr: addr,
+		Val:  assign,
+	})
 }
 
 func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
@@ -667,14 +705,48 @@ func (e *ArithExpr) String() string {
 func (e *LoadExpr) String() string  { return fmt.Sprintf("%v = load *%v", *e.Assign, *e.Addr) }
 func (e *StoreStmt) String() string { return fmt.Sprintf("store *%v %v", *e.Addr, *e.Val) }
 func (s *PrintStmt) String() string { return fmt.Sprintf("%v %v", s.Op, *s.Val) }
-func (e *ReadExpr) String() string  { return e.Op.String() }
+func (e *ReadExpr) String() string  { return fmt.Sprintf("%v = %v", *e.Assign, e.Op) }
 func (s *CallStmt) String() string  { return fmt.Sprintf("call %s", s.Callee.Name()) }
 func (s *JmpStmt) String() string   { return fmt.Sprintf("%v %s", s.Op, s.Block.Name()) }
 func (s *JmpCondStmt) String() string {
 	return fmt.Sprintf("%v %v %s %s", s.Op, *s.Cond, s.ThenBlock.Name(), s.ElseBlock.Name())
 }
 func (*RetStmt) String() string  { return "ret" }
-func (*ExitStmt) String() string { return "end" }
+func (*ExitStmt) String() string { return "exit" }
+
+func (op OpType) String() string {
+	switch op {
+	case Add:
+		return "add"
+	case Sub:
+		return "sub"
+	case Mul:
+		return "mul"
+	case Div:
+		return "div"
+	case Mod:
+		return "mod"
+	case Printc:
+		return "printc"
+	case Printi:
+		return "printi"
+	case Prints:
+		return "prints"
+	case Readc:
+		return "readc"
+	case Readi:
+		return "readi"
+	case Jmp:
+		return "jmp"
+	case Fallthrough:
+		return "fallthrough"
+	case Jz:
+		return "jz"
+	case Jn:
+		return "jn"
+	}
+	return "illegal"
+}
 
 func (l *Label) String() string {
 	if l.Name != "" {

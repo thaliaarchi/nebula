@@ -5,7 +5,6 @@ import (
 
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/token"
 	"llvm.org/llvm/bindings/go/llvm"
 )
 
@@ -149,15 +148,15 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 		rhs := lookupVal(*inst.RHS, idents)
 		var val llvm.Value
 		switch inst.Op {
-		case token.Add:
+		case ir.Add:
 			val = b.CreateAdd(lhs, rhs, "add")
-		case token.Sub:
+		case ir.Sub:
 			val = b.CreateSub(lhs, rhs, "sub")
-		case token.Mul:
+		case ir.Mul:
 			val = b.CreateMul(lhs, rhs, "mul")
-		case token.Div:
+		case ir.Div:
 			val = b.CreateSDiv(lhs, rhs, "div")
-		case token.Mod:
+		case ir.Mod:
 			val = b.CreateSRem(lhs, rhs, "mod")
 		}
 		idents[*inst.Assign] = val
@@ -171,9 +170,9 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 	case *ir.PrintStmt:
 		var f llvm.Value
 		switch inst.Op {
-		case token.Printc:
+		case ir.Printc:
 			f = d.PrintcFunc
-		case token.Printi:
+		case ir.Printi:
 			f = d.PrintiFunc
 		}
 		val := lookupVal(*inst.Val, idents)
@@ -181,9 +180,9 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 	case *ir.ReadExpr:
 		var f llvm.Value
 		switch inst.Op {
-		case token.Readc:
+		case ir.Readc:
 			f = d.ReadcFunc
-		case token.Readi:
+		case ir.Readi:
 			f = d.ReadiFunc
 		}
 		idents[*inst.Assign] = b.CreateCall(f, []llvm.Value{}, "read")
@@ -242,9 +241,9 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		val := idents[*term.Cond]
 		var cond llvm.Value
 		switch term.Op {
-		case token.Jz:
+		case ir.Jz:
 			cond = b.CreateICmp(llvm.IntEQ, val, zero, "cmp")
-		case token.Jn:
+		case ir.Jn:
 			cond = b.CreateICmp(llvm.IntSLT, val, zero, "cmp")
 		}
 		b.CreateCondBr(cond, blocks[term.ThenBlock], blocks[term.ElseBlock])

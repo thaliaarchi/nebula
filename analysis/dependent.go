@@ -3,7 +3,6 @@ package analysis // import "github.com/andrewarchi/nebula/analysis"
 import (
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/token"
 )
 
 // ControlFlowGraph creates a directed graph with edges representing the
@@ -59,7 +58,7 @@ func isIO(node ir.Node) bool {
 // canThrow returns whether the node is a division with a non-constant
 // RHS.
 func canThrow(node ir.Node) bool {
-	if n, ok := node.(*ir.ArithExpr); ok && n.Op == token.Div {
+	if n, ok := node.(*ir.ArithExpr); ok && n.Op == ir.Div {
 		_, ok := (*n.RHS).(*ir.ConstVal)
 		return !ok
 	}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/token"
 )
 
 // ReduceBlock accumulates sequences of nodes and replaces the starting
@@ -49,7 +48,7 @@ func ConcatStrings(p *ir.Program) {
 				if acc == nil {
 					val := ir.Val(&ir.StringVal{Val: str})
 					return &ir.PrintStmt{
-						Op:  token.Prints,
+						Op:  ir.Prints,
 						Val: &val,
 					}, true
 				}
@@ -66,14 +65,14 @@ func checkPrint(node ir.Node) (string, bool) {
 	if p, ok := node.(*ir.PrintStmt); ok {
 		if val, ok := (*p.Val).(*ir.ConstVal); ok {
 			switch p.Op {
-			case token.Printc:
+			case ir.Printc:
 				return string(bigint.ToRune(val.Val)), true
-			case token.Printi:
+			case ir.Printi:
 				return val.Val.String(), true
 			}
 		}
 		if val, ok := (*p.Val).(*ir.StringVal); ok {
-			if p.Op == token.Prints {
+			if p.Op == ir.Prints {
 				return val.Val, true
 			}
 		}
@@ -116,15 +115,15 @@ func FoldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
 func foldConstLR(p *ir.Program, expr *ir.ArithExpr, lhs, rhs *big.Int) (*ir.Val, bool) {
 	result := new(big.Int)
 	switch expr.Op {
-	case token.Add:
+	case ir.Add:
 		result.Add(lhs, rhs)
-	case token.Sub:
+	case ir.Sub:
 		result.Sub(lhs, rhs)
-	case token.Mul:
+	case ir.Mul:
 		result.Mul(lhs, rhs)
-	case token.Div:
+	case ir.Div:
 		result.Div(lhs, rhs)
-	case token.Mod:
+	case ir.Mod:
 		result.Mod(lhs, rhs)
 	}
 	return p.LookupConst(result), true
@@ -138,16 +137,16 @@ var (
 func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool) {
 	if lhs.Sign() == 0 {
 		switch expr.Op {
-		case token.Add:
+		case ir.Add:
 			return expr.RHS, true
-		case token.Sub:
+		case ir.Sub:
 			// negation
-		case token.Mul, token.Div, token.Mod:
+		case ir.Mul, ir.Div, ir.Mod:
 			return expr.LHS, true
 		}
 	} else if lhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
-		case token.Mul, token.Div:
+		case ir.Mul, ir.Div:
 			return expr.RHS, true
 		}
 	}
@@ -157,18 +156,18 @@ func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool)
 func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool) {
 	if rhs.Sign() == 0 {
 		switch expr.Op {
-		case token.Add, token.Sub:
+		case ir.Add, ir.Sub:
 			return expr.LHS, true
-		case token.Mul:
+		case ir.Mul:
 			return expr.RHS, true
-		case token.Div, token.Mod:
+		case ir.Div, ir.Mod:
 			panic("ir: division by zero")
 		}
 	} else if rhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
-		case token.Mul, token.Div:
+		case ir.Mul, ir.Div:
 			return expr.LHS, true
-		case token.Mod:
+		case ir.Mod:
 			return p.LookupConst(bigZero), true
 		}
 	}
@@ -178,12 +177,12 @@ func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool)
 func foldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
 	if ir.ValEq(expr.LHS, expr.RHS) {
 		switch expr.Op {
-		case token.Sub:
+		case ir.Sub:
 			return p.LookupConst(bigZero), true
-		case token.Mod:
+		case ir.Mod:
 			// TODO: trap if zero
 			return p.LookupConst(bigZero), true
-		case token.Div:
+		case ir.Div:
 			// TODO: trap if zero
 			return p.LookupConst(bigOne), true
 		}

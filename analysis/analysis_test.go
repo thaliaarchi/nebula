@@ -116,15 +116,15 @@ func TestTransforms(t *testing.T) {
 	blockStart := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
-			&ir.ArithExpr{Op: token.Mul, Assign: &s0, LHS: &v10, RHS: &v2},
-			&ir.ArithExpr{Op: token.Add, Assign: &s1, LHS: &v3, RHS: &s0},
-			&ir.ArithExpr{Op: token.Sub, Assign: &s2, LHS: &vC, RHS: &v1},
-			&ir.ArithExpr{Op: token.Add, Assign: &s3, LHS: &vn32, RHS: &va},
-			&ir.PrintStmt{Op: token.Printc, Val: &s3},
-			&ir.PrintStmt{Op: token.Printc, Val: &s2},
-			&ir.PrintStmt{Op: token.Printc, Val: &vC},
-			&ir.PrintStmt{Op: token.Printi, Val: &v1},
-			&ir.PrintStmt{Op: token.Printi, Val: &s1},
+			&ir.ArithExpr{Op: ir.Mul, Assign: &s0, LHS: &v10, RHS: &v2},
+			&ir.ArithExpr{Op: ir.Add, Assign: &s1, LHS: &v3, RHS: &s0},
+			&ir.ArithExpr{Op: ir.Sub, Assign: &s2, LHS: &vC, RHS: &v1},
+			&ir.ArithExpr{Op: ir.Add, Assign: &s3, LHS: &vn32, RHS: &va},
+			&ir.PrintStmt{Op: ir.Printc, Val: &s3},
+			&ir.PrintStmt{Op: ir.Printc, Val: &s2},
+			&ir.PrintStmt{Op: ir.Printc, Val: &vC},
+			&ir.PrintStmt{Op: ir.Printi, Val: &v1},
+			&ir.PrintStmt{Op: ir.Printi, Val: &s1},
 		},
 		Terminator: &ir.ExitStmt{},
 		Entries:    []*ir.BasicBlock{nil},
@@ -150,11 +150,11 @@ func TestTransforms(t *testing.T) {
 	blockConst := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
-			&ir.PrintStmt{Op: token.Printc, Val: &vA},
-			&ir.PrintStmt{Op: token.Printc, Val: &vB},
-			&ir.PrintStmt{Op: token.Printc, Val: &vC},
-			&ir.PrintStmt{Op: token.Printi, Val: &v1},
-			&ir.PrintStmt{Op: token.Printi, Val: &v23},
+			&ir.PrintStmt{Op: ir.Printc, Val: &vA},
+			&ir.PrintStmt{Op: ir.Printc, Val: &vB},
+			&ir.PrintStmt{Op: ir.Printc, Val: &vC},
+			&ir.PrintStmt{Op: ir.Printi, Val: &v1},
+			&ir.PrintStmt{Op: ir.Printi, Val: &v23},
 		},
 		Terminator: &ir.ExitStmt{},
 		Entries:    []*ir.BasicBlock{nil},
@@ -181,7 +181,7 @@ func TestTransforms(t *testing.T) {
 
 	blockStr := &ir.BasicBlock{
 		Nodes: []ir.Node{
-			&ir.PrintStmt{Op: token.Prints, Val: &vABC123},
+			&ir.PrintStmt{Op: ir.Prints, Val: &vABC123},
 		},
 		Terminator: &ir.ExitStmt{},
 		Stack:      stack,

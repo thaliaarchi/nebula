@@ -77,11 +77,6 @@ const (
 	Readc
 	Readi
 	ioEnd
-
-	// Extended instructions
-	Storea
-	Fallthrough
-	Prints
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
@@ -158,12 +153,6 @@ func (typ Type) String() string {
 		return "readc"
 	case Readi:
 		return "readi"
-	case Storea:
-		return "storea"
-	case Fallthrough:
-		return "fallthrough"
-	case Prints:
-		return "prints"
 	}
 	return "illegal"
 }
