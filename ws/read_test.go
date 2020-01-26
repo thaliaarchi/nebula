@@ -3,7 +3,6 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 import (
 	"bytes"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -57,18 +56,7 @@ func tokensString(tokens []SpaceToken) string {
 		if i != 0 {
 			str.WriteRune(' ')
 		}
-		switch tok {
-		case EOF:
-			str.WriteString("EOF")
-		case Space:
-			str.WriteString("Space")
-		case Tab:
-			str.WriteString("Tab")
-		case LF:
-			str.WriteString("LF")
-		default:
-			str.WriteString(strconv.Itoa(int(tok)))
-		}
+		str.WriteString(tok.String())
 	}
 	str.WriteRune(']')
 	return str.String()

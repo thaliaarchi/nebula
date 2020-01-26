@@ -31,13 +31,15 @@ func main() {
 		return
 	}
 
-	var bitPacked, emitTokens, emitDot, emitMatrix, emitIR, emitLLVM bool
+	var bitPacked, emitWs, emitWsa, emitDot, emitMatrix, emitIR, emitLLVM bool
 	for _, mode := range os.Args[2:] {
 		switch mode {
 		case "bit":
 			bitPacked = true
-		case "tokens":
-			emitTokens = true
+		case "ws":
+			emitWs = true
+		case "wsa":
+			emitWsa = true
 		case "dot":
 			emitDot = true
 		case "matrix":
@@ -72,7 +74,10 @@ func main() {
 	}
 
 	p := ws.Program{Name: filename, Tokens: tokens, LabelNames: labelNames}
-	if emitTokens {
+	if emitWs {
+		fmt.Print(p.DumpWS())
+	}
+	if emitWsa {
 		fmt.Print(p.Dump("    "))
 	}
 

@@ -16,6 +16,21 @@ const (
 	LF
 )
 
+func (tok SpaceToken) String() string {
+	switch tok {
+	case EOF:
+		return "EOF"
+	case Space:
+		return "Space"
+	case Tab:
+		return "Tab"
+	case LF:
+		return "LF"
+	default:
+		return "illegal"
+	}
+}
+
 type SpaceReader interface {
 	Next() (SpaceToken, error)
 	Pos() (int, int)

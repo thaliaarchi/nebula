@@ -13,7 +13,7 @@ type Program struct {
 	LabelNames *bigint.Map // map[*big.Int]string
 }
 
-// Dump formats a program.
+// Dump formats a program as Whitespace assembly.
 func (p *Program) Dump(indent string) string {
 	var b strings.Builder
 	for _, tok := range p.Tokens {
@@ -22,6 +22,15 @@ func (p *Program) Dump(indent string) string {
 		}
 		b.WriteString(tok.Format(p.LabelNames))
 		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// DumpWS formats a program as Whitespace.
+func (p *Program) DumpWS() string {
+	var b strings.Builder
+	for _, tok := range p.Tokens {
+		b.WriteString(tok.StringWS())
 	}
 	return b.String()
 }

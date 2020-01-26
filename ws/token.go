@@ -3,6 +3,7 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/andrewarchi/nebula/bigint"
 )
@@ -13,7 +14,7 @@ type Token struct {
 	Arg  *big.Int
 }
 
-// Format formats a token with label names used when available.
+// Format formats a token as Whitespace assembly.
 func (tok *Token) Format(labelNames *bigint.Map /* map[*big.Int]string */) string {
 	switch {
 	case tok.Type == Label:
@@ -39,6 +40,39 @@ func (tok *Token) formatArg(labelNames *bigint.Map) string {
 
 func (tok *Token) String() string {
 	return tok.Format(nil)
+}
+
+// StringWS formats a token as Whitespace.
+func (tok *Token) StringWS() string {
+	s := tok.Type.StringWS()
+	if tok.Type.HasArg() {
+		s += tok.formatArgWS()
+	}
+	return s
+}
+
+func (tok *Token) formatArgWS() string {
+	var b strings.Builder
+	num := tok.Arg
+	if !tok.Type.IsFlow() {
+		if num.Sign() != -1 {
+			b.WriteByte(' ')
+		} else {
+			b.WriteByte('\t')
+		}
+	}
+	if num.Sign() == -1 {
+		num = new(big.Int).Neg(num)
+	}
+	for i := num.BitLen() - 1; i >= 0; i-- {
+		if num.Bit(i) == 0 {
+			b.WriteByte(' ')
+		} else {
+			b.WriteByte('\t')
+		}
+	}
+	b.WriteByte('\n')
+	return b.String()
 }
 
 // Type is the instruction type of a token.
@@ -166,6 +200,62 @@ func (typ Type) String() string {
 		return "readc"
 	case Readi:
 		return "readi"
+	}
+	return "illegal"
+}
+
+// StringWS returns the string representation of the instruction in
+// Whitespace.
+func (typ Type) StringWS() string {
+	switch typ {
+	case Push:
+		return "  "
+	case Dup:
+		return " \n "
+	case Copy:
+		return " \t "
+	case Swap:
+		return " \n\t"
+	case Drop:
+		return " \n\n"
+	case Slide:
+		return " \t\n"
+	case Add:
+		return "\t   "
+	case Sub:
+		return "\t  \t"
+	case Mul:
+		return "\t  \n"
+	case Div:
+		return "\t \t "
+	case Mod:
+		return "\t \t\t"
+	case Store:
+		return "\t\t "
+	case Retrieve:
+		return "\t\t\t"
+	case Label:
+		return "\n  "
+	case Call:
+		return "\n \t"
+	case Jmp:
+		return "\n \n"
+	case Jz:
+		return "\n\t "
+	case Jn:
+		return "\n\t\t"
+	case Ret:
+		return "\n\t\n"
+	case End:
+		return "\n\n\n"
+	case Printc:
+		return "\t\n  "
+	case Printi:
+		return "\t\n \t"
+	case Readc:
+		return "\t\n\t "
+	case Readi:
+		return "\t\n\t\t"
 	}
 	return "illegal"
 }
