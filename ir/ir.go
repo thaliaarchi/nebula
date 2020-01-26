@@ -27,7 +27,7 @@ type BasicBlock struct {
 	Labels     []Label       // Labels for this block in source
 	Stack      Stack         // Stack frame of this block
 	Nodes      []Node        // Non-branching non-stack instructions
-	Terminator Terminator    // Terminator control flow instruction
+	Terminator Branch        // Terminator control flow instruction
 	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
 	Callers    []*BasicBlock // Calling blocks; blocks calling this block or its parents
 	Returns    []*BasicBlock // Returning blocks; blocks returning to this block
@@ -78,9 +78,9 @@ type Stmt interface {
 	stmtNode()
 }
 
-// Terminator is any control flow statement. Valid types are CallStmt,
+// Branch is any control flow statement. Valid types are CallStmt,
 // JmpStmt, JmpCondStmt, RetStmt, and ExitStmt.
-type Terminator interface {
+type Branch interface {
 	Node
 	termNode()
 }
@@ -121,23 +121,23 @@ type ReadExpr struct {
 
 // CallStmt represents a call.
 type CallStmt struct {
-	Callee *BasicBlock
+	Dest *BasicBlock
 }
 
 // JmpStmt unconditionally jumps to a block. Valid instructions are jmp
 // and fallthrough.
 type JmpStmt struct {
-	Op    OpType
-	Block *BasicBlock
+	Op   OpType
+	Dest *BasicBlock
 }
 
 // JmpCondStmt conditionally jumps to a block based on a value. Valid
 // instructions are jz and jn.
 type JmpCondStmt struct {
-	Op        OpType
-	Cond      *Val
-	ThenBlock *BasicBlock
-	ElseBlock *BasicBlock
+	Op   OpType
+	Cond *Val
+	Then *BasicBlock
+	Else *BasicBlock
 }
 
 // RetStmt represents a ret.
@@ -389,12 +389,12 @@ func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
 
 			switch term := block.Terminator.(type) {
 			case *CallStmt:
-				term.Callee = callee
+				term.Dest = callee
 			case *JmpStmt:
-				term.Block = callee
+				term.Dest = callee
 			case *JmpCondStmt:
-				term.ThenBlock = callee
-				term.ElseBlock = block.Next
+				term.Then = callee
+				term.Else = block.Next
 				block.Next.Entries = append(block.Next.Entries, block)
 			}
 		}
@@ -416,14 +416,14 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 	var errs *ErrorRetUnderflow
 	switch term := block.Terminator.(type) {
 	case *CallStmt:
-		errs = errs.addTrace(term.Callee.connectCaller(block), block)
+		errs = errs.addTrace(term.Dest.connectCaller(block), block)
 		errs = errs.addTrace(block.Next.connectCaller(caller), block)
 		block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
 	case *JmpStmt:
-		errs = errs.addTrace(term.Block.connectCaller(caller), block)
+		errs = errs.addTrace(term.Dest.connectCaller(caller), block)
 	case *JmpCondStmt:
-		errs = errs.addTrace(term.ThenBlock.connectCaller(caller), block)
-		errs = errs.addTrace(term.ElseBlock.connectCaller(caller), caller)
+		errs = errs.addTrace(term.Then.connectCaller(caller), block)
+		errs = errs.addTrace(term.Else.connectCaller(caller), caller)
 	case *RetStmt:
 		if caller == nil {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
@@ -513,11 +513,11 @@ func ValEq(a, b *Val) bool {
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {
 	case *CallStmt:
-		return []*BasicBlock{term.Callee}
+		return []*BasicBlock{term.Dest}
 	case *JmpStmt:
-		return []*BasicBlock{term.Block}
+		return []*BasicBlock{term.Dest}
 	case *JmpCondStmt:
-		return []*BasicBlock{term.ThenBlock, term.ElseBlock}
+		return []*BasicBlock{term.Then, term.Else}
 	case *RetStmt:
 		exits := make([]*BasicBlock, len(block.Callers))
 		for i, caller := range block.Callers {
@@ -581,12 +581,12 @@ func (p *Program) DotDigraph() string {
 	for _, block := range p.Blocks {
 		switch term := block.Terminator.(type) {
 		case *CallStmt:
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, term.Callee.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, term.Dest.ID)
 		case *JmpStmt:
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"jmp\"];\n", block.ID, term.Block.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"jmp\"];\n", block.ID, term.Dest.ID)
 		case *JmpCondStmt:
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, term.ThenBlock.ID)
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, term.ElseBlock.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, term.Then.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, term.Else.ID)
 		case *RetStmt:
 			for _, caller := range block.Callers {
 				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\\n%s\"];\n", block.ID, caller.Next.ID, caller.Name())
@@ -706,10 +706,10 @@ func (e *LoadExpr) String() string  { return fmt.Sprintf("%v = load *%v", *e.Ass
 func (e *StoreStmt) String() string { return fmt.Sprintf("store *%v %v", *e.Addr, *e.Val) }
 func (s *PrintStmt) String() string { return fmt.Sprintf("%v %v", s.Op, *s.Val) }
 func (e *ReadExpr) String() string  { return fmt.Sprintf("%v = %v", *e.Assign, e.Op) }
-func (s *CallStmt) String() string  { return fmt.Sprintf("call %s", s.Callee.Name()) }
-func (s *JmpStmt) String() string   { return fmt.Sprintf("%v %s", s.Op, s.Block.Name()) }
+func (s *CallStmt) String() string  { return fmt.Sprintf("call %s", s.Dest.Name()) }
+func (s *JmpStmt) String() string   { return fmt.Sprintf("%v %s", s.Op, s.Dest.Name()) }
 func (s *JmpCondStmt) String() string {
-	return fmt.Sprintf("%v %v %s %s", s.Op, *s.Cond, s.ThenBlock.Name(), s.ElseBlock.Name())
+	return fmt.Sprintf("%v %v %s %s", s.Op, *s.Cond, s.Then.Name(), s.Else.Name())
 }
 func (*RetStmt) String() string  { return "ret" }
 func (*ExitStmt) String() string { return "exit" }

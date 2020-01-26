@@ -7,7 +7,7 @@ import (
 
 	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/token"
+	"github.com/andrewarchi/nebula/ws"
 )
 
 func TestTransforms(t *testing.T) {

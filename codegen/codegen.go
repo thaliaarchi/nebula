@@ -234,9 +234,9 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		b.CreateStore(callStackLen, d.CallStackLen)
 		addr := llvm.BlockAddress(d.MainFunc, blocks[block.Next])
 		b.CreateStore(addr, gep)
-		b.CreateBr(blocks[term.Callee])
+		b.CreateBr(blocks[term.Dest])
 	case *ir.JmpStmt:
-		b.CreateBr(blocks[term.Block])
+		b.CreateBr(blocks[term.Dest])
 	case *ir.JmpCondStmt:
 		val := idents[*term.Cond]
 		var cond llvm.Value
@@ -246,7 +246,7 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		case ir.Jn:
 			cond = b.CreateICmp(llvm.IntSLT, val, zero, "cmp")
 		}
-		b.CreateCondBr(cond, blocks[term.ThenBlock], blocks[term.ElseBlock])
+		b.CreateCondBr(cond, blocks[term.Then], blocks[term.Else])
 	case *ir.RetStmt:
 		callStackLen := b.CreateLoad(d.CallStackLen, "call_stack_len")
 		callStackLen = b.CreateSub(callStackLen, one, "call_stack_len")
