@@ -27,17 +27,12 @@ type BasicBlock struct {
 	Labels     []Label       // Labels for this block in source
 	Stack      Stack         // Stack frame of this block
 	Nodes      []Node        // Non-branching non-stack instructions
-	Terminator FlowStmt      // Terminator control flow instruction
+	Terminator Terminator    // Terminator control flow instruction
 	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
 	Callers    []*BasicBlock // Calling blocks; blocks calling this block or its parents
 	Returns    []*BasicBlock // Returning blocks; blocks returning to this block
 	Prev       *BasicBlock   // Predecessor block in source
 	Next       *BasicBlock   // Successor block in source
-}
-
-// Node can be any expr or stmt type.
-type Node interface {
-	String() string
 }
 
 // Val can be StackVal, HeapVal, ConstVal, or AddrVal. Two vals can be
@@ -65,29 +60,50 @@ type PhiVal struct {
 	Vals []*Val
 }
 
-// AssignStmt assigns the value of an expression to the stack or heap.
-type AssignStmt struct {
-	Assign *Val
-	Expr   Node
+// Node can be any expr or stmt type.
+type Node interface {
+	String() string
+}
+
+// Expr represents an SSA expression that produces a value.
+type Expr interface {
+	Node
+	Assign() *Val
+	exprNode()
+}
+
+// Stmt represents an SSA statement that does not produce a value.
+type Stmt interface {
+	Node
+	stmtNode()
+}
+
+// Terminator is any control flow statement. Valid types are CallStmt,
+// JmpStmt, JmpCondStmt, RetStmt, and ExitStmt.
+type Terminator interface {
+	Node
+	termNode()
 }
 
 // ArithExpr evalutates a binary arithmetic operation. Valid operations
 // are add, sub, mul, div, and mod.
 type ArithExpr struct {
-	Op  token.Type
-	LHS *Val
-	RHS *Val
+	Op     token.Type
+	Assign *Val
+	LHS    *Val
+	RHS    *Val
 }
 
-// StoreExpr evaluates a store operation.
-type StoreExpr struct {
+// LoadExpr evaluates a retrieve operation.
+type LoadExpr struct {
+	Assign *Val
+	Addr   *Val
+}
+
+// StoreStmt evaluates a store operation.
+type StoreStmt struct {
 	Addr *Val
 	Val  *Val
-}
-
-// RetrieveExpr evaluates a retrieve operation.
-type RetrieveExpr struct {
-	Addr *Val
 }
 
 // PrintStmt prints a value. Valid operations are printc and printi.
@@ -99,12 +115,9 @@ type PrintStmt struct {
 // ReadExpr reads a value from stdin. Valid operations are readc and
 // readi.
 type ReadExpr struct {
-	Op token.Type
+	Op     token.Type
+	Assign *Val
 }
-
-// FlowStmt is any flow control statement. Valid types are CallStmt,
-// JmpStmt, JmpCondStmt, RetStmt, and EndStmt.
-type FlowStmt = Node
 
 // CallStmt represents a call.
 type CallStmt struct {
@@ -130,8 +143,8 @@ type JmpCondStmt struct {
 // RetStmt represents a ret.
 type RetStmt struct{}
 
-// EndStmt represents an end.
-type EndStmt struct{}
+// ExitStmt represents an end.
+type ExitStmt struct{}
 
 // Label is a label with an optional name.
 type Label struct {
@@ -259,22 +272,27 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 
 	case token.Add, token.Sub, token.Mul, token.Div, token.Mod:
 		rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
-		expr := &ArithExpr{Op: tok.Type, LHS: lhs, RHS: rhs}
 		assign := p.nextVal()
 		block.Stack.Push(assign)
-		block.assign(assign, expr)
+		block.Nodes = append(block.Nodes, &ArithExpr{
+			Op:     tok.Type,
+			Assign: assign,
+			LHS:    lhs,
+			RHS:    rhs,
+		})
 
 	case token.Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
-		block.Nodes = append(block.Nodes, &StoreExpr{
+		block.Nodes = append(block.Nodes, &StoreStmt{
 			Addr: addr,
 			Val:  val,
 		})
 	case token.Retrieve:
 		addr, assign := block.Stack.Pop(), p.nextVal()
 		block.Stack.Push(assign)
-		block.assign(assign, &RetrieveExpr{
-			Addr: addr,
+		block.Nodes = append(block.Nodes, &LoadExpr{
+			Assign: assign,
+			Addr:   addr,
 		})
 
 	case token.Label:
@@ -295,7 +313,7 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 	case token.Ret:
 		block.Terminator = &RetStmt{}
 	case token.End:
-		block.Terminator = &EndStmt{}
+		block.Terminator = &ExitStmt{}
 
 	case token.Printc, token.Printi:
 		block.Nodes = append(block.Nodes, &PrintStmt{
@@ -304,10 +322,11 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 		})
 	case token.Readc, token.Readi:
 		addr, assign := block.Stack.Pop(), p.nextVal()
-		block.assign(assign, &ReadExpr{
-			Op: tok.Type,
+		block.Nodes = append(block.Nodes, &ReadExpr{
+			Op:     tok.Type,
+			Assign: assign,
 		})
-		block.Nodes = append(block.Nodes, &StoreExpr{
+		block.Nodes = append(block.Nodes, &StoreStmt{
 			Addr: addr,
 			Val:  assign,
 		})
@@ -316,13 +335,6 @@ func (p *Program) appendInstruction(block *BasicBlock, tok token.Token) *big.Int
 		panic(fmt.Sprintf("ir: illegal token: %v", tok.Type))
 	}
 	return nil
-}
-
-func (block *BasicBlock) assign(assign *Val, expr Val) {
-	block.Nodes = append(block.Nodes, &AssignStmt{
-		Assign: assign,
-		Expr:   expr,
-	})
 }
 
 func (p *Program) connectEdges(branches []*big.Int, labels *bigint.Map) error {
@@ -379,7 +391,7 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
 		}
 		caller.Returns = append(caller.Returns, block)
-	case *EndStmt:
+	case *ExitStmt:
 	}
 	return errs
 }
@@ -474,7 +486,7 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 			exits[i] = caller.Next
 		}
 		return exits
-	case *EndStmt:
+	case *ExitStmt:
 		return nil
 	}
 	panic(fmt.Errorf("ir: invalid terminator type: %T", block.Terminator))
@@ -519,7 +531,7 @@ func (p *Program) DotDigraph() string {
 				fmt.Fprintf(&b, " r%d", len(block.Stack.Under))
 			}
 			b.WriteByte('"')
-			if _, ok := block.Terminator.(*EndStmt); ok {
+			if _, ok := block.Terminator.(*ExitStmt); ok {
 				b.WriteString(" peripheries=2")
 			}
 			b.WriteString("];\n")
@@ -633,24 +645,36 @@ func formatBlockList(blocks []*BasicBlock) string {
 	return b.String()
 }
 
-func (s *StackVal) String() string     { return fmt.Sprintf("%%%d", s.Val) }
-func (c *ConstVal) String() string     { return c.Val.String() }
-func (s *StringVal) String() string    { return fmt.Sprintf("%q", s.Val) }
-func (a *ArrayVal) String() string     { return bigint.FormatSlice(a.Val) }
-func (p *PhiVal) String() string       { return fmt.Sprintf("phi(%s)", formatValSlice(p.Vals)) }
-func (a *AssignStmt) String() string   { return fmt.Sprintf("%v = %v", *a.Assign, a.Expr) }
-func (b *ArithExpr) String() string    { return fmt.Sprintf("%v %v %v", b.Op, *b.LHS, *b.RHS) }
-func (u *StoreExpr) String() string    { return fmt.Sprintf("store *%v %v", *u.Addr, *u.Val) }
-func (u *RetrieveExpr) String() string { return fmt.Sprintf("retrieve *%v", *u.Addr) }
-func (p *PrintStmt) String() string    { return fmt.Sprintf("%v %v", p.Op, *p.Val) }
-func (r *ReadExpr) String() string     { return r.Op.String() }
-func (c *CallStmt) String() string     { return fmt.Sprintf("call %s", c.Callee.Name()) }
-func (j *JmpStmt) String() string      { return fmt.Sprintf("%v %s", j.Op, j.Block.Name()) }
-func (j *JmpCondStmt) String() string {
-	return fmt.Sprintf("%v %v %s %s", j.Op, *j.Cond, j.ThenBlock.Name(), j.ElseBlock.Name())
+func (ArithExpr) exprNode()   {}
+func (LoadExpr) exprNode()    {}
+func (StoreStmt) stmtNode()   {}
+func (PrintStmt) stmtNode()   {}
+func (ReadExpr) exprNode()    {}
+func (CallStmt) termNode()    {}
+func (JmpStmt) termNode()     {}
+func (JmpCondStmt) termNode() {}
+func (RetStmt) termNode()     {}
+func (ExitStmt) termNode()    {}
+
+func (v *StackVal) String() string  { return fmt.Sprintf("%%%d", v.Val) }
+func (v *ConstVal) String() string  { return v.Val.String() }
+func (v *StringVal) String() string { return fmt.Sprintf("%q", v.Val) }
+func (v *ArrayVal) String() string  { return bigint.FormatSlice(v.Val) }
+func (v *PhiVal) String() string    { return fmt.Sprintf("phi(%s)", formatValSlice(v.Vals)) }
+func (e *ArithExpr) String() string {
+	return fmt.Sprintf("%v = %v %v %v", *e.Assign, e.Op, *e.LHS, *e.RHS)
 }
-func (r *RetStmt) String() string { return "ret" }
-func (*EndStmt) String() string   { return "end" }
+func (e *LoadExpr) String() string  { return fmt.Sprintf("%v = load *%v", *e.Assign, *e.Addr) }
+func (e *StoreStmt) String() string { return fmt.Sprintf("store *%v %v", *e.Addr, *e.Val) }
+func (s *PrintStmt) String() string { return fmt.Sprintf("%v %v", s.Op, *s.Val) }
+func (e *ReadExpr) String() string  { return e.Op.String() }
+func (s *CallStmt) String() string  { return fmt.Sprintf("call %s", s.Callee.Name()) }
+func (s *JmpStmt) String() string   { return fmt.Sprintf("%v %s", s.Op, s.Block.Name()) }
+func (s *JmpCondStmt) String() string {
+	return fmt.Sprintf("%v %v %s %s", s.Op, *s.Cond, s.ThenBlock.Name(), s.ElseBlock.Name())
+}
+func (*RetStmt) String() string  { return "ret" }
+func (*ExitStmt) String() string { return "end" }
 
 func (l *Label) String() string {
 	if l.Name != "" {

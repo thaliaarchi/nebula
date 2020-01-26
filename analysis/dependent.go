@@ -69,24 +69,19 @@ func canThrow(node ir.Node) bool {
 // references returns whether node B references the assignment of
 // node A.
 func references(a, b ir.Node) bool {
-	if assignA, ok := a.(*ir.AssignStmt); ok {
-		assign := assignA.Assign
-		if assignB, ok := b.(*ir.AssignStmt); ok {
-			if assignB.Assign == assign {
-				return false
-			}
-			b = assignB.Expr
-		}
+	if expr, ok := a.(ir.Expr); ok {
+		assign := expr.Assign()
 		switch expr := b.(type) {
 		case *ir.ArithExpr:
-			return expr.LHS == assign || expr.RHS == assign
-		case *ir.StoreExpr:
+			return expr.Assign == assign || expr.LHS == assign || expr.RHS == assign
+		case *ir.LoadExpr:
+			return expr.Assign == assign || expr.Addr == assign
+		case *ir.StoreStmt:
 			return expr.Addr == assign || expr.Val == assign
-		case *ir.RetrieveExpr:
-			return expr.Addr == assign
 		case *ir.PrintStmt:
 			return expr.Val == assign
 		case *ir.ReadExpr:
+			return expr.Assign == assign
 		}
 	}
 	return false

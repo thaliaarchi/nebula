@@ -87,12 +87,10 @@ func FoldConstArith(p *ir.Program) {
 	for _, block := range p.Blocks {
 		j := 0
 		for i := 0; i < len(block.Nodes); i++ {
-			if assign, ok := block.Nodes[i].(*ir.AssignStmt); ok {
-				if expr, ok := assign.Expr.(*ir.ArithExpr); ok {
-					if val, ok := FoldConst(p, expr); ok {
-						*assign.Assign = *val
-						continue
-					}
+			if expr, ok := block.Nodes[i].(*ir.ArithExpr); ok {
+				if val, ok := FoldConst(p, expr); ok {
+					*expr.Assign = *val
+					continue
 				}
 			}
 			block.Nodes[j] = block.Nodes[i]

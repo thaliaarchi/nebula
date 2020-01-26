@@ -144,41 +144,30 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 
 func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Value) {
 	switch inst := node.(type) {
-	case *ir.AssignStmt:
+	case *ir.ArithExpr:
+		lhs := lookupVal(*inst.LHS, idents)
+		rhs := lookupVal(*inst.RHS, idents)
 		var val llvm.Value
-		switch expr := inst.Expr.(type) {
-		case *ir.ArithExpr:
-			lhs := lookupVal(*expr.LHS, idents)
-			rhs := lookupVal(*expr.RHS, idents)
-			switch expr.Op {
-			case token.Add:
-				val = b.CreateAdd(lhs, rhs, "add")
-			case token.Sub:
-				val = b.CreateSub(lhs, rhs, "sub")
-			case token.Mul:
-				val = b.CreateMul(lhs, rhs, "mul")
-			case token.Div:
-				val = b.CreateSDiv(lhs, rhs, "div")
-			case token.Mod:
-				val = b.CreateSRem(lhs, rhs, "mod")
-			}
-		case *ir.RetrieveExpr:
-			addr := d.heapAddr(b, *expr.Addr, idents)
-			val = b.CreateLoad(addr, "retrieve")
-		case *ir.ReadExpr:
-			var f llvm.Value
-			switch expr.Op {
-			case token.Readc:
-				f = d.ReadcFunc
-			case token.Readi:
-				f = d.ReadiFunc
-			}
-			val = b.CreateCall(f, []llvm.Value{}, "read")
+		switch inst.Op {
+		case token.Add:
+			val = b.CreateAdd(lhs, rhs, "add")
+		case token.Sub:
+			val = b.CreateSub(lhs, rhs, "sub")
+		case token.Mul:
+			val = b.CreateMul(lhs, rhs, "mul")
+		case token.Div:
+			val = b.CreateSDiv(lhs, rhs, "div")
+		case token.Mod:
+			val = b.CreateSRem(lhs, rhs, "mod")
 		}
 		idents[*inst.Assign] = val
-	case *ir.StoreExpr:
+	case *ir.LoadExpr:
 		addr := d.heapAddr(b, *inst.Addr, idents)
-		b.CreateStore(lookupVal(*inst.Val, idents), addr)
+		idents[*inst.Assign] = b.CreateLoad(addr, "retrieve")
+	case *ir.StoreStmt:
+		addr := d.heapAddr(b, *inst.Addr, idents)
+		val := lookupVal(*inst.Val, idents)
+		b.CreateStore(val, addr)
 	case *ir.PrintStmt:
 		var f llvm.Value
 		switch inst.Op {
@@ -189,6 +178,15 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 		}
 		val := lookupVal(*inst.Val, idents)
 		b.CreateCall(f, []llvm.Value{val}, "")
+	case *ir.ReadExpr:
+		var f llvm.Value
+		switch inst.Op {
+		case token.Readc:
+			f = d.ReadcFunc
+		case token.Readi:
+			f = d.ReadiFunc
+		}
+		idents[*inst.Assign] = b.CreateCall(f, []llvm.Value{}, "read")
 	}
 }
 
@@ -262,7 +260,7 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		for _, dest := range dests {
 			br.AddDest(blocks[dest])
 		}
-	case *ir.EndStmt:
+	case *ir.ExitStmt:
 		b.CreateRetVoid()
 	}
 }

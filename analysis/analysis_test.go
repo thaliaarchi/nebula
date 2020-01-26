@@ -116,17 +116,17 @@ func TestTransforms(t *testing.T) {
 	blockStart := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
-			&ir.AssignStmt{Assign: &s0, Expr: &ir.ArithExpr{Op: token.Mul, LHS: &v10, RHS: &v2}},
-			&ir.AssignStmt{Assign: &s1, Expr: &ir.ArithExpr{Op: token.Add, LHS: &v3, RHS: &s0}},
-			&ir.AssignStmt{Assign: &s2, Expr: &ir.ArithExpr{Op: token.Sub, LHS: &vC, RHS: &v1}},
-			&ir.AssignStmt{Assign: &s3, Expr: &ir.ArithExpr{Op: token.Add, LHS: &vn32, RHS: &va}},
+			&ir.ArithExpr{Op: token.Mul, Assign: &s0, LHS: &v10, RHS: &v2},
+			&ir.ArithExpr{Op: token.Add, Assign: &s1, LHS: &v3, RHS: &s0},
+			&ir.ArithExpr{Op: token.Sub, Assign: &s2, LHS: &vC, RHS: &v1},
+			&ir.ArithExpr{Op: token.Add, Assign: &s3, LHS: &vn32, RHS: &va},
 			&ir.PrintStmt{Op: token.Printc, Val: &s3},
 			&ir.PrintStmt{Op: token.Printc, Val: &s2},
 			&ir.PrintStmt{Op: token.Printc, Val: &vC},
 			&ir.PrintStmt{Op: token.Printi, Val: &v1},
 			&ir.PrintStmt{Op: token.Printi, Val: &s1},
 		},
-		Terminator: &ir.EndStmt{},
+		Terminator: &ir.ExitStmt{},
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
 	}
@@ -156,7 +156,7 @@ func TestTransforms(t *testing.T) {
 			&ir.PrintStmt{Op: token.Printi, Val: &v1},
 			&ir.PrintStmt{Op: token.Printi, Val: &v23},
 		},
-		Terminator: &ir.EndStmt{},
+		Terminator: &ir.ExitStmt{},
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
 	}
@@ -183,7 +183,7 @@ func TestTransforms(t *testing.T) {
 		Nodes: []ir.Node{
 			&ir.PrintStmt{Op: token.Prints, Val: &vABC123},
 		},
-		Terminator: &ir.EndStmt{},
+		Terminator: &ir.ExitStmt{},
 		Stack:      stack,
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
