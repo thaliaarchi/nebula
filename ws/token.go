@@ -3,6 +3,8 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/andrewarchi/nebula/bigint"
 )
 
 // Token is a lexical token in the Whitespace language.
@@ -11,21 +13,32 @@ type Token struct {
 	Arg  *big.Int
 }
 
-func (tok *Token) String() string {
+// Format formats a token with label names used when available.
+func (tok *Token) Format(labelNames *bigint.Map /* map[*big.Int]string */) string {
 	switch {
 	case tok.Type == Label:
-		if tok.Arg == nil {
-			return "label_0:"
-		}
-		return fmt.Sprintf("label_%s:", tok.Arg)
+		return fmt.Sprintf("label_%s:", tok.formatArg(labelNames))
 	case tok.Type.HasArg():
-		if tok.Arg == nil {
-			return fmt.Sprintf("%s 0", tok.Type)
-		}
-		return fmt.Sprintf("%s %d", tok.Type, tok.Arg)
+		return fmt.Sprintf("%s %s", tok.Type, tok.formatArg(labelNames))
 	default:
 		return tok.Type.String()
 	}
+}
+
+func (tok *Token) formatArg(labelNames *bigint.Map) string {
+	if tok.Type.IsFlow() && labelNames != nil {
+		if name, ok := labelNames.Get(tok.Arg); ok {
+			return name.(string)
+		}
+	}
+	if tok.Arg == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", tok.Arg)
+}
+
+func (tok *Token) String() string {
+	return tok.Format(nil)
 }
 
 // Type is the instruction type of a token.

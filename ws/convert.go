@@ -8,13 +8,6 @@ import (
 	"github.com/andrewarchi/nebula/ir"
 )
 
-// Program is a sequence of tokens with source map information.
-type Program struct {
-	Name       string
-	Tokens     []Token
-	LabelNames *bigint.Map // map[*big.Int]string
-}
-
 // ConvertSSA converts tokens into Nebula IR in SSA form.
 func (p *Program) ConvertSSA() (*ir.Program, error) {
 	if needsImplicitEnd(p.Tokens) {
