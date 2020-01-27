@@ -101,6 +101,8 @@ func (f *formatter) FormatNode(node Node) string {
 		return fmt.Sprintf("%v %s", n.Op, f.FormatVal(*n.Val))
 	case *ReadExpr:
 		return fmt.Sprintf("%s = %v", f.FormatVal(*n.Assign), n.Op)
+	case *FlushStmt:
+		return "flush"
 	case *CallStmt:
 		return fmt.Sprintf("call %s", n.Dest.Name())
 	case *JmpStmt:

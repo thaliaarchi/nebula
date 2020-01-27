@@ -161,8 +161,10 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token) *big.Int 
 
 	case Printc:
 		block.AppendNode(&ir.PrintStmt{Op: ir.Printc, Val: block.Stack.Pop()})
+		block.AppendNode(&ir.FlushStmt{})
 	case Printi:
 		block.AppendNode(&ir.PrintStmt{Op: ir.Printi, Val: block.Stack.Pop()})
+		block.AppendNode(&ir.FlushStmt{})
 	case Readc:
 		appendRead(p, block, ir.Readc)
 	case Readi:

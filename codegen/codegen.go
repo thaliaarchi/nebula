@@ -192,6 +192,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			f = d.ReadiFunc
 		}
 		idents[*inst.Assign] = b.CreateCall(f, []llvm.Value{}, "read")
+	case *ir.FlushStmt:
+		b.CreateCall(d.FlushFunc, []llvm.Value{}, "")
 	}
 }
 

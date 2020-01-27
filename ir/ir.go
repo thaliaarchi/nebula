@@ -122,6 +122,9 @@ type ReadExpr struct {
 	Assign *Val
 }
 
+// FlushStmt flushes stdout.
+type FlushStmt struct{}
+
 // CallStmt represents a call.
 type CallStmt struct {
 	Dest *BasicBlock
@@ -449,6 +452,7 @@ func (LoadExpr) node()    {}
 func (StoreStmt) node()   {}
 func (PrintStmt) node()   {}
 func (ReadExpr) node()    {}
+func (FlushStmt) node()   {}
 func (CallStmt) node()    {}
 func (JmpStmt) node()     {}
 func (JmpCondStmt) node() {}
@@ -461,6 +465,7 @@ func (LoadExpr) exprNode()    {}
 func (StoreStmt) stmtNode()   {}
 func (PrintStmt) stmtNode()   {}
 func (ReadExpr) exprNode()    {}
+func (FlushStmt) stmtNode()   {}
 func (CallStmt) termNode()    {}
 func (JmpStmt) termNode()     {}
 func (JmpCondStmt) termNode() {}
