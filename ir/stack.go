@@ -192,12 +192,13 @@ func (s *Stack) Len() int {
 
 func (s *Stack) String() string {
 	var b strings.Builder
+	f := newFormatter()
 	b.WriteString("push [")
 	for i, val := range s.Vals {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString((*val).String())
+		b.WriteString(f.FormatVal(*val))
 	}
 	fmt.Fprintf(&b, "], pop %d, access %d [", s.Pops, s.Access)
 	first := true
@@ -206,7 +207,7 @@ func (s *Stack) String() string {
 			if !first {
 				b.WriteByte(' ')
 			}
-			b.WriteString((*val).String())
+			b.WriteString(f.FormatVal(*val))
 			first = false
 		}
 	}

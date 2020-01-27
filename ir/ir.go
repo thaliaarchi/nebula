@@ -16,7 +16,6 @@ type Program struct {
 	Entry       *BasicBlock
 	ConstVals   bigint.Map // map[*big.Int]*Val
 	NextBlockID int
-	NextStackID int
 }
 
 // BasicBlock is a list of consecutive non-branching instructions in a
@@ -37,7 +36,7 @@ type BasicBlock struct {
 // Val can be StackVal, HeapVal, ConstVal, or AddrVal. Two vals can be
 // compared by address for equality.
 type Val interface {
-	String() string
+	val()
 }
 
 // StackVal is a position on the stack.
@@ -55,13 +54,11 @@ type ArrayVal struct{ Array []*big.Int }
 
 // PhiVal represents an SSA Φ function and stores the set of values it
 // could be.
-type PhiVal struct {
-	Vals []*Val
-}
+type PhiVal struct{ Vals []*Val }
 
 // Node can be any expr or stmt type.
 type Node interface {
-	String() string
+	node()
 }
 
 // Expr represents an SSA expression that produces a value.
@@ -279,8 +276,8 @@ func (p *Program) trimUnreachable() {
 	p.Blocks = p.Blocks[:i]
 }
 
-// RenumberIDs cleans up block IDs to match the block index.
-func (p *Program) RenumberIDs() {
+// RenumberBlockIDs cleans up block IDs to match the block index.
+func (p *Program) RenumberBlockIDs() {
 	for i, block := range p.Blocks {
 		block.ID = i
 	}
@@ -311,8 +308,7 @@ func (p *Program) LookupConst(c *big.Int) *Val {
 
 // NextVal creates a unique stack val.
 func (p *Program) NextVal() *Val {
-	val := Val(&StackVal{p.NextStackID})
-	p.NextStackID++
+	val := Val(&StackVal{0}) // TODO remove ID entirely
 	return &val
 }
 
@@ -367,7 +363,7 @@ func (p *Program) DotDigraph() string {
 	var b strings.Builder
 	b.WriteString("digraph {\n")
 	b.WriteString("  entry[shape=point];\n")
-	p.RenumberIDs()
+	p.RenumberBlockIDs()
 	for i, scc := range p.Digraph().SCCs() {
 		fmt.Fprintf(&b, "  subgraph cluster_%d {\n", i)
 		for _, node := range scc {
@@ -416,16 +412,21 @@ func (p *Program) DotDigraph() string {
 
 func (p *Program) String() string {
 	var b strings.Builder
+	f := newFormatter()
 	for i, block := range p.Blocks {
 		if i != 0 {
 			b.WriteByte('\n')
 		}
-		b.WriteString(block.String())
+		b.WriteString(block.dump(f))
 	}
 	return b.String()
 }
 
 func (block *BasicBlock) String() string {
+	return block.dump(newFormatter())
+}
+
+func (block *BasicBlock) dump(f *formatter) string {
 	var b strings.Builder
 	if len(block.Labels) == 0 {
 		if block.ID == 0 {
@@ -453,7 +454,7 @@ func (block *BasicBlock) String() string {
 				if !first {
 					b.WriteByte(' ')
 				}
-				b.WriteString((*val).String())
+				b.WriteString(f.FormatVal(*val))
 				first = false
 			}
 		}
@@ -462,7 +463,7 @@ func (block *BasicBlock) String() string {
 
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
-		b.WriteString(node.String())
+		b.WriteString(f.FormatNode(node))
 		b.WriteByte('\n')
 	}
 
@@ -475,13 +476,13 @@ func (block *BasicBlock) String() string {
 			if i != 0 {
 				b.WriteByte(' ')
 			}
-			b.WriteString((*val).String())
+			b.WriteString(f.FormatVal(*val))
 		}
 		b.WriteString("]\n")
 	}
 
 	b.WriteString("    ")
-	b.WriteString(block.Terminator.String())
+	b.WriteString(f.FormatNode(block.Terminator))
 	b.WriteByte('\n')
 	return b.String()
 }
@@ -500,6 +501,23 @@ func formatBlockList(blocks []*BasicBlock) string {
 	return b.String()
 }
 
+func (StackVal) val()  {}
+func (ConstVal) val()  {}
+func (StringVal) val() {}
+func (ArrayVal) val()  {}
+func (PhiVal) val()    {}
+
+func (ArithExpr) node()   {}
+func (LoadExpr) node()    {}
+func (StoreStmt) node()   {}
+func (PrintStmt) node()   {}
+func (ReadExpr) node()    {}
+func (CallStmt) node()    {}
+func (JmpStmt) node()     {}
+func (JmpCondStmt) node() {}
+func (RetStmt) node()     {}
+func (ExitStmt) node()    {}
+
 func (ArithExpr) exprNode()   {}
 func (LoadExpr) exprNode()    {}
 func (StoreStmt) stmtNode()   {}
@@ -510,29 +528,6 @@ func (JmpStmt) termNode()     {}
 func (JmpCondStmt) termNode() {}
 func (RetStmt) termNode()     {}
 func (ExitStmt) termNode()    {}
-
-func (v *StackVal) String() string  { return fmt.Sprintf("%%%d", v.ID) }
-func (v *ConstVal) String() string  { return v.Int.String() }
-func (v *StringVal) String() string { return fmt.Sprintf("%q", v.Str) }
-func (v *ArrayVal) String() string  { return bigint.FormatSlice(v.Array) }
-func (v *PhiVal) String() string    { return fmt.Sprintf("phi(%s)", formatValSlice(v.Vals)) }
-func (e *ArithExpr) String() string {
-	if e.Op == Neg {
-		return fmt.Sprintf("%v = neg %v", *e.Assign, *e.LHS)
-	}
-	return fmt.Sprintf("%v = %v %v %v", *e.Assign, e.Op, *e.LHS, *e.RHS)
-}
-func (e *LoadExpr) String() string  { return fmt.Sprintf("%v = load *%v", *e.Assign, *e.Addr) }
-func (e *StoreStmt) String() string { return fmt.Sprintf("store *%v %v", *e.Addr, *e.Val) }
-func (s *PrintStmt) String() string { return fmt.Sprintf("%v %v", s.Op, *s.Val) }
-func (e *ReadExpr) String() string  { return fmt.Sprintf("%v = %v", *e.Assign, e.Op) }
-func (s *CallStmt) String() string  { return fmt.Sprintf("call %s", s.Dest.Name()) }
-func (s *JmpStmt) String() string   { return fmt.Sprintf("%v %s", s.Op, s.Dest.Name()) }
-func (s *JmpCondStmt) String() string {
-	return fmt.Sprintf("%v %v %s %s", s.Op, *s.Cond, s.Then.Name(), s.Else.Name())
-}
-func (*RetStmt) String() string  { return "ret" }
-func (*ExitStmt) String() string { return "exit" }
 
 func (op OpType) String() string {
 	switch op {
@@ -626,15 +621,4 @@ outer:
 		slice = append(slice, block)
 	}
 	return slice
-}
-
-func formatValSlice(vals []*Val) string {
-	var b strings.Builder
-	for i, val := range vals {
-		if i != 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString((*val).String())
-	}
-	return b.String()
 }

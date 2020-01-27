@@ -66,9 +66,9 @@ func TestTransforms(t *testing.T) {
 	va := ir.Val(&ir.ConstVal{Int: big.NewInt('a')})
 	vABC123 := ir.Val(&ir.StringVal{Str: "ABC123"})
 	s0 := ir.Val(&ir.StackVal{ID: 0})
-	s1 := ir.Val(&ir.StackVal{ID: 1})
-	s2 := ir.Val(&ir.StackVal{ID: 2})
-	s3 := ir.Val(&ir.StackVal{ID: 3})
+	s1 := ir.Val(&ir.StackVal{ID: 0})
+	s2 := ir.Val(&ir.StackVal{ID: 0})
+	s3 := ir.Val(&ir.StackVal{ID: 0})
 
 	var stack ir.Stack
 	stack.Push(&v1)   // 0
@@ -136,7 +136,6 @@ func TestTransforms(t *testing.T) {
 		Entry:       blockStart,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
-		NextStackID: 4,
 	}
 
 	p := &ws.Program{Name: "test", Tokens: tokens, LabelNames: nil}
@@ -167,7 +166,6 @@ func TestTransforms(t *testing.T) {
 		Entry:       blockConst,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
-		NextStackID: 4,
 	}
 
 	FoldConstArith(program)
@@ -195,7 +193,6 @@ func TestTransforms(t *testing.T) {
 		Entry:       blockStr,
 		ConstVals:   *constVals,
 		NextBlockID: 1,
-		NextStackID: 4,
 	}
 
 	ConcatStrings(program)

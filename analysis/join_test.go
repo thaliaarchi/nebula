@@ -29,8 +29,8 @@ func TestJoinSimpleEntries(t *testing.T) {
 
 	v1 := ir.Val(&ir.ConstVal{Int: big.NewInt(1)})
 	s0 := ir.Val(&ir.StackVal{ID: 0})
-	s1 := ir.Val(&ir.StackVal{ID: 1})
-	s2 := ir.Val(&ir.StackVal{ID: 2})
+	s1 := ir.Val(&ir.StackVal{ID: 0})
+	s2 := ir.Val(&ir.StackVal{ID: 0})
 	sn1 := ir.Val(&ir.StackVal{ID: -1})
 	sn2 := ir.Val(&ir.StackVal{ID: -2})
 	sn7 := ir.Val(&ir.StackVal{ID: -7})
@@ -69,7 +69,6 @@ func TestJoinSimpleEntries(t *testing.T) {
 		Entry:       blockJoined,
 		ConstVals:   *constVals,
 		NextBlockID: 2,
-		NextStackID: 3,
 	}
 
 	JoinSimpleEntries(program)
