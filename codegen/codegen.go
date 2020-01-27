@@ -120,9 +120,9 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 		if val != nil {
 			switch v := (*val).(type) {
 			case *ir.StackVal:
-				if v.Val < 0 {
-					name := fmt.Sprintf("s%d", v.Val)
-					n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Val), false)
+				if v.ID < 0 {
+					name := fmt.Sprintf("s%d", v.ID)
+					n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.ID), false)
 					idx := b.CreateSub(stackLen, n, name+".idx")
 					gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
 					idents[v] = b.CreateLoad(gep, name)
@@ -130,7 +130,7 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 					panic(fmt.Sprintf("codegen: non-negative stack vals not currently supported: %v", v)) // TODO
 				}
 			case *ir.ConstVal:
-				if i64, ok := bigint.ToInt64(v.Val); ok {
+				if i64, ok := bigint.ToInt64(v.Int); ok {
 					idents[v] = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
 				} else {
 					panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
@@ -206,7 +206,7 @@ func (d *defs) updateStack(b llvm.Builder, block *ir.BasicBlock, idents map[ir.V
 				panic(fmt.Sprintf("codegen: val not in scope of %s: %v", block.Name(), *val))
 			}
 		case *ir.ConstVal:
-			if i64, ok := bigint.ToInt64(v.Val); ok {
+			if i64, ok := bigint.ToInt64(v.Int); ok {
 				s = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
 			} else {
 				panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
@@ -279,7 +279,7 @@ func lookupVal(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
 		}
 		panic(fmt.Sprintf("codegen: val not found: %v", val))
 	case *ir.ConstVal:
-		if i64, ok := bigint.ToInt64(v.Val); ok {
+		if i64, ok := bigint.ToInt64(v.Int); ok {
 			return llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
 		}
 		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", val))

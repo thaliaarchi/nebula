@@ -130,7 +130,7 @@ func (s *Stack) AtExists(n int) (*Val, bool) {
 		val = s.Under[len(s.Under)-len(s.Vals)-n-1]
 	}
 	if val != nil {
-		if v, ok := (*val).(*StackVal); !ok || v.Val >= 0 {
+		if v, ok := (*val).(*StackVal); !ok || v.ID >= 0 {
 			return val, true
 		}
 	}
@@ -142,8 +142,8 @@ func (s *Stack) AtExists(n int) (*Val, bool) {
 func (s *Stack) LookupUnderflow(prev *Stack) {
 	for _, val := range s.Under {
 		if val != nil {
-			if v, ok := (*val).(*StackVal); ok && v.Val < 0 {
-				if pv, ok := prev.AtExists(-v.Val - 1); ok {
+			if v, ok := (*val).(*StackVal); ok && v.ID < 0 {
+				if pv, ok := prev.AtExists(-v.ID - 1); ok {
 					*val = *pv
 				}
 			}
@@ -155,8 +155,8 @@ func (s *Stack) LookupUnderflow(prev *Stack) {
 func (s *Stack) Concat(next *Stack) {
 	for _, val := range next.Under {
 		if val != nil {
-			if v, ok := (*val).(*StackVal); ok && v.Val < 0 {
-				*val = *s.At(-v.Val - 1)
+			if v, ok := (*val).(*StackVal); ok && v.ID < 0 {
+				*val = *s.At(-v.ID - 1)
 			}
 		}
 	}
@@ -177,7 +177,7 @@ func (s *Stack) simplify() {
 		if s.Pops <= 0 {
 			break
 		}
-		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Val != -s.Pops {
+		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.ID != -s.Pops {
 			break
 		}
 		s.Pops--

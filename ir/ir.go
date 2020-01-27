@@ -41,17 +41,17 @@ type Val interface {
 }
 
 // StackVal is a position on the stack.
-type StackVal struct{ Val int }
+type StackVal struct{ ID int }
 
 // ConstVal is a constant value such as from push or an expression with
 // constant operands.
-type ConstVal struct{ Val *big.Int }
+type ConstVal struct{ Int *big.Int }
 
 // StringVal is a sequence of characters.
-type StringVal struct{ Val string }
+type StringVal struct{ Str string }
 
 // ArrayVal is a sequence of integers.
-type ArrayVal struct{ Val []*big.Int }
+type ArrayVal struct{ Array []*big.Int }
 
 // PhiVal represents an SSA Φ function and stores the set of values it
 // could be.
@@ -511,10 +511,10 @@ func (JmpCondStmt) termNode() {}
 func (RetStmt) termNode()     {}
 func (ExitStmt) termNode()    {}
 
-func (v *StackVal) String() string  { return fmt.Sprintf("%%%d", v.Val) }
-func (v *ConstVal) String() string  { return v.Val.String() }
-func (v *StringVal) String() string { return fmt.Sprintf("%q", v.Val) }
-func (v *ArrayVal) String() string  { return bigint.FormatSlice(v.Val) }
+func (v *StackVal) String() string  { return fmt.Sprintf("%%%d", v.ID) }
+func (v *ConstVal) String() string  { return v.Int.String() }
+func (v *StringVal) String() string { return fmt.Sprintf("%q", v.Str) }
+func (v *ArrayVal) String() string  { return bigint.FormatSlice(v.Array) }
 func (v *PhiVal) String() string    { return fmt.Sprintf("phi(%s)", formatValSlice(v.Vals)) }
 func (e *ArithExpr) String() string {
 	if e.Op == Neg {

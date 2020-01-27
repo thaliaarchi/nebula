@@ -46,14 +46,14 @@ func ConcatStrings(p *ir.Program) {
 		ReduceBlock(block, func(acc, curr ir.Node, i int) (ir.Node, bool) {
 			if str, ok := checkPrint(curr); ok {
 				if acc == nil {
-					val := ir.Val(&ir.StringVal{Val: str})
+					val := ir.Val(&ir.StringVal{Str: str})
 					return &ir.PrintStmt{
 						Op:  ir.Prints,
 						Val: &val,
 					}, true
 				}
 				val := (*acc.(*ir.PrintStmt).Val).(*ir.StringVal)
-				val.Val += str
+				val.Str += str
 				return acc, true
 			}
 			return nil, false
@@ -66,14 +66,14 @@ func checkPrint(node ir.Node) (string, bool) {
 		if val, ok := (*p.Val).(*ir.ConstVal); ok {
 			switch p.Op {
 			case ir.Printc:
-				return string(bigint.ToRune(val.Val)), true
+				return string(bigint.ToRune(val.Int)), true
 			case ir.Printi:
-				return val.Val.String(), true
+				return val.Int.String(), true
 			}
 		}
 		if val, ok := (*p.Val).(*ir.StringVal); ok {
 			if p.Op == ir.Prints {
-				return val.Val, true
+				return val.Str, true
 			}
 		}
 	}
@@ -103,17 +103,17 @@ func FoldConstArith(p *ir.Program) {
 func FoldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
 	if expr.Op == ir.Neg {
 		if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
-			return p.LookupConst(new(big.Int).Neg(lhs.Val)), true
+			return p.LookupConst(new(big.Int).Neg(lhs.Int)), true
 		}
 		return nil, false
 	}
 	if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
 		if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
-			return foldConstLR(p, expr, lhs.Val, rhs.Val)
+			return foldConstLR(p, expr, lhs.Int, rhs.Int)
 		}
-		return foldConstL(p, expr, lhs.Val)
+		return foldConstL(p, expr, lhs.Int)
 	} else if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
-		return foldConstR(p, expr, rhs.Val)
+		return foldConstR(p, expr, rhs.Int)
 	}
 	return foldConst(p, expr)
 }

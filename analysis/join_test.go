@@ -27,13 +27,13 @@ func TestJoinSimpleEntries(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	v1 := ir.Val(&ir.ConstVal{Val: big.NewInt(1)})
-	s0 := ir.Val(&ir.StackVal{Val: 0})
-	s1 := ir.Val(&ir.StackVal{Val: 1})
-	s2 := ir.Val(&ir.StackVal{Val: 2})
-	sn1 := ir.Val(&ir.StackVal{Val: -1})
-	sn2 := ir.Val(&ir.StackVal{Val: -2})
-	sn7 := ir.Val(&ir.StackVal{Val: -7})
+	v1 := ir.Val(&ir.ConstVal{Int: big.NewInt(1)})
+	s0 := ir.Val(&ir.StackVal{ID: 0})
+	s1 := ir.Val(&ir.StackVal{ID: 1})
+	s2 := ir.Val(&ir.StackVal{ID: 2})
+	sn1 := ir.Val(&ir.StackVal{ID: -1})
+	sn2 := ir.Val(&ir.StackVal{ID: -2})
+	sn7 := ir.Val(&ir.StackVal{ID: -7})
 
 	var stack ir.Stack
 	stack.Push(&v1) // 0
