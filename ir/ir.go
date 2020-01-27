@@ -411,94 +411,11 @@ func (p *Program) DotDigraph() string {
 }
 
 func (p *Program) String() string {
-	var b strings.Builder
-	f := newFormatter()
-	for i, block := range p.Blocks {
-		if i != 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(block.dump(f))
-	}
-	return b.String()
+	return newFormatter().FormatProgram(p)
 }
 
 func (block *BasicBlock) String() string {
-	return block.dump(newFormatter())
-}
-
-func (block *BasicBlock) dump(f *formatter) string {
-	var b strings.Builder
-	if len(block.Labels) == 0 {
-		if block.ID == 0 {
-			b.WriteString("entry:\n")
-		} else {
-			fmt.Fprintf(&b, "block_%d:\n", block.ID)
-		}
-	}
-	for _, label := range block.Labels {
-		b.WriteString(label.String())
-		b.WriteString(":\n")
-	}
-
-	fmt.Fprintf(&b, "    ; entries: %s\n", formatBlockList(block.Entries))
-	fmt.Fprintf(&b, "    ; callers: %s\n", formatBlockList(block.Callers))
-	if len(block.Returns) != 0 {
-		fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockList(block.Returns))
-	}
-
-	if block.Stack.Access > 0 {
-		fmt.Fprintf(&b, "    access %d [", block.Stack.Access)
-		first := true
-		for _, val := range block.Stack.Under {
-			if val != nil {
-				if !first {
-					b.WriteByte(' ')
-				}
-				b.WriteString(f.FormatVal(*val))
-				first = false
-			}
-		}
-		b.WriteString("]\n")
-	}
-
-	for _, node := range block.Nodes {
-		b.WriteString("    ")
-		b.WriteString(f.FormatNode(node))
-		b.WriteByte('\n')
-	}
-
-	if block.Stack.Pops > 0 {
-		fmt.Fprintf(&b, "    pop %d\n", block.Stack.Pops)
-	}
-	if len(block.Stack.Vals) != 0 {
-		b.WriteString("    push [")
-		for i, val := range block.Stack.Vals {
-			if i != 0 {
-				b.WriteByte(' ')
-			}
-			b.WriteString(f.FormatVal(*val))
-		}
-		b.WriteString("]\n")
-	}
-
-	b.WriteString("    ")
-	b.WriteString(f.FormatNode(block.Terminator))
-	b.WriteByte('\n')
-	return b.String()
-}
-
-func formatBlockList(blocks []*BasicBlock) string {
-	if len(blocks) == 0 {
-		return "-"
-	}
-	var b strings.Builder
-	for i, block := range blocks {
-		if i != 0 {
-			b.WriteByte(' ')
-		}
-		b.WriteString(block.Name())
-	}
-	return b.String()
+	return newFormatter().FormatBlock(block)
 }
 
 func (StackVal) val()  {}

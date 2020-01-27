@@ -19,6 +19,74 @@ func newFormatter() *formatter {
 	}
 }
 
+func (f *formatter) FormatProgram(p *Program) string {
+	var b strings.Builder
+	for i, block := range p.Blocks {
+		if i != 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(f.FormatBlock(block))
+	}
+	return b.String()
+}
+
+func (f *formatter) FormatBlock(block *BasicBlock) string {
+	var b strings.Builder
+	if len(block.Labels) == 0 {
+		fmt.Fprintf(&b, "block_%d:\n", block.ID)
+	}
+	for _, label := range block.Labels {
+		b.WriteString(label.String())
+		b.WriteString(":\n")
+	}
+
+	fmt.Fprintf(&b, "    ; entries: %s\n", formatBlockSlice(block.Entries))
+	fmt.Fprintf(&b, "    ; callers: %s\n", formatBlockSlice(block.Callers))
+	if len(block.Returns) != 0 {
+		fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockSlice(block.Returns))
+	}
+
+	if block.Stack.Access > 0 {
+		fmt.Fprintf(&b, "    access %d [", block.Stack.Access)
+		first := true
+		for _, val := range block.Stack.Under {
+			if val != nil {
+				if !first {
+					b.WriteByte(' ')
+				}
+				b.WriteString(f.FormatVal(*val))
+				first = false
+			}
+		}
+		b.WriteString("]\n")
+	}
+
+	for _, node := range block.Nodes {
+		b.WriteString("    ")
+		b.WriteString(f.FormatNode(node))
+		b.WriteByte('\n')
+	}
+
+	if block.Stack.Pops > 0 {
+		fmt.Fprintf(&b, "    pop %d\n", block.Stack.Pops)
+	}
+	if len(block.Stack.Vals) != 0 {
+		b.WriteString("    push [")
+		for i, val := range block.Stack.Vals {
+			if i != 0 {
+				b.WriteByte(' ')
+			}
+			b.WriteString(f.FormatVal(*val))
+		}
+		b.WriteString("]\n")
+	}
+
+	b.WriteString("    ")
+	b.WriteString(f.FormatNode(block.Terminator))
+	b.WriteByte('\n')
+	return b.String()
+}
+
 func (f *formatter) FormatNode(node Node) string {
 	switch n := node.(type) {
 	case *ArithExpr:
@@ -52,7 +120,7 @@ func (f *formatter) FormatVal(val Val) string {
 	switch v := val.(type) {
 	case *StackVal:
 		id := v.ID
-		if id > 0 {
+		if id >= 0 {
 			if vid, ok := f.IDs[val]; ok {
 				id = vid
 			} else {
@@ -69,18 +137,32 @@ func (f *formatter) FormatVal(val Val) string {
 	case *ArrayVal:
 		return bigint.FormatSlice(v.Array)
 	case *PhiVal:
-		return fmt.Sprintf("phi(%s)", f.FormatSlice(v.Vals))
+		return fmt.Sprintf("phi(%s)", f.FormatValSlice(v.Vals))
 	}
 	panic("ir: unrecognized val type")
 }
 
-func (f *formatter) FormatSlice(vals []*Val) string {
+func (f *formatter) FormatValSlice(vals []*Val) string {
 	var b strings.Builder
 	for i, val := range vals {
 		if i != 0 {
 			b.WriteString(", ")
 		}
 		b.WriteString(f.FormatVal(*val))
+	}
+	return b.String()
+}
+
+func formatBlockSlice(blocks []*BasicBlock) string {
+	if len(blocks) == 0 {
+		return "-"
+	}
+	var b strings.Builder
+	for i, block := range blocks {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(block.Name())
 	}
 	return b.String()
 }
