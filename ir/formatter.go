@@ -162,7 +162,11 @@ func formatBlockSlice(blocks []*BasicBlock) string {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString(block.Name())
+		if block == nil {
+			b.WriteString("<entry>")
+		} else {
+			b.WriteString(block.Name())
+		}
 	}
 	return b.String()
 }
