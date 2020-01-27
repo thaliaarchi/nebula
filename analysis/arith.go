@@ -79,14 +79,14 @@ func foldBinaryL(p *ir.Program, expr *ir.BinaryExpr, lhs *big.Int) (*ir.Val, boo
 			return expr.RHS, false
 		case ir.Sub:
 			return expr.RHS, true
-		case ir.Mul, ir.Div, ir.Mod:
+		case ir.Mul:
+			return expr.LHS, false
+		case ir.Div, ir.Mod:
+			// TODO trap if RHS zero
 			return expr.LHS, false
 		}
-	} else if lhs.Cmp(bigOne) == 0 {
-		switch expr.Op {
-		case ir.Mul, ir.Div:
-			return expr.RHS, false
-		}
+	} else if expr.Op == ir.Mul && lhs.Cmp(bigOne) == 0 {
+		return expr.RHS, false
 	} else if expr.Op == ir.Mul && lhs.Cmp(bigNegOne) == 0 {
 		return expr.RHS, true
 	}
@@ -101,7 +101,7 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, boo
 		case ir.Mul:
 			return expr.RHS, false
 		case ir.Div, ir.Mod:
-			panic("analysis: division by zero")
+			panic("analysis: divide by zero")
 		}
 	} else if rhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
@@ -114,6 +114,15 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, boo
 		switch expr.Op {
 		case ir.Mul, ir.Div:
 			return expr.LHS, true
+		case ir.Mod:
+			return p.LookupConst(bigZero), false
+		}
+	} else if expr.Op == ir.Mod {
+		x := new(big.Int).Sub(rhs, bigOne)
+		y := new(big.Int).And(rhs, x)
+		if y.Sign() == 0 { // v & (v - 1) == 0
+			expr.Op = ir.And
+			expr.RHS = p.LookupConst(x)
 		}
 	}
 	return nil, false
@@ -124,12 +133,12 @@ func foldBinary(p *ir.Program, expr *ir.BinaryExpr) (*ir.Val, bool) {
 		switch expr.Op {
 		case ir.Sub:
 			return p.LookupConst(bigZero), false
-		case ir.Mod:
-			// TODO trap if zero
-			return p.LookupConst(bigZero), false
 		case ir.Div:
-			// TODO trap if zero
+			// TODO trap if RHS zero
 			return p.LookupConst(bigOne), false
+		case ir.Mod:
+			// TODO trap if RHS zero
+			return p.LookupConst(bigZero), false
 		}
 	}
 	return nil, false
