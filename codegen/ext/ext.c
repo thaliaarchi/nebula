@@ -30,8 +30,8 @@ void flush() {
 // TODO change to procedure generated in IR to enable transformations.
 void check_stack(uint64_t n) {
   if (stack_len < n) {
-    fputs("stack underflow\n", stdout);
-    fflush(stdout);
+    fputs("stack underflow\n", stderr);
+    fflush(stderr);
     exit(1);
   }
 }
@@ -39,8 +39,8 @@ void check_stack(uint64_t n) {
 // TODO change to procedure generated in IR to enable transformations.
 void check_call_stack() {
   if (call_stack_len < 1) {
-    fputs("call stack underflow\n", stdout);
-    fflush(stdout);
+    fputs("call stack underflow\n", stderr);
+    fflush(stderr);
     exit(1);
   }
 }

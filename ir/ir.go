@@ -166,6 +166,13 @@ const (
 	Mod
 	Neg
 
+	Shl
+	LShr
+	AShr
+	And
+	Or
+	Xor
+
 	Printc
 	Printi
 	Prints
@@ -492,6 +499,18 @@ func (op OpType) String() string {
 		return "mod"
 	case Neg:
 		return "neg"
+	case Shl:
+		return "shl"
+	case LShr:
+		return "lshr"
+	case AShr:
+		return "ashr"
+	case And:
+		return "and"
+	case Or:
+		return "or"
+	case Xor:
+		return "xor"
 	case Printc:
 		return "printc"
 	case Printi:
