@@ -231,15 +231,30 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		errs = errs.addTrace(term.Dest.connectCaller(caller), block)
 	case *JmpCondStmt:
 		errs = errs.addTrace(term.Then.connectCaller(caller), block)
-		errs = errs.addTrace(term.Else.connectCaller(caller), caller)
+		errs = errs.addTrace(term.Else.connectCaller(caller), block)
 	case *RetStmt:
 		if caller == nil {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
+		} else {
+			caller.Returns = append(caller.Returns, block)
 		}
-		caller.Returns = append(caller.Returns, block)
 	case *ExitStmt:
 	}
 	return errs
+}
+
+func appendUnique(slice []*BasicBlock, blocks ...*BasicBlock) []*BasicBlock {
+	l := len(slice)
+outer:
+	for _, block := range blocks {
+		for i := 0; i < l; i++ {
+			if slice[i] == block {
+				continue outer
+			}
+		}
+		slice = append(slice, block)
+	}
+	return slice
 }
 
 // Disconnect removes incoming edges to a basic block. The block is not
@@ -351,9 +366,6 @@ func (block *BasicBlock) Name() string {
 	}
 	if len(block.Labels) != 0 {
 		return block.Labels[0].String()
-	}
-	if block.ID == 0 {
-		return "entry"
 	}
 	return fmt.Sprintf("block_%d", block.ID)
 }
@@ -524,18 +536,4 @@ func (err *ErrorRetUnderflow) Error() string {
 		b.WriteByte('\n')
 	}
 	return b.String()
-}
-
-func appendUnique(slice []*BasicBlock, blocks ...*BasicBlock) []*BasicBlock {
-	l := len(slice)
-outer:
-	for _, block := range blocks {
-		for i := 0; i < l; i++ {
-			if slice[i] == block {
-				continue outer
-			}
-		}
-		slice = append(slice, block)
-	}
-	return slice
 }

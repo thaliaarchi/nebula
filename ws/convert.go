@@ -41,7 +41,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	}
 	var branches []*big.Int
 	labels := bigint.NewMap(nil) // map[*big.Int]int
-	prevLabel := "entry"
+	prevLabel := ""
 	labelIndex := 0
 
 	for i := 0; i < len(p.Tokens); i++ {
