@@ -70,17 +70,23 @@ func canThrow(node ir.Node) bool {
 func references(a, b ir.Node) bool {
 	if expr, ok := a.(ir.Expr); ok {
 		assign := expr.Assign()
-		switch expr := b.(type) {
+		switch node := b.(type) {
 		case *ir.BinaryExpr:
-			return expr.Assign == assign || expr.LHS == assign || expr.RHS == assign
+			return node.Assign == assign || node.LHS == assign || node.RHS == assign
+		case *ir.UnaryExpr:
+			return node.Assign == assign || node.Val == assign
 		case *ir.LoadExpr:
-			return expr.Assign == assign || expr.Addr == assign
+			return node.Assign == assign || node.Addr == assign
 		case *ir.StoreStmt:
-			return expr.Addr == assign || expr.Val == assign
+			return node.Addr == assign || node.Val == assign
 		case *ir.PrintStmt:
-			return expr.Val == assign
+			return node.Val == assign
 		case *ir.ReadExpr:
-			return expr.Assign == assign
+			return node.Assign == assign
+		case *ir.FlushStmt:
+			return false
+		default:
+			panic("analysis: unrecognized node type")
 		}
 	}
 	return false

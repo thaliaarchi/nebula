@@ -175,7 +175,7 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, boo
 		case ir.Mul:
 			return expr.RHS, false
 		case ir.Div, ir.Mod:
-			panic("ir: division by zero")
+			panic("analysis: division by zero")
 		}
 	} else if rhs.Cmp(bigOne) == 0 {
 		switch expr.Op {

@@ -194,6 +194,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 		idents[*inst.Assign] = b.CreateCall(f, []llvm.Value{}, "read")
 	case *ir.FlushStmt:
 		b.CreateCall(d.FlushFunc, []llvm.Value{}, "")
+	default:
+		panic("codegen: unrecognized node type")
 	}
 }
 
@@ -218,7 +220,7 @@ func (d *defs) updateStack(b llvm.Builder, block *ir.BasicBlock, idents map[ir.V
 				panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
 			}
 		default:
-			panic(fmt.Sprintf("codegen: unsupported type %T", v))
+			panic("codegen: unrecognized val type")
 		}
 		name := fmt.Sprintf("s%d", i)
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
@@ -269,6 +271,8 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		}
 	case *ir.ExitStmt:
 		b.CreateRetVoid()
+	default:
+		panic("codegen: unrecognized branch type")
 	}
 }
 
@@ -290,6 +294,6 @@ func lookupVal(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
 		}
 		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", val))
 	default:
-		panic(fmt.Sprintf("codegen: val type not supported: %v", val))
+		panic("codegen: unrecognized val type")
 	}
 }

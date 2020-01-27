@@ -249,6 +249,8 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 			caller.Returns = append(caller.Returns, block)
 		}
 	case *ExitStmt:
+	default:
+		panic("ir: unrecognized branch type")
 	}
 	return errs
 }
@@ -364,8 +366,9 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 		return exits
 	case *ExitStmt:
 		return nil
+	default:
+		panic("ir: unrecognized branch type")
 	}
-	panic(fmt.Errorf("ir: invalid terminator type: %T", block.Terminator))
 }
 
 // Name returns the name of the basic block from either the first label
@@ -426,6 +429,9 @@ func (p *Program) DotDigraph() string {
 			for _, caller := range block.Callers {
 				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\\n%s\"];\n", block.ID, caller.Next.ID, caller.Name())
 			}
+		case *ExitStmt:
+		default:
+			panic("ir: unrecognized branch type")
 		}
 	}
 	b.WriteString("}\n")

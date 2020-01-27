@@ -26,9 +26,8 @@ func (tok SpaceToken) String() string {
 		return "Tab"
 	case LF:
 		return "LF"
-	default:
-		return "illegal"
 	}
+	return "illegal"
 }
 
 type SpaceReader interface {
