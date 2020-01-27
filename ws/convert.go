@@ -178,7 +178,7 @@ func appendArith(p *ir.Program, block *ir.BasicBlock, op ir.OpType) {
 	rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
 	assign := p.NextVal()
 	block.Stack.Push(assign)
-	block.AppendNode(&ir.ArithExpr{
+	block.AppendNode(&ir.BinaryExpr{
 		Op:     op,
 		Assign: assign,
 		LHS:    lhs,

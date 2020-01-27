@@ -143,7 +143,7 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 
 func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Value) {
 	switch inst := node.(type) {
-	case *ir.ArithExpr:
+	case *ir.BinaryExpr:
 		lhs := lookupVal(*inst.LHS, idents)
 		rhs := lookupVal(*inst.RHS, idents)
 		var val llvm.Value
@@ -158,10 +158,14 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			val = b.CreateSDiv(lhs, rhs, "div")
 		case ir.Mod:
 			val = b.CreateSRem(lhs, rhs, "mod")
-		case ir.Neg:
-			val = b.CreateSub(zero, lhs, "neg")
 		}
 		idents[*inst.Assign] = val
+	case *ir.UnaryExpr:
+		switch inst.Op {
+		case ir.Neg:
+			val := lookupVal(*inst.Val, idents)
+			idents[*inst.Assign] = b.CreateSub(zero, val, "neg")
+		}
 	case *ir.LoadExpr:
 		addr := d.heapAddr(b, *inst.Addr, idents)
 		idents[*inst.Assign] = b.CreateLoad(addr, "retrieve")

@@ -55,9 +55,9 @@ func TestJoinSimpleEntries(t *testing.T) {
 	blockJoined := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
-			&ir.ArithExpr{Op: ir.Add, Assign: &s0, LHS: &sn1, RHS: &v1},
-			&ir.ArithExpr{Op: ir.Mul, Assign: &s1, LHS: &sn2, RHS: &s0},
-			&ir.ArithExpr{Op: ir.Mod, Assign: &s2, LHS: &s1, RHS: &sn7},
+			&ir.BinaryExpr{Op: ir.Add, Assign: &s0, LHS: &sn1, RHS: &v1},
+			&ir.BinaryExpr{Op: ir.Mul, Assign: &s1, LHS: &sn2, RHS: &s0},
+			&ir.BinaryExpr{Op: ir.Mod, Assign: &s2, LHS: &s1, RHS: &sn7},
 		},
 		Terminator: &ir.ExitStmt{},
 		Entries:    []*ir.BasicBlock{nil},

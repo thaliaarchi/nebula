@@ -89,11 +89,10 @@ func (f *formatter) FormatBlock(block *BasicBlock) string {
 
 func (f *formatter) FormatNode(node Node) string {
 	switch n := node.(type) {
-	case *ArithExpr:
-		if n.Op == Neg {
-			return fmt.Sprintf("%s = neg %s", f.FormatVal(*n.Assign), f.FormatVal(*n.LHS))
-		}
+	case *BinaryExpr:
 		return fmt.Sprintf("%s = %v %s %s", f.FormatVal(*n.Assign), n.Op, f.FormatVal(*n.LHS), f.FormatVal(*n.RHS))
+	case *UnaryExpr:
+		return fmt.Sprintf("%s = %v %s", f.FormatVal(*n.Assign), n.Op, f.FormatVal(*n.Val))
 	case *LoadExpr:
 		return fmt.Sprintf("%s = load *%s", f.FormatVal(*n.Assign), f.FormatVal(*n.Addr))
 	case *StoreStmt:

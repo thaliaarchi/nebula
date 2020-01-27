@@ -86,39 +86,44 @@ func FoldConstArith(p *ir.Program) {
 	for _, block := range p.Blocks {
 		j := 0
 		for i := 0; i < len(block.Nodes); i++ {
-			if expr, ok := block.Nodes[i].(*ir.ArithExpr); ok {
-				if val, ok := FoldConst(p, expr); ok {
-					*expr.Assign = *val
+			node := block.Nodes[i]
+			switch n := node.(type) {
+			case *ir.BinaryExpr:
+				val, neg := foldBinaryExpr(p, n)
+				if neg {
+					node = &ir.UnaryExpr{Op: ir.Neg, Assign: n.Assign, Val: val}
+				} else if val != nil {
+					*n.Assign = *val
 					continue
 				}
+			case *ir.UnaryExpr:
+				if n.Op == ir.Neg {
+					if lhs, ok := (*n.Val).(*ir.ConstVal); ok {
+						*n.Assign = *p.LookupConst(new(big.Int).Neg(lhs.Int))
+						continue
+					}
+				}
 			}
-			block.Nodes[j] = block.Nodes[i]
+			block.Nodes[j] = node
 			j++
 		}
 		block.Nodes = block.Nodes[:j]
 	}
 }
 
-// FoldConst reduces constant arithmetic expressions or identities.
-func FoldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
-	if expr.Op == ir.Neg {
-		if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
-			return p.LookupConst(new(big.Int).Neg(lhs.Int)), true
-		}
-		return nil, false
-	}
+func foldBinaryExpr(p *ir.Program, expr *ir.BinaryExpr) (*ir.Val, bool) {
 	if lhs, ok := (*expr.LHS).(*ir.ConstVal); ok {
 		if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
-			return foldConstLR(p, expr, lhs.Int, rhs.Int)
+			return foldBinaryLR(p, expr, lhs.Int, rhs.Int)
 		}
-		return foldConstL(p, expr, lhs.Int)
+		return foldBinaryL(p, expr, lhs.Int)
 	} else if rhs, ok := (*expr.RHS).(*ir.ConstVal); ok {
-		return foldConstR(p, expr, rhs.Int)
+		return foldBinaryR(p, expr, rhs.Int)
 	}
-	return foldConst(p, expr)
+	return foldBinary(p, expr)
 }
 
-func foldConstLR(p *ir.Program, expr *ir.ArithExpr, lhs, rhs *big.Int) (*ir.Val, bool) {
+func foldBinaryLR(p *ir.Program, expr *ir.BinaryExpr, lhs, rhs *big.Int) (*ir.Val, bool) {
 	result := new(big.Int)
 	switch expr.Op {
 	case ir.Add:
@@ -132,7 +137,7 @@ func foldConstLR(p *ir.Program, expr *ir.ArithExpr, lhs, rhs *big.Int) (*ir.Val,
 	case ir.Mod:
 		result.Mod(lhs, rhs)
 	}
-	return p.LookupConst(result), true
+	return p.LookupConst(result), false
 }
 
 var (
@@ -141,64 +146,64 @@ var (
 	bigNegOne = big.NewInt(-1)
 )
 
-func foldConstL(p *ir.Program, expr *ir.ArithExpr, lhs *big.Int) (*ir.Val, bool) {
+func foldBinaryL(p *ir.Program, expr *ir.BinaryExpr, lhs *big.Int) (*ir.Val, bool) {
 	if lhs.Sign() == 0 {
 		switch expr.Op {
 		case ir.Add:
-			return expr.RHS, true
+			return expr.RHS, false
 		case ir.Sub:
-			expr.Op, expr.LHS, expr.RHS = ir.Neg, expr.RHS, nil
+			return expr.RHS, true
 		case ir.Mul, ir.Div, ir.Mod:
-			return expr.LHS, true
+			return expr.LHS, false
 		}
 	} else if lhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
 		case ir.Mul, ir.Div:
-			return expr.RHS, true
+			return expr.RHS, false
 		}
 	} else if expr.Op == ir.Mul && lhs.Cmp(bigNegOne) == 0 {
-		expr.Op, expr.LHS, expr.RHS = ir.Neg, expr.RHS, nil
+		return expr.RHS, true
 	}
 	return nil, false
 }
 
-func foldConstR(p *ir.Program, expr *ir.ArithExpr, rhs *big.Int) (*ir.Val, bool) {
+func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, bool) {
 	if rhs.Sign() == 0 {
 		switch expr.Op {
 		case ir.Add, ir.Sub:
-			return expr.LHS, true
+			return expr.LHS, false
 		case ir.Mul:
-			return expr.RHS, true
+			return expr.RHS, false
 		case ir.Div, ir.Mod:
 			panic("ir: division by zero")
 		}
 	} else if rhs.Cmp(bigOne) == 0 {
 		switch expr.Op {
 		case ir.Mul, ir.Div:
-			return expr.LHS, true
+			return expr.LHS, false
 		case ir.Mod:
-			return p.LookupConst(bigZero), true
+			return p.LookupConst(bigZero), false
 		}
 	} else if rhs.Cmp(bigNegOne) == 0 {
 		switch expr.Op {
 		case ir.Mul, ir.Div:
-			expr.Op, expr.RHS = ir.Neg, nil
+			return expr.LHS, true
 		}
 	}
 	return nil, false
 }
 
-func foldConst(p *ir.Program, expr *ir.ArithExpr) (*ir.Val, bool) {
+func foldBinary(p *ir.Program, expr *ir.BinaryExpr) (*ir.Val, bool) {
 	if ir.ValEq(expr.LHS, expr.RHS) {
 		switch expr.Op {
 		case ir.Sub:
-			return p.LookupConst(bigZero), true
+			return p.LookupConst(bigZero), false
 		case ir.Mod:
-			// TODO: trap if zero
-			return p.LookupConst(bigZero), true
+			// TODO trap if zero
+			return p.LookupConst(bigZero), false
 		case ir.Div:
-			// TODO: trap if zero
-			return p.LookupConst(bigOne), true
+			// TODO trap if zero
+			return p.LookupConst(bigOne), false
 		}
 	}
 	return nil, false

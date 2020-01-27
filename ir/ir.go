@@ -81,13 +81,20 @@ type Branch interface {
 	termNode()
 }
 
-// ArithExpr evaluates an arithmetic operation. Valid operations are
-// add, sub, mul, div, mod, and neg.
-type ArithExpr struct {
+// BinaryExpr evaluates a binary operation. Valid operator are add, sub,
+// mul, div, and mod.
+type BinaryExpr struct {
 	Op     OpType
 	Assign *Val
 	LHS    *Val
 	RHS    *Val
+}
+
+// UnaryExpr evaluates a unary operation. Valid operator is neg.
+type UnaryExpr struct {
+	Op     OpType
+	Assign *Val
+	Val    *Val
 }
 
 // LoadExpr evaluates a retrieve operation.
@@ -145,7 +152,7 @@ type ExitStmt struct{}
 // OpType is the kind of operation of a node.
 type OpType uint8
 
-// Operation types for ArithExpr, PrintExpr, and ReadExpr.
+// Operators for nodes with multiple types.
 const (
 	Illegal OpType = iota
 
@@ -436,7 +443,8 @@ func (StringVal) val() {}
 func (ArrayVal) val()  {}
 func (PhiVal) val()    {}
 
-func (ArithExpr) node()   {}
+func (BinaryExpr) node()  {}
+func (UnaryExpr) node()   {}
 func (LoadExpr) node()    {}
 func (StoreStmt) node()   {}
 func (PrintStmt) node()   {}
@@ -447,7 +455,8 @@ func (JmpCondStmt) node() {}
 func (RetStmt) node()     {}
 func (ExitStmt) node()    {}
 
-func (ArithExpr) exprNode()   {}
+func (BinaryExpr) exprNode()  {}
+func (UnaryExpr) exprNode()   {}
 func (LoadExpr) exprNode()    {}
 func (StoreStmt) stmtNode()   {}
 func (PrintStmt) stmtNode()   {}

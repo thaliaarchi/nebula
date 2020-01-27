@@ -116,10 +116,10 @@ func TestTransforms(t *testing.T) {
 	blockStart := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
-			&ir.ArithExpr{Op: ir.Mul, Assign: &s0, LHS: &v10, RHS: &v2},
-			&ir.ArithExpr{Op: ir.Add, Assign: &s1, LHS: &v3, RHS: &s0},
-			&ir.ArithExpr{Op: ir.Sub, Assign: &s2, LHS: &vC, RHS: &v1},
-			&ir.ArithExpr{Op: ir.Add, Assign: &s3, LHS: &vn32, RHS: &va},
+			&ir.BinaryExpr{Op: ir.Mul, Assign: &s0, LHS: &v10, RHS: &v2},
+			&ir.BinaryExpr{Op: ir.Add, Assign: &s1, LHS: &v3, RHS: &s0},
+			&ir.BinaryExpr{Op: ir.Sub, Assign: &s2, LHS: &vC, RHS: &v1},
+			&ir.BinaryExpr{Op: ir.Add, Assign: &s3, LHS: &vn32, RHS: &va},
 			&ir.PrintStmt{Op: ir.Printc, Val: &s3},
 			&ir.PrintStmt{Op: ir.Printc, Val: &s2},
 			&ir.PrintStmt{Op: ir.Printc, Val: &vC},
