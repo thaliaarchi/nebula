@@ -9,7 +9,7 @@ import (
 
 func TestTextReaderNext(t *testing.T) {
 	r := strings.NewReader("  \t\t \t\n \n\n\t\n\t \n\n\n")
-	l := NewTextReader(r)
+	l := NewTextReader(r, "test")
 	var tokens []SpaceToken
 	for {
 		tok, err := l.Next()
@@ -30,7 +30,7 @@ func TestTextReaderNext(t *testing.T) {
 
 func TestBitReaderNext(t *testing.T) {
 	r := bytes.NewReader([]byte{0x29, 0x6F, 0xB9, 0xF8}) // 00101001 01101111 10111001 11111(000)
-	l := NewBitReader(r)
+	l := NewBitReader(r, "test")
 	var tokens []SpaceToken
 	for {
 		tok, err := l.Next()

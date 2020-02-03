@@ -32,22 +32,23 @@ func (tok SpaceToken) String() string {
 
 type SpaceReader interface {
 	Next() (SpaceToken, error)
-	Pos() (int, int)
+	Pos() Pos
 }
 
 type TextReader struct {
-	br   io.ByteReader
-	line int
-	col  int
+	br       io.ByteReader
+	filename string
+	line     int
+	col      int
 }
 
-func NewTextReader(r io.Reader) *TextReader {
+func NewTextReader(r io.Reader, filename string) *TextReader {
 	var br io.ByteReader
 	br, ok := r.(io.ByteReader)
 	if !ok {
 		br = bufio.NewReader(r)
 	}
-	return &TextReader{br, 1, 1}
+	return &TextReader{br, filename, 1, 1}
 }
 
 func (l *TextReader) Next() (SpaceToken, error) {
@@ -73,22 +74,23 @@ func (l *TextReader) Next() (SpaceToken, error) {
 	}
 }
 
-func (l *TextReader) Pos() (int, int) {
-	return l.line, l.col
+func (l *TextReader) Pos() Pos {
+	return Pos{l.filename, l.line, l.col}
 }
 
 type BitReader struct {
-	br  bitio.Reader
-	pos int
+	br       bitio.Reader
+	filename string
+	pos      int
 }
 
-func NewBitReader(r io.Reader) *BitReader {
+func NewBitReader(r io.Reader, filename string) *BitReader {
 	var br bitio.Reader
 	br, ok := r.(bitio.Reader)
 	if !ok {
 		br = bitio.NewReader(r)
 	}
-	return &BitReader{br, 0}
+	return &BitReader{br, filename, 0}
 }
 
 func (l *BitReader) Next() (SpaceToken, error) {
@@ -117,6 +119,6 @@ func (l *BitReader) Next() (SpaceToken, error) {
 	return Tab, nil
 }
 
-func (l *BitReader) Pos() (int, int) {
-	return (l.pos / 8) + 1, (l.pos % 8) + 1
+func (l *BitReader) Pos() Pos {
+	return Pos{l.filename, (l.pos / 8) + 1, (l.pos % 8) + 1}
 }

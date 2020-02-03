@@ -10,15 +10,18 @@ import (
 
 // Token is a lexical token in the Whitespace language.
 type Token struct {
-	Type Type
-	Arg  *big.Int
+	Type     Type
+	Arg      *big.Int
+	StartPos Pos
+	ArgPos   Pos
+	EndPos   Pos
 }
 
 // Format formats a token as Whitespace assembly.
 func (tok *Token) Format(labelNames *bigint.Map /* map[*big.Int]string */) string {
 	switch {
 	case tok.Type == Label:
-		return fmt.Sprintf("label_%s:", tok.formatArg(labelNames))
+		return fmt.Sprintf("%s:", tok.formatArg(labelNames))
 	case tok.Type.HasArg():
 		return fmt.Sprintf("%s %s", tok.Type, tok.formatArg(labelNames))
 	default:
@@ -27,15 +30,15 @@ func (tok *Token) Format(labelNames *bigint.Map /* map[*big.Int]string */) strin
 }
 
 func (tok *Token) formatArg(labelNames *bigint.Map) string {
-	if tok.Type.IsFlow() && labelNames != nil {
+	if !tok.Type.IsFlow() {
+		return tok.Arg.String()
+	}
+	if labelNames != nil {
 		if name, ok := labelNames.Get(tok.Arg); ok {
 			return name.(string)
 		}
 	}
-	if tok.Arg == nil {
-		return "0"
-	}
-	return fmt.Sprintf("%d", tok.Arg)
+	return fmt.Sprintf("label_%s", tok.Arg)
 }
 
 func (tok *Token) String() string {

@@ -11,12 +11,12 @@ func TestTokenString(t *testing.T) {
 		Token  *Token
 		String string
 	}{
-		{&Token{Push, arg}, "push 123"},
-		{&Token{Push, nil}, "push 0"},
-		{&Token{Add, arg}, "add"},
-		{&Token{Add, nil}, "add"},
-		{&Token{Label, arg}, "label_123:"},
-		{&Token{Label, nil}, "label_0:"},
+		{&Token{Type: Push, Arg: arg}, "push 123"},
+		{&Token{Type: Push, Arg: nil}, "push <nil>"},
+		{&Token{Type: Add, Arg: arg}, "add"},
+		{&Token{Type: Add, Arg: nil}, "add"},
+		{&Token{Type: Label, Arg: arg}, "label_123:"},
+		{&Token{Type: Label, Arg: nil}, "label_<nil>:"},
 	}
 
 	for i, test := range tests {

@@ -10,13 +10,14 @@ import (
 type lexer struct {
 	r      SpaceReader
 	tokens []Token
+	pos    Pos
 }
 
 // Lex lexically analyzes a Whitespace source to produce tokens.
 func Lex(r SpaceReader) ([]Token, error) {
 	l := &lexer{r: r}
 	var err error
-	for state := lexInstr; state != nil; {
+	for state := lexInst; state != nil; {
 		state, err = state(l)
 		if err != nil {
 			return nil, err
@@ -25,8 +26,8 @@ func Lex(r SpaceReader) ([]Token, error) {
 	return l.tokens, nil
 }
 
-func (l *lexer) appendToken(tok Token) {
-	l.tokens = append(l.tokens, tok)
+func (l *lexer) appendToken(typ Type, arg *big.Int, argPos Pos) {
+	l.tokens = append(l.tokens, Token{typ, arg, l.pos, argPos, l.r.Pos()})
 }
 
 type stateFn func(*lexer) (stateFn, error)
@@ -39,8 +40,8 @@ type states struct {
 }
 
 func transition(s states) stateFn {
-	return func(p *lexer) (stateFn, error) {
-		tok, err := p.r.Next()
+	return func(l *lexer) (stateFn, error) {
+		tok, err := l.r.Next()
 		if err != nil {
 			return nil, err
 		}
@@ -61,61 +62,66 @@ func transition(s states) stateFn {
 	}
 }
 
-func emitInstr(typ Type) stateFn {
+func emitInst(typ Type) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		l.appendToken(Token{typ, nil})
-		return lexInstr, nil
+		l.appendToken(typ, nil, Pos{})
+		return lexInst, nil
 	}
 }
 
-func lexInstrNumber(typ Type) stateFn {
+func lexNumber(typ Type) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		arg, err := lexSigned(l)
+		argPos := l.r.Pos()
+		arg, err := l.lexSigned()
 		if err != nil {
 			return nil, err
 		}
-		l.appendToken(Token{typ, arg})
-		return lexInstr, nil
+		l.appendToken(typ, arg, argPos)
+		return lexInst, nil
 	}
 }
 
-func lexInstrLabel(typ Type) stateFn {
+func lexLabel(typ Type) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		arg, err := lexUnsigned(l)
+		argPos := l.r.Pos()
+		arg, err := l.lexUnsigned()
 		if err != nil {
 			return nil, err
 		}
-		l.appendToken(Token{typ, arg})
-		return lexInstr, nil
+		l.appendToken(typ, arg, argPos)
+		return lexInst, nil
 	}
 }
 
-func lexSigned(l *lexer) (*big.Int, error) {
+var (
+	bigZero = big.NewInt(0)
+	bigOne  = big.NewInt(1)
+)
+
+func (l *lexer) lexSigned() (*big.Int, error) {
 	tok, err := l.r.Next()
 	if err != nil {
 		return nil, err
 	}
 	switch tok {
 	case Space:
-		return lexUnsigned(l)
+		return l.lexUnsigned()
 	case Tab:
-		num, err := lexUnsigned(l)
+		num, err := l.lexUnsigned()
 		if err != nil {
 			return nil, err
 		}
 		num.Neg(num)
 		return num, nil
 	case LF:
-		return nil, nil // zero
+		return bigZero, nil
 	case EOF:
 		return nil, errors.New("unterminated number")
 	}
 	panic(invalidToken(tok))
 }
 
-var bigOne = big.NewInt(1)
-
-func lexUnsigned(l *lexer) (*big.Int, error) {
+func (l *lexer) lexUnsigned() (*big.Int, error) {
 	num := new(big.Int)
 	for {
 		tok, err := l.r.Next()
@@ -138,77 +144,80 @@ func lexUnsigned(l *lexer) (*big.Int, error) {
 }
 
 func invalidToken(tok SpaceToken) string {
-	return fmt.Sprintf("invalid token: %d", tok)
+	return fmt.Sprintf("ws: invalid token: %d", tok)
 }
 
 func init() {
-	lexInstr = transition(states{
-		Space: lexStack,
-		Tab: transition(states{
-			Space: lexArith,
-			Tab:   lexHeap,
-			LF:    lexIO,
-		}),
-		LF:   lexFlow,
-		Root: true,
-	})
+	lexInst = func(l *lexer) (stateFn, error) {
+		l.pos = l.r.Pos()
+		return transition(states{
+			Space: lexStack,
+			Tab: transition(states{
+				Space: lexArith,
+				Tab:   lexHeap,
+				LF:    lexIO,
+			}),
+			LF:   lexFlow,
+			Root: true,
+		})(l)
+	}
 }
 
-var lexInstr stateFn
+var lexInst stateFn
 
 var lexStack = transition(states{
-	Space: lexInstrNumber(Push),
+	Space: lexNumber(Push),
 	Tab: transition(states{
-		Space: lexInstrNumber(Copy),
-		LF:    lexInstrNumber(Slide),
+		Space: lexNumber(Copy),
+		LF:    lexNumber(Slide),
 	}),
 	LF: transition(states{
-		Space: emitInstr(Dup),
-		Tab:   emitInstr(Swap),
-		LF:    emitInstr(Drop),
+		Space: emitInst(Dup),
+		Tab:   emitInst(Swap),
+		LF:    emitInst(Drop),
 	}),
 })
 
 var lexArith = transition(states{
 	Space: transition(states{
-		Space: emitInstr(Add),
-		Tab:   emitInstr(Sub),
-		LF:    emitInstr(Mul),
+		Space: emitInst(Add),
+		Tab:   emitInst(Sub),
+		LF:    emitInst(Mul),
 	}),
 	Tab: transition(states{
-		Space: emitInstr(Div),
-		Tab:   emitInstr(Mod),
+		Space: emitInst(Div),
+		Tab:   emitInst(Mod),
 	}),
 })
 
 var lexHeap = transition(states{
-	Space: emitInstr(Store),
-	Tab:   emitInstr(Retrieve),
+	Space: emitInst(Store),
+	Tab:   emitInst(Retrieve),
 })
 
 var lexIO = transition(states{
 	Space: transition(states{
-		Space: emitInstr(Printc),
-		Tab:   emitInstr(Printi),
+		Space: emitInst(Printc),
+		Tab:   emitInst(Printi),
 	}),
 	Tab: transition(states{
-		Space: emitInstr(Readc),
-		Tab:   emitInstr(Readi),
+		Space: emitInst(Readc),
+		Tab:   emitInst(Readi),
 	}),
 })
 
 var lexFlow = transition(states{
 	Space: transition(states{
-		Space: lexInstrLabel(Label),
-		Tab:   lexInstrLabel(Call),
-		LF:    lexInstrLabel(Jmp),
+		Space: lexLabel(Label),
+		Tab:   lexLabel(Call),
+		LF:    lexLabel(Jmp),
 	}),
 	Tab: transition(states{
-		Space: lexInstrLabel(Jz),
-		Tab:   lexInstrLabel(Jn),
-		LF:    emitInstr(Ret),
+		Space: lexLabel(Jz),
+		Tab:   lexLabel(Jn),
+		LF:    emitInst(Ret),
 	}),
 	LF: transition(states{
-		LF: emitInstr(End),
+		LF: emitInst(End),
 	}),
 })

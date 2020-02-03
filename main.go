@@ -55,9 +55,9 @@ func main() {
 
 	var r ws.SpaceReader
 	if bitPacked {
-		r = ws.NewBitReader(f)
+		r = ws.NewBitReader(f, filename)
 	} else {
-		r = ws.NewTextReader(f)
+		r = ws.NewTextReader(f, filename)
 	}
 	tokens, err := ws.Lex(r)
 	if err != nil {
