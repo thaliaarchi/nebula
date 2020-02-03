@@ -293,7 +293,7 @@ func (d *defs) heapAddr(b llvm.Builder, val ir.Val, idents map[ir.Val]llvm.Value
 
 func lookupVal(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
 	switch v := val.(type) {
-	case *ir.StackVal:
+	case *ir.SSAVal, *ir.StackVal:
 		if v, ok := idents[val]; ok {
 			return v
 		}

@@ -8,13 +8,13 @@ import (
 )
 
 type formatter struct {
-	ids    map[Val]int
+	ids    map[*SSAVal]int
 	nextID int
 }
 
 func newFormatter() *formatter {
 	return &formatter{
-		ids:    make(map[Val]int),
+		ids:    make(map[*SSAVal]int),
 		nextID: 0,
 	}
 }
