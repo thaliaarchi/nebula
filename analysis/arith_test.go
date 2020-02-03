@@ -103,7 +103,7 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 
-	constVals := bigint.NewMap(nil)
+	constVals := bigint.NewMap()
 	constVals.Put(big.NewInt(1), &v1)
 	constVals.Put(big.NewInt(3), &v3)
 	constVals.Put(big.NewInt(10), &v10)

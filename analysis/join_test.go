@@ -49,7 +49,7 @@ func TestJoinSimpleEntries(t *testing.T) {
 	stack.Push(&s2) // 5
 	stack.Slide(2)  // 6
 
-	constVals := bigint.NewMap(nil)
+	constVals := bigint.NewMap()
 	constVals.Put(big.NewInt(1), &v1)
 
 	blockJoined := &ir.BasicBlock{

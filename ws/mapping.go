@@ -13,7 +13,7 @@ import (
 // label to source name.
 func ParseSourceMap(r io.Reader) (*bigint.Map, error) {
 	br := bufio.NewReader(r)
-	labels := bigint.NewMap(nil) // map[*big.Int]string
+	labels := bigint.NewMap() // map[*big.Int]string
 	for {
 		labelText, err := br.ReadString(':')
 		if err == io.EOF {

@@ -37,10 +37,10 @@ func needsImplicitEnd(tokens []Token) bool {
 func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	irp := &ir.Program{
 		Name:      p.Name,
-		ConstVals: *bigint.NewMap(nil),
+		ConstVals: *bigint.NewMap(),
 	}
 	var branches []*big.Int
-	labels := bigint.NewMap(nil) // map[*big.Int]int
+	labels := bigint.NewMap() // map[*big.Int]int
 	prevLabel := ""
 	labelIndex := 0
 
