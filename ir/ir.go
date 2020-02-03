@@ -39,8 +39,11 @@ type Val interface {
 	val()
 }
 
-// StackVal is a position on the stack.
-type StackVal struct{ ID int }
+// SSAVal is an SSA register.
+type SSAVal struct{}
+
+// StackVal is a position under the stack.
+type StackVal struct{ Pos int }
 
 // ConstVal is a constant value such as from push or an expression with
 // constant operands.
@@ -342,7 +345,7 @@ func (p *Program) LookupConst(c *big.Int) *Val {
 
 // NextVal creates a unique stack val.
 func (p *Program) NextVal() *Val {
-	val := Val(&StackVal{0}) // TODO remove ID entirely
+	val := Val(&SSAVal{})
 	return &val
 }
 
@@ -453,6 +456,7 @@ func (block *BasicBlock) String() string {
 	return newFormatter().FormatBlock(block)
 }
 
+func (SSAVal) val()    {}
 func (StackVal) val()  {}
 func (ConstVal) val()  {}
 func (StringVal) val() {}

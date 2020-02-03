@@ -119,16 +119,14 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 	for _, val := range block.Stack.Under {
 		if val != nil {
 			switch v := (*val).(type) {
+			case *ir.SSAVal:
+				panic(fmt.Sprintf("codegen: ssa vals not currently supported: %v", v)) // TODO
 			case *ir.StackVal:
-				if v.ID < 0 {
-					name := fmt.Sprintf("s%d", v.ID)
-					n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.ID), false)
-					idx := b.CreateSub(stackLen, n, name+".idx")
-					gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
-					idents[v] = b.CreateLoad(gep, name)
-				} else {
-					panic(fmt.Sprintf("codegen: non-negative stack vals not currently supported: %v", v)) // TODO
-				}
+				name := fmt.Sprintf("s%d", v.Pos)
+				n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Pos), false)
+				idx := b.CreateSub(stackLen, n, name+".idx")
+				gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
+				idents[v] = b.CreateLoad(gep, name)
 			case *ir.ConstVal:
 				if i64, ok := bigint.ToInt64(v.Int); ok {
 					idents[v] = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
@@ -219,7 +217,7 @@ func (d *defs) updateStack(b llvm.Builder, block *ir.BasicBlock, idents map[ir.V
 	for i, val := range block.Stack.Vals {
 		var s llvm.Value
 		switch v := (*val).(type) {
-		case *ir.StackVal:
+		case *ir.SSAVal, *ir.StackVal:
 			if ident, ok := idents[v]; ok {
 				s = ident
 			} else {

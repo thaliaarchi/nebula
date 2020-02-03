@@ -130,7 +130,7 @@ func (s *Stack) AtExists(n int) (*Val, bool) {
 		val = s.Under[len(s.Under)-len(s.Vals)-n-1]
 	}
 	if val != nil {
-		if v, ok := (*val).(*StackVal); !ok || v.ID >= 0 {
+		if _, ok := (*val).(*SSAVal); ok {
 			return val, true
 		}
 	}
@@ -142,8 +142,8 @@ func (s *Stack) AtExists(n int) (*Val, bool) {
 func (s *Stack) LookupUnderflow(prev *Stack) {
 	for _, val := range s.Under {
 		if val != nil {
-			if v, ok := (*val).(*StackVal); ok && v.ID < 0 {
-				if pv, ok := prev.AtExists(-v.ID - 1); ok {
+			if v, ok := (*val).(*StackVal); ok {
+				if pv, ok := prev.AtExists(-v.Pos - 1); ok {
 					*val = *pv
 				}
 			}
@@ -155,8 +155,8 @@ func (s *Stack) LookupUnderflow(prev *Stack) {
 func (s *Stack) Concat(next *Stack) {
 	for _, val := range next.Under {
 		if val != nil {
-			if v, ok := (*val).(*StackVal); ok && v.ID < 0 {
-				*val = *s.At(-v.ID - 1)
+			if v, ok := (*val).(*StackVal); ok {
+				*val = *s.At(-v.Pos - 1)
 			}
 		}
 	}
@@ -177,7 +177,7 @@ func (s *Stack) simplify() {
 		if s.Pops <= 0 {
 			break
 		}
-		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.ID != -s.Pops {
+		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Pos != -s.Pops {
 			break
 		}
 		s.Pops--
@@ -198,7 +198,7 @@ func (s *Stack) String() string {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString(f.FormatVal(*val))
+		b.WriteString(f.FormatVal(val))
 	}
 	fmt.Fprintf(&b, "], pop %d, access %d [", s.Pops, s.Access)
 	first := true
@@ -207,7 +207,7 @@ func (s *Stack) String() string {
 			if !first {
 				b.WriteByte(' ')
 			}
-			b.WriteString(f.FormatVal(*val))
+			b.WriteString(f.FormatVal(val))
 			first = false
 		}
 	}

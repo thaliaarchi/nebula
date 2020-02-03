@@ -65,10 +65,10 @@ func TestTransforms(t *testing.T) {
 	vC := ir.Val(&ir.ConstVal{Int: big.NewInt('C')})
 	va := ir.Val(&ir.ConstVal{Int: big.NewInt('a')})
 	vABC123 := ir.Val(&ir.StringVal{Str: "ABC123"})
-	s0 := ir.Val(&ir.StackVal{ID: 0})
-	s1 := ir.Val(&ir.StackVal{ID: 0})
-	s2 := ir.Val(&ir.StackVal{ID: 0})
-	s3 := ir.Val(&ir.StackVal{ID: 0})
+	s0 := ir.Val(&ir.SSAVal{})
+	s1 := ir.Val(&ir.SSAVal{})
+	s2 := ir.Val(&ir.SSAVal{})
+	s3 := ir.Val(&ir.SSAVal{})
 
 	var stack ir.Stack
 	stack.Push(&v1)   // 0
@@ -147,6 +147,11 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", program, programStart)
 	}
 
+	constVals.Put(big.NewInt('A'), &vA)
+	constVals.Put(big.NewInt('B'), &vB)
+	constVals.Put(big.NewInt(20), &v20)
+	constVals.Put(big.NewInt(23), &v23)
+
 	blockConst := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
@@ -169,11 +174,6 @@ func TestTransforms(t *testing.T) {
 	}
 
 	FoldConstArith(program)
-	constVals.Put(big.NewInt('A'), &vA)
-	constVals.Put(big.NewInt('B'), &vB)
-	constVals.Put(big.NewInt(20), &v20)
-	constVals.Put(big.NewInt(23), &v23)
-
 	if !reflect.DeepEqual(program, programConst) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
