@@ -40,7 +40,7 @@ type Val interface {
 }
 
 // SSAVal is an SSA register.
-type SSAVal struct{}
+type SSAVal struct{ int } // TODO apparently not uniquely addressable when empty
 
 // StackVal is a position under the stack.
 type StackVal struct{ Pos int }
