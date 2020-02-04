@@ -25,7 +25,7 @@ type BasicBlock struct {
 	Labels     []Label       // Labels for this block in source
 	Stack      Stack         // Stack frame of this block
 	Nodes      []Node        // Non-branching non-stack instructions
-	Terminator Branch        // Terminator control flow instruction
+	Terminator Terminator    // Terminator control flow instruction
 	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
 	Callers    []*BasicBlock // Calling blocks; blocks calling this block or its parents
 	Returns    []*BasicBlock // Returning blocks; blocks returning to this block
@@ -77,9 +77,9 @@ type Stmt interface {
 	stmtNode()
 }
 
-// Branch is any control flow statement. Valid types are CallStmt,
+// Terminator is any control flow statement. Valid types are CallStmt,
 // JmpStmt, JmpCondStmt, RetStmt, and ExitStmt.
-type Branch interface {
+type Terminator interface {
 	Node
 	termNode()
 }
@@ -224,6 +224,9 @@ func (p *Program) ConnectEdges(branches []*big.Int, labels *bigint.Map /* map[*b
 				term.Then = callee
 				term.Else = block.Next
 				block.Next.Entries = append(block.Next.Entries, block)
+			case *RetStmt, ExitStmt:
+			default:
+				panic("ir: unrecognized terminator type")
 			}
 		}
 	}
@@ -260,7 +263,7 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 		}
 	case *ExitStmt:
 	default:
-		panic("ir: unrecognized branch type")
+		panic("ir: unrecognized terminator type")
 	}
 	return errs
 }
@@ -377,7 +380,7 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 	case *ExitStmt:
 		return nil
 	default:
-		panic("ir: unrecognized branch type")
+		panic("ir: unrecognized terminator type")
 	}
 }
 
@@ -441,7 +444,7 @@ func (p *Program) DotDigraph() string {
 			}
 		case *ExitStmt:
 		default:
-			panic("ir: unrecognized branch type")
+			panic("ir: unrecognized terminator type")
 		}
 	}
 	b.WriteString("}\n")

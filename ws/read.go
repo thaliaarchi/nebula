@@ -54,10 +54,10 @@ func NewTextReader(r io.Reader, filename string) *TextReader {
 func (l *TextReader) Next() (SpaceToken, error) {
 	for {
 		b, err := l.br.ReadByte()
-		if err == io.EOF {
-			return EOF, nil
-		}
 		if err != nil {
+			if err == io.EOF {
+				return EOF, nil
+			}
 			return EOF, err
 		}
 		l.col++
@@ -95,10 +95,10 @@ func NewBitReader(r io.Reader, filename string) *BitReader {
 
 func (l *BitReader) Next() (SpaceToken, error) {
 	b, err := l.br.ReadBool()
-	if err == io.EOF {
-		return EOF, nil
-	}
 	if err != nil {
+		if err == io.EOF {
+			return EOF, nil
+		}
 		return EOF, err
 	}
 	l.pos++

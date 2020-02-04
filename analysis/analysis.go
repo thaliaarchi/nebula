@@ -67,6 +67,8 @@ func checkPrint(node ir.Node) (string, bool) {
 				return string(bigint.ToRune(val.Int)), true
 			case ir.Printi:
 				return val.Int.String(), true
+			default:
+				panic("analysis: unrecognized print op")
 			}
 		}
 		if val, ok := (*p.Val).(*ir.StringVal); ok {

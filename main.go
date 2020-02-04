@@ -50,6 +50,8 @@ func main() {
 			emitIR = true
 		case "llvm":
 			emitLLVM = true
+		default:
+			fmt.Fprintln(os.Stderr, "unrecognized mode: "+mode)
 		}
 	}
 

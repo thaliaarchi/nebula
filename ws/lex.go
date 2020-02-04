@@ -36,29 +36,40 @@ type states struct {
 	Space stateFn
 	Tab   stateFn
 	LF    stateFn
-	Root  bool
+}
+
+func root(s states) stateFn {
+	return func(l *lexer) (stateFn, error) {
+		l.pos = l.r.Pos()
+		return l.nextState(s, true)
+	}
 }
 
 func transition(s states) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		tok, err := l.r.Next()
-		if err != nil {
-			return nil, err
-		}
-		switch tok {
-		case Space:
-			return s.Space, nil
-		case Tab:
-			return s.Tab, nil
-		case LF:
-			return s.LF, nil
-		case EOF:
-			if !s.Root {
-				return nil, io.ErrUnexpectedEOF
-			}
+		return l.nextState(s, false)
+	}
+}
+
+func (l *lexer) nextState(s states, isRoot bool) (stateFn, error) {
+	tok, err := l.r.Next()
+	if err != nil {
+		return nil, err
+	}
+	switch tok {
+	case Space:
+		return s.Space, nil
+	case Tab:
+		return s.Tab, nil
+	case LF:
+		return s.LF, nil
+	case EOF:
+		if isRoot {
 			return nil, nil
 		}
-		panic(invalidToken(tok))
+		return nil, io.ErrUnexpectedEOF
+	default:
+		panic("ws: unrecognized token")
 	}
 }
 
@@ -117,8 +128,9 @@ func (l *lexer) lexSigned() (*big.Int, error) {
 		return bigZero, nil
 	case EOF:
 		return nil, errors.New("unterminated number")
+	default:
+		panic("ws: unrecognized token")
 	}
-	panic(invalidToken(tok))
 }
 
 func (l *lexer) lexUnsigned() (*big.Int, error) {
@@ -138,29 +150,21 @@ func (l *lexer) lexUnsigned() (*big.Int, error) {
 		case EOF:
 			return nil, fmt.Errorf("unterminated number: %d", num)
 		default:
-			panic(invalidToken(tok))
+			panic("ws: unrecognized token")
 		}
 	}
 }
 
-func invalidToken(tok SpaceToken) string {
-	return fmt.Sprintf("ws: invalid token: %d", tok)
-}
-
 func init() {
-	lexInst = func(l *lexer) (stateFn, error) {
-		l.pos = l.r.Pos()
-		return transition(states{
-			Space: lexStack,
-			Tab: transition(states{
-				Space: lexArith,
-				Tab:   lexHeap,
-				LF:    lexIO,
-			}),
-			LF:   lexFlow,
-			Root: true,
-		})(l)
-	}
+	lexInst = root(states{
+		Space: lexStack,
+		Tab: transition(states{
+			Space: lexArith,
+			Tab:   lexHeap,
+			LF:    lexIO,
+		}),
+		LF: lexFlow,
+	})
 }
 
 var lexInst stateFn

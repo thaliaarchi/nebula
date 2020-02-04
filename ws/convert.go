@@ -171,7 +171,7 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token) *big.Int 
 		appendRead(p, block, ir.Readi)
 
 	default:
-		panic(fmt.Sprintf("ws: illegal token: %v", tok.Type))
+		panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
 	}
 	return nil
 }

@@ -113,8 +113,9 @@ func (f *formatter) FormatNode(node Node) string {
 		return "ret"
 	case *ExitStmt:
 		return "exit"
+	default:
+		panic("ir: unrecognized node type")
 	}
-	panic("ir: unrecognized node type")
 }
 
 func (f *formatter) FormatVal(val *Val) string {
@@ -139,8 +140,9 @@ func (f *formatter) FormatVal(val *Val) string {
 		return bigint.FormatSlice(v.Array)
 	case *PhiVal:
 		return fmt.Sprintf("phi(%s)", f.FormatValSlice(v.Vals))
+	default:
+		panic("ir: unrecognized val type")
 	}
-	panic("ir: unrecognized val type")
 }
 
 func (f *formatter) FormatValSlice(vals []*Val) string {

@@ -133,6 +133,8 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 				} else {
 					panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
 				}
+			default:
+				panic("codegen: unrecognized val type")
 			}
 		}
 	}
@@ -168,6 +170,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			val = b.CreateOr(lhs, rhs, "or")
 		case ir.Xor:
 			val = b.CreateXor(lhs, rhs, "xor")
+		default:
+			panic("codegen: unrecognized binary op")
 		}
 		idents[*inst.Assign] = val
 	case *ir.UnaryExpr:
@@ -175,6 +179,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 		case ir.Neg:
 			val := lookupVal(*inst.Val, idents)
 			idents[*inst.Assign] = b.CreateSub(zero, val, "neg")
+		default:
+			panic("codegen: unrecognized unary op")
 		}
 	case *ir.LoadExpr:
 		addr := d.heapAddr(b, *inst.Addr, idents)
@@ -190,6 +196,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			f = d.PrintcFunc
 		case ir.Printi:
 			f = d.PrintiFunc
+		default:
+			panic("codegen: unrecognized print op")
 		}
 		val := lookupVal(*inst.Val, idents)
 		b.CreateCall(f, []llvm.Value{val}, "")
@@ -200,6 +208,8 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 			f = d.ReadcFunc
 		case ir.Readi:
 			f = d.ReadiFunc
+		default:
+			panic("codegen: unrecognized read op")
 		}
 		idents[*inst.Assign] = b.CreateCall(f, []llvm.Value{}, "read")
 	case *ir.FlushStmt:
@@ -265,6 +275,8 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 			cond = b.CreateICmp(llvm.IntEQ, val, zero, "cmp")
 		case ir.Jn:
 			cond = b.CreateICmp(llvm.IntSLT, val, zero, "cmp")
+		default:
+			panic("codegen: unrecognized conditional jump op")
 		}
 		b.CreateCondBr(cond, blocks[term.Then], blocks[term.Else])
 	case *ir.RetStmt:
@@ -282,7 +294,7 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 	case *ir.ExitStmt:
 		b.CreateRetVoid()
 	default:
-		panic("codegen: unrecognized branch type")
+		panic("codegen: unrecognized terminator type")
 	}
 }
 
