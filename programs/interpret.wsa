@@ -446,6 +446,8 @@ interpret:
     push INST_END
     store
 
+    call .debug_dump_program
+
     # reset IP to IMIN
     push IMIN
     store
@@ -464,6 +466,13 @@ interpret:
 # find instruction with binary search
 .select_inst:
     # drop temp value
+    drop
+
+    # print instruction for debugging
+    push IP
+    retrieve
+    call .debug_print_inst
+    drop
     drop
 
     # push current instruction ID
@@ -539,8 +548,6 @@ interpret:
 
 
 .do_push:
-    # push 0; push 'h'; push 's'; push 'u'; push 'p'; call .debug_inst_arg
-
     # push SP and *SP
     push SP
     dup
@@ -563,8 +570,6 @@ interpret:
     jmp .select_next_inst
 
 .do_dup:
-    # push 0; push 'p'; push 'u'; push 'd'; call .debug_inst
-
     push 1; call .check_stack_underflow
 
     # push SP and *SP
@@ -588,8 +593,6 @@ interpret:
     jmp .select_next_inst
 
 .do_copy:
-    # push 0; push 'y'; push 'p'; push 'o'; push 'c'; call .debug_inst_arg
-
     # replace temp value with argument
     drop
 
@@ -625,8 +628,6 @@ interpret:
     jmp .select_next_inst
 
 .do_swap:
-    # push 0; push 'p'; push 'a'; push 'w'; push 's'; call .debug_inst
-
     push 2; call .check_stack_underflow
 
     # push *SP-1, *(*SP-2), *SP-2, and *(*SP-1)
@@ -650,8 +651,6 @@ interpret:
     jmp .select_next_inst
 
 .do_drop:
-    # push 0; push 'p'; push 'o'; push 'r'; push 'd'; call .debug_inst
-
     push 1; call .check_stack_underflow
 
     # decrement SP
@@ -665,43 +664,35 @@ interpret:
     jmp .select_next_inst
 
 .do_slide:
-    # push 0; push 'e'; push 'd'; push 'i'; push 'l'; push 's'; call .debug_inst
     jmp .err_unimplemented_inst
 
 .do_add:
-    # push 0; push 'd'; push 'd'; push 'a'; call .debug_inst
     call .arith_retrieve
     add
     jmp .arith_store
 
 .do_sub:
-    # push 0; push 'b'; push 'u'; push 's'; call .debug_inst
     call .arith_retrieve
     sub
     jmp .arith_store
 
 .do_mul:
-    # push 0; push 'l'; push 'u'; push 'm'; call .debug_inst
     call .arith_retrieve
     mul
     jmp .arith_store
 
 .do_div:
-    # push 0; push 'v'; push 'i'; push 'd'; call .debug_inst
     call .arith_retrieve
     dup; jz .err_division_by_zero
     div
     jmp .arith_store
 
 .do_mod:
-    # push 0; push 'd'; push 'o'; push 'm'; call .debug_inst
     call .arith_retrieve
     mod
     jmp .arith_store
 
 .do_store:
-    # push 0; push 'e'; push 'r'; push 'o'; push 't'; push 's'; call .debug_inst
-
     push 2; call .check_stack_underflow
 
     # push SP and *SP-2
@@ -728,8 +719,6 @@ interpret:
     jmp .select_next_inst
 
 .do_retrieve:
-    # push 0; push 'e'; push 'v'; push 'e'; push 'i'; push 'r'; push 't'; push 'e'; push 'r'; call .debug_inst
-
     push 1; call .check_stack_underflow
 
     # push SP and *SP-1
@@ -748,8 +737,6 @@ interpret:
     jmp .select_next_inst
 
 .do_call:
-    # push 0; push 'l'; push 'l'; push 'a'; push 'c'; call .debug_inst_arg
-
     # push CP, *CP, and *CP
     push CP
     dup
@@ -773,8 +760,6 @@ interpret:
     # fallthrough
 
 .do_jmp:
-    # push 0; push 'p'; push 'm'; push 'j'; call .debug_inst_arg
-
     # push IP and address of jmp label
     push IP
     dup
@@ -789,22 +774,16 @@ interpret:
     jmp .select_inst
 
 .do_jz:
-    # push 0; push 'z'; push 'j'; call .debug_inst_arg
-
     call .pop_stack
     jz .do_jmp
     jmp .select_next_inst
 
 .do_jn:
-    # push 0; push 'n'; push 'j'; call .debug_inst_arg
-
     call .pop_stack
     jn .do_jmp
     jmp .select_next_inst
 
 .do_ret:
-    # push 0; push 't'; push 'e'; push 'r'; call .debug_inst
-
     call .check_call_stack_underflow
 
     # push CP and *CP-1
@@ -826,37 +805,27 @@ interpret:
     jmp .select_inst
 
 .do_end:
-    # push 0; push 'd'; push 'n'; push 'e'; call .debug_inst
-
     # drop temp value and end
     drop
     end
 
 .do_printc:
-    # push 0; push 'c'; push 't'; push 'n'; push 'i'; push 'r'; push 'p'; call .debug_inst
-
     call .pop_stack
     printc
     jmp .select_next_inst
 
 .do_printi:
-    # push 0; push 'i'; push 't'; push 'n'; push 'i'; push 'r'; push 'p'; call .debug_inst
-
     call .pop_stack
     printi
     jmp .select_next_inst
 
 .do_readc:
-    # push 0; push 'c'; push 'd'; push 'a'; push 'e'; push 'r'; call .debug_inst
-
     call .pop_stack
     call .to_heap_addr
     readc
     jmp .select_next_inst
 
 .do_readi:
-    # push 0; push 'i'; push 'd'; push 'a'; push 'e'; push 'r'; call .debug_inst
-
     call .pop_stack
     call .to_heap_addr
     readi
@@ -1219,20 +1188,6 @@ interpret:
     call .str_error
     jmp print
 
-.debug_inst:
-    jmp println
-.debug_inst_arg:
-    call print
-    push ' '; printc
-    push IP
-    retrieve
-    push 1
-    add
-    retrieve
-    printi
-    push '\n'; printc
-    ret
-
 # print prints a string on the stack terminated with 0
 # params: char..., 0
 print:
@@ -1247,5 +1202,97 @@ print:
 # params: char..., 0
 println:
     call print
+    push '\n'; printc
+    ret
+
+# .debug_dump_program prints all instructions ranging from IMIN to IP
+.debug_dump_program:
+    push IP
+    retrieve
+.debug_dump_loop:
+    push IMIN
+    copy 1
+    sub
+    jn .debug_dump_break
+    dup
+    call .debug_print_inst
+    push 1
+    add
+    jmp .debug_dump_loop
+.debug_dump_break:
+    drop
+    drop
+    ret
+
+# params: addr
+.debug_print_inst:
+    dup
+    push IMIN
+    sub
+    push '('; printc
+    printi
+    push ')'; printc
+    push '\t'; printc
+
+    dup
+    retrieve
+    dup; push INST_PUSH;     sub; jz .debug_print_push
+    dup; push INST_DUP;      sub; jz .debug_print_dup
+    dup; push INST_STORE;    sub; jz .debug_print_copy
+    dup; push INST_SUB;      sub; jz .debug_print_swap
+    dup; push INST_JZ;       sub; jz .debug_print_drop
+    dup; push INST_RETRIEVE; sub; jz .debug_print_slide
+    dup; push INST_JMP;      sub; jz .debug_print_add
+    dup; push INST_CALL;     sub; jz .debug_print_sub
+    dup; push INST_DROP;     sub; jz .debug_print_mul
+    dup; push INST_PRINTC;   sub; jz .debug_print_div
+    dup; push INST_RET;      sub; jz .debug_print_mod
+    dup; push INST_ADD;      sub; jz .debug_print_store
+    dup; push INST_SWAP;     sub; jz .debug_print_retrieve
+    dup; push INST_PRINTI;   sub; jz .debug_print_call
+    dup; push INST_JN;       sub; jz .debug_print_jmp
+    dup; push INST_END;      sub; jz .debug_print_jz
+    dup; push INST_MUL;      sub; jz .debug_print_jn
+    dup; push INST_READC;    sub; jz .debug_print_ret
+    dup; push INST_READI;    sub; jz .debug_print_end
+    dup; push INST_COPY;     sub; jz .debug_print_printc
+    dup; push INST_SLIDE;    sub; jz .debug_print_printi
+    dup; push INST_DIV;      sub; jz .debug_print_readc
+    dup; push INST_MOD;      sub; jz .debug_print_readi
+    ret
+
+.debug_print_push:     push 0; push 'h'; push 's'; push 'u'; push 'p'; jmp .debug_print_arg
+.debug_print_dup:      push 0; push 'p'; push 'u'; push 'd'; jmp println
+.debug_print_copy:     push 0; push 'y'; push 'p'; push 'o'; push 'c'; jmp .debug_print_arg
+.debug_print_swap:     push 0; push 'p'; push 'a'; push 'w'; push 's'; jmp println
+.debug_print_drop:     push 0; push 'p'; push 'o'; push 'r'; push 'd'; jmp println
+.debug_print_slide:    push 0; push 'e'; push 'd'; push 'i'; push 'l'; push 's'; jmp println
+.debug_print_add:      push 0; push 'd'; push 'd'; push 'a'; jmp println
+.debug_print_sub:      push 0; push 'b'; push 'u'; push 's'; jmp println
+.debug_print_mul:      push 0; push 'l'; push 'u'; push 'm'; jmp println
+.debug_print_div:      push 0; push 'v'; push 'i'; push 'd'; jmp println
+.debug_print_mod:      push 0; push 'd'; push 'o'; push 'm'; jmp println
+.debug_print_store:    push 0; push 'e'; push 'r'; push 'o'; push 't'; push 's'; jmp println
+.debug_print_retrieve: push 0; push 'e'; push 'v'; push 'e'; push 'i'; push 'r'; push 't'; push 'e'; push 'r'; jmp println
+.debug_print_call:     push 0; push 'l'; push 'l'; push 'a'; push 'c'; jmp .debug_print_arg
+.debug_print_jmp:      push 0; push 'p'; push 'm'; push 'j'; jmp .debug_print_arg
+.debug_print_jz:       push 0; push 'z'; push 'j'; jmp .debug_print_arg
+.debug_print_jn:       push 0; push 'n'; push 'j'; jmp .debug_print_arg
+.debug_print_ret:      push 0; push 't'; push 'e'; push 'r'; jmp println
+.debug_print_end:      push 0; push 'd'; push 'n'; push 'e'; jmp println
+.debug_print_printc:   push 0; push 'c'; push 't'; push 'n'; push 'i'; push 'r'; push 'p'; jmp println
+.debug_print_printi:   push 0; push 'i'; push 't'; push 'n'; push 'i'; push 'r'; push 'p'; jmp println
+.debug_print_readc:    push 0; push 'c'; push 'd'; push 'a'; push 'e'; push 'r'; jmp println
+.debug_print_readi:    push 0; push 'i'; push 'd'; push 'a'; push 'e'; push 'r'; jmp println
+
+# .debug_print_arg prints an instruction and its argument
+# params: char..., 0, addr
+.debug_print_arg:
+    call print
+    push ' '; printc
+    push 1
+    add
+    retrieve
+    printi
     push '\n'; printc
     ret
