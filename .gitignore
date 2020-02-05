@@ -8,6 +8,7 @@ nebula
 
 /build
 *.ll
+*.out
 *.o
 *.s
 
