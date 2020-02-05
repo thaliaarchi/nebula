@@ -30,6 +30,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
+	defer f.Close()
 
 	var bitPacked, fold, emitWs, emitWsa, emitDot, emitMatrix, emitIR, emitLLVM bool
 	for _, mode := range os.Args[2:] {
@@ -74,7 +75,12 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
+		defer sourceMap.Close()
 		labelNames, err = ws.ParseSourceMap(sourceMap)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
 	}
 
 	p := ws.Program{Name: filename, Tokens: tokens, LabelNames: labelNames}

@@ -572,8 +572,7 @@ func (err *ErrorRetUnderflow) Error() string {
 	b.WriteString("call stack underflow\n")
 	for _, trace := range err.Traces {
 		fmt.Fprintf(&b, "  %s: ", trace[0].Name())
-		for i := len(trace); i > 0; {
-			i--
+		for i := len(trace) - 1; i >= 0; i-- {
 			b.WriteString(trace[i].Name())
 			if i != 0 {
 				b.WriteString(" -> ")

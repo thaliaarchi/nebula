@@ -73,7 +73,8 @@ var (
 )
 
 func foldBinaryL(p *ir.Program, expr *ir.BinaryExpr, lhs *big.Int) (*ir.Val, bool) {
-	if lhs.Sign() == 0 {
+	switch lhs.Sign() {
+	case 0:
 		switch expr.Op {
 		case ir.Add:
 			return expr.RHS, false
@@ -85,16 +86,21 @@ func foldBinaryL(p *ir.Program, expr *ir.BinaryExpr, lhs *big.Int) (*ir.Val, boo
 			// TODO trap if RHS zero
 			return expr.LHS, false
 		}
-	} else if expr.Op == ir.Mul && lhs.Cmp(bigOne) == 0 {
-		return expr.RHS, false
-	} else if expr.Op == ir.Mul && lhs.Cmp(bigNegOne) == 0 {
-		return expr.RHS, true
+	case 1:
+		if expr.Op == ir.Mul && lhs.Cmp(bigOne) == 0 {
+			return expr.RHS, false
+		}
+	case -1:
+		if expr.Op == ir.Mul && lhs.Cmp(bigNegOne) == 0 {
+			return expr.RHS, true
+		}
 	}
 	return nil, false
 }
 
 func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, bool) {
-	if rhs.Sign() == 0 {
+	switch rhs.Sign() {
+	case 0:
 		switch expr.Op {
 		case ir.Add, ir.Sub:
 			return expr.LHS, false
@@ -103,26 +109,39 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, boo
 		case ir.Div, ir.Mod:
 			panic("analysis: divide by zero")
 		}
-	} else if rhs.Cmp(bigOne) == 0 {
-		switch expr.Op {
-		case ir.Mul, ir.Div:
-			return expr.LHS, false
-		case ir.Mod:
-			return p.LookupConst(bigZero), false
+	case 1:
+		if rhs.Cmp(bigOne) == 0 {
+			switch expr.Op {
+			case ir.Mul, ir.Div:
+				return expr.LHS, false
+			case ir.Mod:
+				return p.LookupConst(bigZero), false
+			}
+		} else {
+			l := rhs.BitLen()
+			ntz := rhs.TrailingZeroBits()
+			if l == int(ntz)+1 {
+				switch expr.Op {
+				case ir.Mul:
+					expr.Op = ir.Shl
+					expr.RHS = p.LookupConst(new(big.Int).SetUint64(uint64(ntz)))
+				case ir.Div:
+					expr.Op = ir.AShr
+					expr.RHS = p.LookupConst(new(big.Int).SetUint64(uint64(ntz)))
+				case ir.Mod:
+					expr.Op = ir.And
+					expr.RHS = p.LookupConst(new(big.Int).Sub(rhs, bigOne))
+				}
+			}
 		}
-	} else if rhs.Cmp(bigNegOne) == 0 {
-		switch expr.Op {
-		case ir.Mul, ir.Div:
-			return expr.LHS, true
-		case ir.Mod:
-			return p.LookupConst(bigZero), false
-		}
-	} else if expr.Op == ir.Mod {
-		x := new(big.Int).Sub(rhs, bigOne)
-		y := new(big.Int).And(rhs, x)
-		if y.Sign() == 0 { // v & (v - 1) == 0
-			expr.Op = ir.And
-			expr.RHS = p.LookupConst(x)
+	case -1:
+		if rhs.Cmp(bigNegOne) == 0 {
+			switch expr.Op {
+			case ir.Mul, ir.Div:
+				return expr.LHS, true
+			case ir.Mod:
+				return p.LookupConst(bigZero), false
+			}
 		}
 	}
 	return nil, false

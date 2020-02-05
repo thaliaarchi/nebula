@@ -7,11 +7,14 @@ This project is evolving very rapidly.
 
 ## Usage
 
-Building Nebula requires Go and the LLVM source. Graphviz can be
-optionally used to render generated DOT graphs.
+Requirements
+
+- Go 1.13 or later
+- LLVM source
+- Graphviz to render graphs
 
 ```sh
-go get https://github.com/andrewarchi/nebula
+go get -d github.com/andrewarchi/nebula
 cd nebula
 go get ./...
 go build
