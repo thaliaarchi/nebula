@@ -10,7 +10,7 @@ import (
 	"github.com/andrewarchi/nebula/ws"
 )
 
-func TestTransforms(t *testing.T) {
+func TestFoldConstArith(t *testing.T) {
 	// push 1    ; 0
 	// push 3    ; 1
 	// push 10   ; 2
@@ -64,7 +64,6 @@ func TestTransforms(t *testing.T) {
 	vB := ir.Val(&ir.ConstVal{Int: big.NewInt('B')})
 	vC := ir.Val(&ir.ConstVal{Int: big.NewInt('C')})
 	va := ir.Val(&ir.ConstVal{Int: big.NewInt('a')})
-	vABC123 := ir.Val(&ir.StringVal{Str: "ABC123"})
 	s0 := ir.Val(&ir.SSAVal{})
 	s1 := ir.Val(&ir.SSAVal{})
 	s2 := ir.Val(&ir.SSAVal{})
@@ -178,25 +177,26 @@ func TestTransforms(t *testing.T) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
 
-	blockStr := &ir.BasicBlock{
-		Nodes: []ir.Node{
-			&ir.PrintStmt{Op: ir.Prints, Val: &vABC123},
-		},
-		Terminator: &ir.ExitStmt{},
-		Stack:      stack,
-		Entries:    []*ir.BasicBlock{nil},
-		Callers:    []*ir.BasicBlock{nil},
-	}
-	programStr := &ir.Program{
-		Name:        "test",
-		Blocks:      []*ir.BasicBlock{blockStr},
-		Entry:       blockStr,
-		ConstVals:   *constVals,
-		NextBlockID: 1,
-	}
+	// vABC123 := ir.Val(&ir.StringVal{Str: "ABC123"})
+	// blockStr := &ir.BasicBlock{
+	// 	Nodes: []ir.Node{
+	// 		&ir.PrintStmt{Op: ir.Prints, Val: &vABC123},
+	// 	},
+	// 	Terminator: &ir.ExitStmt{},
+	// 	Stack:      stack,
+	// 	Entries:    []*ir.BasicBlock{nil},
+	// 	Callers:    []*ir.BasicBlock{nil},
+	// }
+	// programStr := &ir.Program{
+	// 	Name:        "test",
+	// 	Blocks:      []*ir.BasicBlock{blockStr},
+	// 	Entry:       blockStr,
+	// 	ConstVals:   *constVals,
+	// 	NextBlockID: 1,
+	// }
 
-	ConcatStrings(program)
-	if !reflect.DeepEqual(program, programStr) {
-		t.Errorf("string concat not equal\ngot:\n%v\nwant:\n%v", program, programStr)
-	}
+	// ConcatStrings(program)
+	// if !reflect.DeepEqual(program, programStr) {
+	// 	t.Errorf("string concat not equal\ngot:\n%v\nwant:\n%v", program, programStr)
+	// }
 }

@@ -49,15 +49,17 @@ type StackVal struct{ Pos int }
 // constant operands.
 type ConstVal struct{ Int *big.Int }
 
-// StringVal is a sequence of characters.
-type StringVal struct{ Str string }
-
-// ArrayVal is a sequence of integers.
-type ArrayVal struct{ Array []*big.Int }
-
 // PhiVal represents an SSA Φ function and stores the set of values it
 // could be.
-type PhiVal struct{ Vals []*Val }
+type PhiVal struct {
+	Refs []PhiRef
+}
+
+// PhiRef is a reference in a PhiVal.
+type PhiRef struct {
+	Val   *Val
+	Block *BasicBlock
+}
 
 // Node can be any expr or stmt type.
 type Node interface {
@@ -384,6 +386,11 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 	}
 }
 
+// AddIncoming adds a val for an incoming edge to the phi node.
+func (phi *PhiVal) AddIncoming(val *Val, block *BasicBlock) {
+	phi.Refs = append(phi.Refs, PhiRef{val, block})
+}
+
 // Name returns the name of the basic block from either the first label
 // or the block address.
 func (block *BasicBlock) Name() string {
@@ -459,12 +466,10 @@ func (block *BasicBlock) String() string {
 	return newFormatter().FormatBlock(block)
 }
 
-func (SSAVal) val()    {}
-func (StackVal) val()  {}
-func (ConstVal) val()  {}
-func (StringVal) val() {}
-func (ArrayVal) val()  {}
-func (PhiVal) val()    {}
+func (SSAVal) val()   {}
+func (StackVal) val() {}
+func (ConstVal) val() {}
+func (PhiVal) val()   {}
 
 func (BinaryExpr) node()  {}
 func (UnaryExpr) node()   {}

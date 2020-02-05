@@ -3,8 +3,6 @@ package ir // import "github.com/andrewarchi/nebula/ir"
 import (
 	"fmt"
 	"strings"
-
-	"github.com/andrewarchi/nebula/bigint"
 )
 
 type formatter struct {
@@ -134,28 +132,23 @@ func (f *formatter) FormatVal(val *Val) string {
 		return fmt.Sprintf("%%s%d", v.Pos)
 	case *ConstVal:
 		return v.Int.String()
-	case *StringVal:
-		return fmt.Sprintf("%q", v.Str)
-	case *ArrayVal:
-		return bigint.FormatSlice(v.Array)
 	case *PhiVal:
-		return fmt.Sprintf("phi(%s)", f.FormatValSlice(v.Vals))
+		var b strings.Builder
+		b.WriteString("phi [")
+		for i, ref := range v.Refs {
+			if i != 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(f.FormatVal(ref.Val))
+			b.WriteByte(' ')
+			b.WriteString(ref.Block.Name())
+		}
+		b.WriteByte(']')
+		return b.String()
 	default:
 		panic("ir: unrecognized val type")
 	}
 }
-
-func (f *formatter) FormatValSlice(vals []*Val) string {
-	var b strings.Builder
-	for i, val := range vals {
-		if i != 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(f.FormatVal(val))
-	}
-	return b.String()
-}
-
 func formatBlockSlice(blocks []*BasicBlock) string {
 	if len(blocks) == 0 {
 		return "-"

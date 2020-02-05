@@ -3,6 +3,7 @@ nebula
 
 *.out.wsa
 *.wsx
+*.nir
 *.ir
 
 /build
