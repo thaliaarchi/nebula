@@ -117,22 +117,19 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr, rhs *big.Int) (*ir.Val, boo
 			case ir.Mod:
 				return p.LookupConst(bigZero), false
 			}
-		} else {
-			l := rhs.BitLen()
-			ntz := rhs.TrailingZeroBits()
-			if l == int(ntz)+1 {
-				switch expr.Op {
-				case ir.Mul:
-					expr.Op = ir.Shl
-					expr.RHS = p.LookupConst(new(big.Int).SetUint64(uint64(ntz)))
-				case ir.Div:
-					expr.Op = ir.AShr
-					expr.RHS = p.LookupConst(new(big.Int).SetUint64(uint64(ntz)))
-				case ir.Mod:
-					expr.Op = ir.And
-					expr.RHS = p.LookupConst(new(big.Int).Sub(rhs, bigOne))
-				}
+		} else if ntz := rhs.TrailingZeroBits(); uint(rhs.BitLen()) == ntz+1 {
+			switch expr.Op {
+			case ir.Mul:
+				expr.Op = ir.Shl
+				expr.RHS = p.LookupConst(new(big.Int).SetUint64(uint64(ntz)))
+			case ir.Div:
+				expr.Op = ir.AShr
+				expr.RHS = p.LookupConst(new(big.Int).SetUint64(uint64(ntz)))
+			case ir.Mod:
+				expr.Op = ir.And
+				expr.RHS = p.LookupConst(new(big.Int).Sub(rhs, bigOne))
 			}
+			return nil, false
 		}
 	case -1:
 		if rhs.Cmp(bigNegOne) == 0 {

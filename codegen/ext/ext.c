@@ -14,12 +14,12 @@ void printi(int64_t i) {
 }
 
 int64_t readc() {
-  return fgetc(stdout);
+  return fgetc(stdin);
 }
 
 int64_t readi() {
   int i;
-  scanf("%d", &i);
+  fscanf(stdin, "%d", &i);
   return i;
 }
 
