@@ -50,6 +50,7 @@ Examples:
 	%s -mode=llvm programs/ascii4.out.ws > ascii4.ll
 	%s -mode=llvm -heap=400000 programs/interpret.out.ws > interpret.ll
 	%s -mode=dot programs/interpret.out.ws | dot -Tpng > graph.png
+
 `
 
 const modeUsage = `Output mode:
@@ -58,7 +59,7 @@ const modeUsage = `Output mode:
 * ir      emit Nebula IR (default)
 * llvm    emit LLVM IR
 * dot     print control flow graph as Graphviz DOT digraph
-* matrix  print control flow graph as matrix`
+* matrix  print control flow graph as Unicode matrix`
 
 func init() {
 	flag.Usage = usage
@@ -67,7 +68,7 @@ func init() {
 	flag.UintVar(&maxCallStackLen, "calls", codegen.DefaultMaxCallStackLen, "Maximum call stack length for LLVM codegen")
 	flag.UintVar(&maxHeapBound, "heap", codegen.DefaultMaxHeapBound, "Maximum heap address bound for LLVM codegen")
 	flag.BoolVar(&noFold, "nofold", false, "Disable constant folding")
-	flag.BoolVar(&packed, "packed", false, "Input file is in bit packed format")
+	flag.BoolVar(&packed, "packed", false, "Enable bit packed format for input file")
 }
 
 func main() {
@@ -170,7 +171,7 @@ func emitLLVM(p *ws.Program) {
 	program := convertSSA(p)
 	mod := codegen.EmitLLVMIR(program, conf)
 	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
-		fmt.Fprintln(os.Stdout, err)
+		fmt.Fprintln(os.Stderr, err)
 	}
 	fmt.Print(mod.String())
 }

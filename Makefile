@@ -8,5 +8,8 @@ build/%: programs/%.ws nebula compile codegen/ext/ext.c
 build/%: programs/%.out.ws nebula compile codegen/ext/ext.c
 	./compile $< $@
 
+build/interpret: programs/interpret.out.ws nebula compile codegen/ext/ext.c
+	./compile $< $@ -O3 -heap=1000000
+
 clean:
 	rm -rf build
