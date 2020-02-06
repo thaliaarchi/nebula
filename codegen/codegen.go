@@ -123,8 +123,7 @@ func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.
 	idents := make(map[ir.Val]llvm.Value)
 	if block.Stack.Access > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(block.Stack.Access), false)
-		name := b.CreateInBoundsGEP(d.BlockNames[block], []llvm.Value{zero, zero}, "name")
-		b.CreateCall(d.CheckStackFunc, []llvm.Value{n, name}, "")
+		b.CreateCall(d.CheckStackFunc, []llvm.Value{n, d.blockName(b, block)}, "")
 	}
 	stackLen := b.CreateLoad(d.StackLen, "stack_len")
 
@@ -292,8 +291,7 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		}
 		b.CreateCondBr(cond, blocks[term.Then], blocks[term.Else])
 	case *ir.RetStmt:
-		name := b.CreateInBoundsGEP(d.BlockNames[block], []llvm.Value{zero, zero}, "name")
-		b.CreateCall(d.CheckCallStackFunc, []llvm.Value{name}, "")
+		b.CreateCall(d.CheckCallStackFunc, []llvm.Value{d.blockName(b, block)}, "")
 		callStackLen := b.CreateLoad(d.CallStackLen, "call_stack_len")
 		callStackLen = b.CreateSub(callStackLen, one, "call_stack_len")
 		b.CreateStore(callStackLen, d.CallStackLen)
@@ -314,6 +312,10 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 func (d *defs) heapAddr(b llvm.Builder, val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
 	addr := lookupVal(val, idents)
 	return b.CreateInBoundsGEP(d.Heap, []llvm.Value{zero, addr}, "gep")
+}
+
+func (d *defs) blockName(b llvm.Builder, block *ir.BasicBlock) llvm.Value {
+	return b.CreateInBoundsGEP(d.BlockNames[block], []llvm.Value{zero, zero}, "name")
 }
 
 func lookupVal(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
