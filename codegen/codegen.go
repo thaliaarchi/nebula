@@ -23,6 +23,8 @@ type defs struct {
 	FlushFunc          llvm.Value
 	CheckStackFunc     llvm.Value
 	CheckCallStackFunc llvm.Value
+
+	BlockNames map[*ir.BasicBlock]llvm.Value
 }
 
 const (
@@ -41,8 +43,9 @@ func EmitLLVMIR(program *ir.Program) llvm.Module {
 	b := ctx.NewBuilder()
 	module := ctx.NewModule(program.Name)
 	var d defs
+	d.BlockNames = make(map[*ir.BasicBlock]llvm.Value)
 	d.declareFuncs(module)
-	d.declareGlobals(module)
+	d.declareGlobals(ctx, module, program.Blocks)
 
 	entry := ctx.AddBasicBlock(d.MainFunc, "")
 	blocks := make(map[*ir.BasicBlock]llvm.BasicBlock)
@@ -74,8 +77,8 @@ func (d *defs) declareFuncs(module llvm.Module) {
 	readcTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	readiTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	flushTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
-	checkStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
-	checkCallStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
+	checkStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type(), llvm.PointerType(llvm.Int8Type(), 0)}, false)
+	checkCallStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.PointerType(llvm.Int8Type(), 0)}, false)
 	d.PrintcFunc = llvm.AddFunction(module, "printc", printcTyp)
 	d.PrintiFunc = llvm.AddFunction(module, "printi", printiTyp)
 	d.ReadcFunc = llvm.AddFunction(module, "readc", readcTyp)
@@ -92,7 +95,7 @@ func (d *defs) declareFuncs(module llvm.Module) {
 	d.CheckCallStackFunc.SetLinkage(llvm.ExternalLinkage)
 }
 
-func (d *defs) declareGlobals(module llvm.Module) {
+func (d *defs) declareGlobals(ctx llvm.Context, module llvm.Module, blocks []*ir.BasicBlock) {
 	stackTyp := llvm.ArrayType(llvm.Int64Type(), maxStackSize)
 	callStackTyp := llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackSize)
 	heapTyp := llvm.ArrayType(llvm.Int64Type(), heapSize)
@@ -106,13 +109,22 @@ func (d *defs) declareGlobals(module llvm.Module) {
 	d.CallStack.SetInitializer(llvm.ConstNull(callStackTyp))
 	d.CallStackLen.SetInitializer(zero)
 	d.Heap.SetInitializer(llvm.ConstNull(heapTyp))
+
+	for _, block := range blocks {
+		name := block.Name()
+		nameGlobal := llvm.AddGlobal(module, llvm.ArrayType(llvm.Int8Type(), len(name)+1), "name_"+name)
+		nameGlobal.SetInitializer(ctx.ConstString(name, true))
+		nameGlobal.SetLinkage(llvm.PrivateLinkage)
+		d.BlockNames[block] = nameGlobal
+	}
 }
 
 func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.Value, llvm.Value) {
 	idents := make(map[ir.Val]llvm.Value)
 	if block.Stack.Access > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(block.Stack.Access), false)
-		b.CreateCall(d.CheckStackFunc, []llvm.Value{n}, "")
+		name := b.CreateInBoundsGEP(d.BlockNames[block], []llvm.Value{zero, zero}, "name")
+		b.CreateCall(d.CheckStackFunc, []llvm.Value{n, name}, "")
 	}
 	stackLen := b.CreateLoad(d.StackLen, "stack_len")
 
@@ -280,9 +292,10 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 		}
 		b.CreateCondBr(cond, blocks[term.Then], blocks[term.Else])
 	case *ir.RetStmt:
+		name := b.CreateInBoundsGEP(d.BlockNames[block], []llvm.Value{zero, zero}, "name")
+		b.CreateCall(d.CheckCallStackFunc, []llvm.Value{name}, "")
 		callStackLen := b.CreateLoad(d.CallStackLen, "call_stack_len")
 		callStackLen = b.CreateSub(callStackLen, one, "call_stack_len")
-		b.CreateCall(d.CheckCallStackFunc, []llvm.Value{}, "")
 		b.CreateStore(callStackLen, d.CallStackLen)
 		gep := b.CreateInBoundsGEP(d.CallStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 		addr := b.CreateLoad(gep, "ret_addr")
