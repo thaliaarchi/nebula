@@ -2,10 +2,11 @@
 
 program="$1"
 out="$2"
+opt=${3:-"-O3"}
 
 mkdir -p build &&
 ./nebula "$program" llvm > "$out.ll" &&
-clang -S -emit-llvm -o build/ext.ll codegen/ext/ext.c &&
+clang $opt -S -emit-llvm -o build/ext.ll codegen/ext/ext.c &&
 llvm-link -o "$out.o" "$out.ll" build/ext.ll &&
-llc "$out.o" &&
-clang -o "$out" "$out.o.s"
+llc $opt "$out.o" &&
+clang $opt -o "$out" "$out.o.s"
