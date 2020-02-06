@@ -2,10 +2,10 @@ all: build/99_bottles build/ascii build/ascii4 build/caesar \
 	build/collatz build/factorial build/fib build/fizz_buzz \
 	build/hello_world build/interpret build/pi
 
-build/%: programs/%.ws nebula
+build/%: programs/%.ws nebula codegen/ext/ext.c
 	./compile $< $@
 
-build/%: programs/%.out.ws nebula
+build/%: programs/%.out.ws nebula codegen/ext/ext.c
 	./compile $< $@
 
 clean:

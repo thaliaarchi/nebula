@@ -28,9 +28,9 @@ type defs struct {
 }
 
 const (
-	maxStackSize     = 1024
-	maxCallStackSize = 256
-	heapSize         = 4096
+	maxStackLen     = 1024
+	maxCallStackLen = 256
+	maxHeapBound    = 400000 // large for interpret.wsa
 )
 
 var (
@@ -38,6 +38,7 @@ var (
 	one  = llvm.ConstInt(llvm.Int64Type(), 1, false)
 )
 
+// EmitLLVMIR generates LLVM IR for the given program.
 func EmitLLVMIR(program *ir.Program) llvm.Module {
 	ctx := llvm.GlobalContext()
 	b := ctx.NewBuilder()
@@ -79,6 +80,7 @@ func (d *defs) declareFuncs(module llvm.Module) {
 	flushTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
 	checkStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type(), llvm.PointerType(llvm.Int8Type(), 0)}, false)
 	checkCallStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.PointerType(llvm.Int8Type(), 0)}, false)
+
 	d.PrintcFunc = llvm.AddFunction(module, "printc", printcTyp)
 	d.PrintiFunc = llvm.AddFunction(module, "printi", printiTyp)
 	d.ReadcFunc = llvm.AddFunction(module, "readc", readcTyp)
@@ -86,6 +88,7 @@ func (d *defs) declareFuncs(module llvm.Module) {
 	d.FlushFunc = llvm.AddFunction(module, "flush", flushTyp)
 	d.CheckStackFunc = llvm.AddFunction(module, "check_stack", checkStackTyp)
 	d.CheckCallStackFunc = llvm.AddFunction(module, "check_call_stack", checkCallStackTyp)
+
 	d.PrintcFunc.SetLinkage(llvm.ExternalLinkage)
 	d.PrintiFunc.SetLinkage(llvm.ExternalLinkage)
 	d.ReadcFunc.SetLinkage(llvm.ExternalLinkage)
@@ -96,14 +99,16 @@ func (d *defs) declareFuncs(module llvm.Module) {
 }
 
 func (d *defs) declareGlobals(ctx llvm.Context, module llvm.Module, blocks []*ir.BasicBlock) {
-	stackTyp := llvm.ArrayType(llvm.Int64Type(), maxStackSize)
-	callStackTyp := llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackSize)
-	heapTyp := llvm.ArrayType(llvm.Int64Type(), heapSize)
+	stackTyp := llvm.ArrayType(llvm.Int64Type(), maxStackLen)
+	callStackTyp := llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackLen)
+	heapTyp := llvm.ArrayType(llvm.Int64Type(), maxHeapBound)
+
 	d.StackLen = llvm.AddGlobal(module, llvm.Int64Type(), "stack_len")
 	d.Stack = llvm.AddGlobal(module, stackTyp, "stack")
 	d.CallStack = llvm.AddGlobal(module, callStackTyp, "call_stack")
 	d.CallStackLen = llvm.AddGlobal(module, llvm.Int64Type(), "call_stack_len")
 	d.Heap = llvm.AddGlobal(module, heapTyp, "heap")
+
 	d.Stack.SetInitializer(llvm.ConstNull(stackTyp))
 	d.StackLen.SetInitializer(zero)
 	d.CallStack.SetInitializer(llvm.ConstNull(callStackTyp))
