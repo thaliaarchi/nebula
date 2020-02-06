@@ -27,10 +27,18 @@ type defs struct {
 	BlockNames map[*ir.BasicBlock]llvm.Value
 }
 
+// Config stores configuration of allocation sizes for codegen.
+type Config struct {
+	MaxStackLen     uint
+	MaxCallStackLen uint
+	MaxHeapBound    uint
+}
+
+// Default configuration values.
 const (
-	maxStackLen     = 1024
-	maxCallStackLen = 256
-	maxHeapBound    = 400000 // large for interpret.wsa
+	DefaultMaxStackLen     = 1024
+	DefaultMaxCallStackLen = 256
+	DefaultMaxHeapBound    = 4096
 )
 
 var (
@@ -39,14 +47,15 @@ var (
 )
 
 // EmitLLVMIR generates LLVM IR for the given program.
-func EmitLLVMIR(program *ir.Program) llvm.Module {
+func EmitLLVMIR(program *ir.Program, conf Config) llvm.Module {
 	ctx := llvm.GlobalContext()
 	b := ctx.NewBuilder()
 	module := ctx.NewModule(program.Name)
+
 	var d defs
 	d.BlockNames = make(map[*ir.BasicBlock]llvm.Value)
 	d.declareFuncs(module)
-	d.declareGlobals(ctx, module, program.Blocks)
+	d.declareGlobals(ctx, module, program.Blocks, conf)
 
 	entry := ctx.AddBasicBlock(d.MainFunc, "")
 	blocks := make(map[*ir.BasicBlock]llvm.BasicBlock)
@@ -98,10 +107,10 @@ func (d *defs) declareFuncs(module llvm.Module) {
 	d.CheckCallStackFunc.SetLinkage(llvm.ExternalLinkage)
 }
 
-func (d *defs) declareGlobals(ctx llvm.Context, module llvm.Module, blocks []*ir.BasicBlock) {
-	stackTyp := llvm.ArrayType(llvm.Int64Type(), maxStackLen)
-	callStackTyp := llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), maxCallStackLen)
-	heapTyp := llvm.ArrayType(llvm.Int64Type(), maxHeapBound)
+func (d *defs) declareGlobals(ctx llvm.Context, module llvm.Module, blocks []*ir.BasicBlock, conf Config) {
+	stackTyp := llvm.ArrayType(llvm.Int64Type(), int(conf.MaxStackLen))
+	callStackTyp := llvm.ArrayType(llvm.PointerType(llvm.Int8Type(), 0), int(conf.MaxCallStackLen))
+	heapTyp := llvm.ArrayType(llvm.Int64Type(), int(conf.MaxHeapBound))
 
 	d.StackLen = llvm.AddGlobal(module, llvm.Int64Type(), "stack_len")
 	d.Stack = llvm.AddGlobal(module, stackTyp, "stack")

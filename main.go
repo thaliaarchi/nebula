@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -13,18 +14,77 @@ import (
 	"llvm.org/llvm/bindings/go/llvm"
 )
 
-const usage = `Usage:
-	nebula [file] [modes...]
-For example:
-	nebula programs/interpret.out.ws dot | dot -Tpng > graph.png`
+var (
+	mode            string
+	maxStackLen     uint
+	maxCallStackLen uint
+	maxHeapBound    uint
+	noFold          bool
+	packed          bool
+
+	modeActions = map[string]func(*ws.Program){
+		"":       emitIR,
+		"ws":     emitWS,
+		"wsa":    emitWSA,
+		"ir":     emitIR,
+		"llvm":   emitLLVM,
+		"dot":    printDOT,
+		"matrix": printMatrix,
+	}
+)
+
+const usageHeader = `Nebula is a compiler for stack-based languages targeting LLVM IR.
+
+Usage:
+
+	%s [options] <program>
+
+Options:
+
+`
+
+const usageFooter = `
+Examples:
+
+	%s -mode=ir programs/pi.out.ws > pi.nir
+	%s -mode=llvm programs/ascii4.out.ws > ascii4.ll
+	%s -mode=llvm -heap=400000 programs/interpret.out.ws > interpret.ll
+	%s -mode=dot programs/interpret.out.ws | dot -Tpng > graph.png
+`
+
+const modeUsage = `Output mode:
+* ws      emit Whitespace syntax
+* wsa     emit Whitespace AST
+* ir      emit Nebula IR (default)
+* llvm    emit LLVM IR
+* dot     print control flow graph as Graphviz DOT digraph
+* matrix  print control flow graph as matrix`
+
+func init() {
+	flag.Usage = usage
+	flag.StringVar(&mode, "mode", "", modeUsage)
+	flag.UintVar(&maxStackLen, "stack", codegen.DefaultMaxStackLen, "Maximum stack length for LLVM codegen")
+	flag.UintVar(&maxCallStackLen, "calls", codegen.DefaultMaxCallStackLen, "Maximum call stack length for LLVM codegen")
+	flag.UintVar(&maxHeapBound, "heap", codegen.DefaultMaxHeapBound, "Maximum heap address bound for LLVM codegen")
+	flag.BoolVar(&noFold, "nofold", false, "Disable constant folding")
+	flag.BoolVar(&packed, "packed", false, "Input file is in bit packed format")
+}
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, usage)
-		return
+	flag.Parse()
+	args := flag.Args()
+	if len(args) != 1 {
+		usage()
+		os.Exit(2)
 	}
 
-	filename := os.Args[1]
+	modeAction, ok := modeActions[mode]
+	if !ok {
+		usage()
+		os.Exit(2)
+	}
+
+	filename := args[0]
 	f, err := os.Open(filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -32,32 +92,8 @@ func main() {
 	}
 	defer f.Close()
 
-	var bitPacked, fold, emitWs, emitWsa, emitDot, emitMatrix, emitIR, emitLLVM bool
-	for _, mode := range os.Args[2:] {
-		switch mode {
-		case "bit":
-			bitPacked = true
-		case "fold":
-			fold = true
-		case "ws":
-			emitWs = true
-		case "wsa":
-			emitWsa = true
-		case "dot":
-			emitDot = true
-		case "matrix":
-			emitMatrix = true
-		case "ir":
-			emitIR = true
-		case "llvm":
-			emitLLVM = true
-		default:
-			fmt.Fprintln(os.Stderr, "unrecognized mode: "+mode)
-		}
-	}
-
 	var r ws.SpaceReader
-	if bitPacked {
+	if packed {
 		r = ws.NewBitReader(f, filename)
 	} else {
 		r = ws.NewTextReader(f, filename)
@@ -69,7 +105,7 @@ func main() {
 	}
 
 	var labelNames *bigint.Map
-	if _, err := os.Stat(filename + ".map"); err == nil {
+	if info, err := os.Stat(filename + ".map"); err == nil && !info.IsDir() {
 		sourceMap, err := os.Open(filename + ".map")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -83,42 +119,66 @@ func main() {
 		}
 	}
 
-	p := ws.Program{Name: filename, Tokens: tokens, LabelNames: labelNames}
-	if emitWs {
-		fmt.Print(p.DumpWS())
+	p := &ws.Program{
+		Name:       filename,
+		Tokens:     tokens,
+		LabelNames: labelNames,
 	}
-	if emitWsa {
-		fmt.Print(p.Dump("    "))
-	}
+	modeAction(p)
+}
 
+func usage() {
+	cmd := os.Args[0]
+	w := flag.CommandLine.Output()
+	fmt.Fprintf(w, usageHeader, cmd)
+	flag.PrintDefaults()
+	fmt.Fprintf(w, usageFooter, cmd, cmd, cmd, cmd)
+}
+
+func convertSSA(p *ws.Program) *ir.Program {
 	program, err := p.ConvertSSA()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if _, ok := err.(*ir.ErrorRetUnderflow); !ok {
-			return
+			os.Exit(2)
 		}
 	}
-
-	// program.JoinSimpleEntries() // incorrect
-	if fold {
+	if !noFold {
 		analysis.FoldConstArith(program)
 	}
-	// program.ConcatStrings() // not general
+	return program
+}
 
-	if emitDot {
-		fmt.Print(program.DotDigraph())
+func emitWS(p *ws.Program) {
+	fmt.Print(p.DumpWS())
+}
+
+func emitWSA(p *ws.Program) {
+	fmt.Print(p.Dump("    "))
+}
+
+func emitIR(p *ws.Program) {
+	fmt.Print(convertSSA(p).String())
+}
+
+func emitLLVM(p *ws.Program) {
+	conf := codegen.Config{
+		MaxStackLen:     maxStackLen,
+		MaxCallStackLen: maxCallStackLen,
+		MaxHeapBound:    maxHeapBound,
 	}
-	if emitMatrix {
-		fmt.Print(graph.FormatMatrix(analysis.ControlFlowGraph(program)))
+	program := convertSSA(p)
+	mod := codegen.EmitLLVMIR(program, conf)
+	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
+		fmt.Fprintln(os.Stdout, err)
 	}
-	if emitIR {
-		fmt.Print(program.String())
-	}
-	if emitLLVM {
-		mod := codegen.EmitLLVMIR(program)
-		if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
-			fmt.Fprintln(os.Stdout, err)
-		}
-		fmt.Print(mod.String())
-	}
+	fmt.Print(mod.String())
+}
+
+func printDOT(p *ws.Program) {
+	fmt.Print(convertSSA(p).DotDigraph())
+}
+
+func printMatrix(p *ws.Program) {
+	fmt.Print(graph.FormatMatrix(analysis.ControlFlowGraph(convertSSA(p))))
 }
