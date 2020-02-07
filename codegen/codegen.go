@@ -68,11 +68,10 @@ func EmitLLVMIR(program *ir.Program, conf Config) llvm.Module {
 	for _, block := range program.Blocks {
 		llvmBlock := blocks[block]
 		b.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
-		d.checkStack(b, block)
 		idents := make(map[ir.Val]llvm.Value)
 		stackLen := b.CreateLoad(d.StackLen, "stack_len")
 		for _, node := range block.Nodes {
-			d.emitNode(b, node, idents, stackLen)
+			d.emitNode(b, node, block, idents, stackLen)
 		}
 		d.updateStack(b, block, idents, stackLen)
 		d.emitTerminator(b, block, idents, blocks)
@@ -135,14 +134,7 @@ func (d *defs) declareGlobals(ctx llvm.Context, module llvm.Module, blocks []*ir
 	}
 }
 
-func (d *defs) checkStack(b llvm.Builder, block *ir.BasicBlock) {
-	if block.Stack.Access > 0 {
-		n := llvm.ConstInt(llvm.Int64Type(), uint64(block.Stack.Access), false)
-		b.CreateCall(d.CheckStackFunc, []llvm.Value{n, d.blockName(b, block)}, "")
-	}
-}
-
-func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Value, stackLen llvm.Value) {
+func (d *defs) emitNode(b llvm.Builder, node ir.Node, block *ir.BasicBlock, idents map[ir.Val]llvm.Value, stackLen llvm.Value) {
 	switch inst := node.(type) {
 	case *ir.BinaryExpr:
 		lhs := lookupVal(inst.LHS, idents)
@@ -196,6 +188,12 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 		addr := d.heapAddr(b, inst.Addr, idents)
 		val := lookupVal(inst.Val, idents)
 		b.CreateStore(val, addr)
+	case *ir.CheckStackStmt:
+		if inst.Access <= 0 {
+			panic(fmt.Sprintf("codegen: invalid access count: %d", inst.Access))
+		}
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Access), false)
+		b.CreateCall(d.CheckStackFunc, []llvm.Value{n, d.blockName(b, block)}, "")
 	case *ir.PrintStmt:
 		var f llvm.Value
 		switch inst.Op {

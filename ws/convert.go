@@ -75,6 +75,9 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 			i++
 		}
 
+		checkStack := &ir.CheckStackStmt{}
+		block.AppendNode(checkStack)
+
 		var branch *big.Int
 		for ; i < len(p.Tokens); i++ {
 			branch = appendInstruction(irp, &block, p.Tokens[i])
@@ -84,6 +87,12 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 				}
 				break
 			}
+		}
+
+		if block.Stack.Access > 0 {
+			checkStack.Access = block.Stack.Access
+		} else {
+			block.Nodes = block.Nodes[1:]
 		}
 
 		irp.Blocks = append(irp.Blocks, &block)

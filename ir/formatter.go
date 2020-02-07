@@ -44,21 +44,6 @@ func (f *formatter) FormatBlock(block *BasicBlock) string {
 		fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockSlice(block.Returns))
 	}
 
-	if block.Stack.Access > 0 {
-		fmt.Fprintf(&b, "    access %d [", block.Stack.Access)
-		first := true
-		for _, val := range block.Stack.Under {
-			if val != nil {
-				if !first {
-					b.WriteByte(' ')
-				}
-				b.WriteString(f.FormatVal(val))
-				first = false
-			}
-		}
-		b.WriteString("]\n")
-	}
-
 	for _, node := range block.Nodes {
 		b.WriteString("    ")
 		b.WriteString(f.FormatNode(node))
@@ -97,6 +82,8 @@ func (f *formatter) FormatNode(node Node) string {
 		return fmt.Sprintf("%s = load *%s", f.FormatVal(n.Assign), f.FormatVal(n.Addr))
 	case *StoreHeapStmt:
 		return fmt.Sprintf("store *%s %s", f.FormatVal(n.Addr), f.FormatVal(n.Val))
+	case *CheckStackStmt:
+		return fmt.Sprintf("checkstack %d", n.Access)
 	case *PrintStmt:
 		return fmt.Sprintf("%v %s", n.Op, f.FormatVal(n.Val))
 	case *ReadExpr:

@@ -94,6 +94,8 @@ func references(a, b ir.Node) bool {
 			return node.Assign == assign || node.Addr == assign
 		case *ir.StoreHeapStmt:
 			return node.Addr == assign || node.Val == assign
+		case *ir.CheckStackStmt:
+			return false
 		case *ir.PrintStmt:
 			return node.Val == assign
 		case *ir.ReadExpr:

@@ -88,6 +88,11 @@ type StoreHeapStmt struct {
 	Val  *Val
 }
 
+// CheckStackStmt asserts the stack length.
+type CheckStackStmt struct {
+	Access int
+}
+
 // PrintStmt prints a value. Valid operations are printc and printi.
 type PrintStmt struct {
 	Op  OpType
@@ -228,30 +233,32 @@ func (SSAVal) val()   {}
 func (ConstVal) val() {}
 func (PhiVal) val()   {}
 
-func (BinaryExpr) node()    {}
-func (UnaryExpr) node()     {}
-func (LoadStackExpr) node() {}
-func (LoadHeapExpr) node()  {}
-func (StoreHeapStmt) node() {}
-func (PrintStmt) node()     {}
-func (ReadExpr) node()      {}
-func (FlushStmt) node()     {}
-func (CallStmt) node()      {}
-func (JmpStmt) node()       {}
-func (JmpCondStmt) node()   {}
-func (RetStmt) node()       {}
-func (ExitStmt) node()      {}
+func (BinaryExpr) node()     {}
+func (UnaryExpr) node()      {}
+func (LoadStackExpr) node()  {}
+func (LoadHeapExpr) node()   {}
+func (StoreHeapStmt) node()  {}
+func (CheckStackStmt) node() {}
+func (PrintStmt) node()      {}
+func (ReadExpr) node()       {}
+func (FlushStmt) node()      {}
+func (CallStmt) node()       {}
+func (JmpStmt) node()        {}
+func (JmpCondStmt) node()    {}
+func (RetStmt) node()        {}
+func (ExitStmt) node()       {}
 
-func (BinaryExpr) exprNode()    {}
-func (UnaryExpr) exprNode()     {}
-func (LoadStackExpr) exprNode() {}
-func (LoadHeapExpr) exprNode()  {}
-func (StoreHeapStmt) stmtNode() {}
-func (PrintStmt) stmtNode()     {}
-func (ReadExpr) exprNode()      {}
-func (FlushStmt) stmtNode()     {}
-func (CallStmt) termNode()      {}
-func (JmpStmt) termNode()       {}
-func (JmpCondStmt) termNode()   {}
-func (RetStmt) termNode()       {}
-func (ExitStmt) termNode()      {}
+func (BinaryExpr) exprNode()     {}
+func (UnaryExpr) exprNode()      {}
+func (LoadStackExpr) exprNode()  {}
+func (LoadHeapExpr) exprNode()   {}
+func (StoreHeapStmt) stmtNode()  {}
+func (CheckStackStmt) stmtNode() {}
+func (PrintStmt) stmtNode()      {}
+func (ReadExpr) exprNode()       {}
+func (FlushStmt) stmtNode()      {}
+func (CallStmt) termNode()       {}
+func (JmpStmt) termNode()        {}
+func (JmpCondStmt) termNode()    {}
+func (RetStmt) termNode()        {}
+func (ExitStmt) termNode()       {}
