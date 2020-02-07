@@ -7,7 +7,6 @@ import (
 
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/nebula/analysis"
-	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/codegen"
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/ws"
@@ -86,46 +85,12 @@ func main() {
 	}
 
 	filename := args[0]
-	f, err := os.Open(filename)
+	program, err := ws.LexProgram(filename, packed)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return
+		os.Exit(1)
 	}
-	defer f.Close()
-
-	var r ws.SpaceReader
-	if packed {
-		r = ws.NewBitReader(f, filename)
-	} else {
-		r = ws.NewTextReader(f, filename)
-	}
-	tokens, err := ws.Lex(r)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-
-	var labelNames *bigint.Map
-	if info, err := os.Stat(filename + ".map"); err == nil && !info.IsDir() {
-		sourceMap, err := os.Open(filename + ".map")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
-		defer sourceMap.Close()
-		labelNames, err = ws.ParseSourceMap(sourceMap)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
-	}
-
-	p := &ws.Program{
-		Name:       filename,
-		Tokens:     tokens,
-		LabelNames: labelNames,
-	}
-	modeAction(p)
+	modeAction(program)
 }
 
 func usage() {
@@ -141,7 +106,7 @@ func convertSSA(p *ws.Program) *ir.Program {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if _, ok := err.(*ir.ErrorRetUnderflow); !ok {
-			os.Exit(2)
+			os.Exit(1)
 		}
 	}
 	if !noFold {

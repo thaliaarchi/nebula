@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"os"
+
+	"github.com/andrewarchi/nebula/bigint"
 )
 
 type lexer struct {
@@ -24,6 +27,44 @@ func Lex(r SpaceReader) ([]Token, error) {
 		}
 	}
 	return l.tokens, nil
+}
+
+func LexProgram(filename string, bitPacked bool) (*Program, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var r SpaceReader
+	if bitPacked {
+		r = NewBitReader(f, filename)
+	} else {
+		r = NewTextReader(f, filename)
+	}
+	tokens, err := Lex(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var labelNames *bigint.Map
+	if info, err := os.Stat(filename + ".map"); err == nil && !info.IsDir() {
+		sourceMap, err := os.Open(filename + ".map")
+		if err != nil {
+			return nil, err
+		}
+		defer sourceMap.Close()
+		labelNames, err = ParseSourceMap(sourceMap)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &Program{
+		Name:       filename,
+		Tokens:     tokens,
+		LabelNames: labelNames,
+	}, nil
 }
 
 func (l *lexer) appendToken(typ Type, arg *big.Int, argPos Pos) {

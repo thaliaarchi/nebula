@@ -16,3 +16,13 @@ echo "collatz 10:";   diff <(echo 10  | build/collatz)   <(echo 10  | "$wspace" 
 echo "collatz 100:";  diff <(echo 100 | build/collatz)   <(echo 100 | "$wspace" programs/collatz.out.ws)
 echo "factorial 10:"; diff <(echo 10  | build/factorial) <(echo 10  | "$wspace" programs/factorial.out.ws)
 echo "pi 5:";         diff <(echo 5   | build/pi)        <(echo 5   | "$wspace" programs/pi.out.ws)
+
+cp programs/interpret.out.ws run.ws
+printf '\0' >> run.ws
+cat programs/hello_world.ws >> run.ws
+printf '\0' >> run.ws
+
+echo "hello_world:"
+time build/interpret < run.ws
+time "$wspace" programs/interpret.out.ws < run.ws
+rm run.ws
