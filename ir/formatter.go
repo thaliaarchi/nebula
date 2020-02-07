@@ -91,9 +91,11 @@ func (f *formatter) FormatNode(node Node) string {
 		return fmt.Sprintf("%s = %v %s %s", f.FormatVal(n.Assign), n.Op, f.FormatVal(n.LHS), f.FormatVal(n.RHS))
 	case *UnaryExpr:
 		return fmt.Sprintf("%s = %v %s", f.FormatVal(n.Assign), n.Op, f.FormatVal(n.Val))
-	case *LoadExpr:
+	case *LoadStackExpr:
+		return fmt.Sprintf("%s = loadstack %d", f.FormatVal(n.Assign), n.Pos)
+	case *LoadHeapExpr:
 		return fmt.Sprintf("%s = load *%s", f.FormatVal(n.Assign), f.FormatVal(n.Addr))
-	case *StoreStmt:
+	case *StoreHeapStmt:
 		return fmt.Sprintf("store *%s %s", f.FormatVal(n.Addr), f.FormatVal(n.Val))
 	case *PrintStmt:
 		return fmt.Sprintf("%v %s", n.Op, f.FormatVal(n.Val))
@@ -128,8 +130,6 @@ func (f *formatter) FormatVal(val *Val) string {
 			f.nextID++
 		}
 		return fmt.Sprintf("%%%d", id)
-	case *StackVal:
-		return fmt.Sprintf("%%s%d", v.Pos)
 	case *ConstVal:
 		return v.Int.String()
 	case *PhiVal:
@@ -149,6 +149,7 @@ func (f *formatter) FormatVal(val *Val) string {
 		panic("ir: unrecognized val type")
 	}
 }
+
 func formatBlockSlice(blocks []*BasicBlock) string {
 	if len(blocks) == 0 {
 		return "-"

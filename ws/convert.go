@@ -47,6 +47,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	for i := 0; i < len(p.Tokens); i++ {
 		var block ir.BasicBlock
 		block.ID = len(irp.Blocks)
+		block.Stack.Block = &block
 		if len(irp.Blocks) > 0 {
 			prev := irp.Blocks[len(irp.Blocks)-1]
 			prev.Next = &block
@@ -133,11 +134,11 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token) *big.Int 
 
 	case Store:
 		val, addr := block.Stack.Pop(), block.Stack.Pop()
-		block.AppendNode(&ir.StoreStmt{Addr: addr, Val: val})
+		block.AppendNode(&ir.StoreHeapStmt{Addr: addr, Val: val})
 	case Retrieve:
 		addr, assign := block.Stack.Pop(), p.NextVal()
 		block.Stack.Push(assign)
-		block.AppendNode(&ir.LoadExpr{Assign: assign, Addr: addr})
+		block.AppendNode(&ir.LoadHeapExpr{Assign: assign, Addr: addr})
 
 	case Label:
 		block.Terminator = &ir.JmpStmt{Op: ir.Fallthrough}
@@ -194,7 +195,7 @@ func appendRead(p *ir.Program, block *ir.BasicBlock, op ir.OpType) {
 		Op:     op,
 		Assign: assign,
 	})
-	block.AppendNode(&ir.StoreStmt{
+	block.AppendNode(&ir.StoreHeapStmt{
 		Addr: addr,
 		Val:  assign,
 	})

@@ -9,10 +9,9 @@ type Val interface {
 }
 
 // SSAVal is an SSA register.
-type SSAVal struct{ int } // TODO apparently not uniquely addressable when empty
-
-// StackVal is a position under the stack.
-type StackVal struct{ Pos int }
+type SSAVal struct {
+	ID int // TODO apparently not uniquely addressable when empty
+}
 
 // ConstVal is a constant value such as from push or an expression with
 // constant operands.
@@ -38,7 +37,6 @@ type Node interface {
 // Expr represents an SSA expression that produces a value.
 type Expr interface {
 	Node
-	Assign() *Val
 	exprNode()
 }
 
@@ -71,14 +69,21 @@ type UnaryExpr struct {
 	Val    *Val
 }
 
-// LoadExpr evaluates a retrieve operation.
-type LoadExpr struct {
+// LoadStackExpr loads from a position under the current stack frame. A
+// position of 1 is the top of the stack.
+type LoadStackExpr struct {
+	Assign *Val
+	Pos    int
+}
+
+// LoadHeapExpr evaluates a retrieve operation.
+type LoadHeapExpr struct {
 	Assign *Val
 	Addr   *Val
 }
 
-// StoreStmt evaluates a store operation.
-type StoreStmt struct {
+// StoreHeapStmt evaluates a store operation.
+type StoreHeapStmt struct {
 	Addr *Val
 	Val  *Val
 }
@@ -220,32 +225,33 @@ func (op OpType) String() string {
 }
 
 func (SSAVal) val()   {}
-func (StackVal) val() {}
 func (ConstVal) val() {}
 func (PhiVal) val()   {}
 
-func (BinaryExpr) node()  {}
-func (UnaryExpr) node()   {}
-func (LoadExpr) node()    {}
-func (StoreStmt) node()   {}
-func (PrintStmt) node()   {}
-func (ReadExpr) node()    {}
-func (FlushStmt) node()   {}
-func (CallStmt) node()    {}
-func (JmpStmt) node()     {}
-func (JmpCondStmt) node() {}
-func (RetStmt) node()     {}
-func (ExitStmt) node()    {}
+func (BinaryExpr) node()    {}
+func (UnaryExpr) node()     {}
+func (LoadStackExpr) node() {}
+func (LoadHeapExpr) node()  {}
+func (StoreHeapStmt) node() {}
+func (PrintStmt) node()     {}
+func (ReadExpr) node()      {}
+func (FlushStmt) node()     {}
+func (CallStmt) node()      {}
+func (JmpStmt) node()       {}
+func (JmpCondStmt) node()   {}
+func (RetStmt) node()       {}
+func (ExitStmt) node()      {}
 
-func (BinaryExpr) exprNode()  {}
-func (UnaryExpr) exprNode()   {}
-func (LoadExpr) exprNode()    {}
-func (StoreStmt) stmtNode()   {}
-func (PrintStmt) stmtNode()   {}
-func (ReadExpr) exprNode()    {}
-func (FlushStmt) stmtNode()   {}
-func (CallStmt) termNode()    {}
-func (JmpStmt) termNode()     {}
-func (JmpCondStmt) termNode() {}
-func (RetStmt) termNode()     {}
-func (ExitStmt) termNode()    {}
+func (BinaryExpr) exprNode()    {}
+func (UnaryExpr) exprNode()     {}
+func (LoadStackExpr) exprNode() {}
+func (LoadHeapExpr) exprNode()  {}
+func (StoreHeapStmt) stmtNode() {}
+func (PrintStmt) stmtNode()     {}
+func (ReadExpr) exprNode()      {}
+func (FlushStmt) stmtNode()     {}
+func (CallStmt) termNode()      {}
+func (JmpStmt) termNode()       {}
+func (JmpCondStmt) termNode()   {}
+func (RetStmt) termNode()       {}
+func (ExitStmt) termNode()      {}

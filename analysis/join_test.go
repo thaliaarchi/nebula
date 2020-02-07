@@ -31,9 +31,9 @@ func TestJoinSimpleEntries(t *testing.T) {
 	s0 := ir.Val(&ir.SSAVal{})
 	s1 := ir.Val(&ir.SSAVal{})
 	s2 := ir.Val(&ir.SSAVal{})
-	sn1 := ir.Val(&ir.StackVal{Pos: -1})
-	sn2 := ir.Val(&ir.StackVal{Pos: -2})
-	sn7 := ir.Val(&ir.StackVal{Pos: -7})
+	sn1 := ir.Val(&ir.SSAVal{ID: -1})
+	sn2 := ir.Val(&ir.SSAVal{ID: -2})
+	sn7 := ir.Val(&ir.SSAVal{ID: -7})
 
 	var stack ir.Stack
 	stack.Push(&v1) // 0
@@ -75,4 +75,5 @@ func TestJoinSimpleEntries(t *testing.T) {
 	if !reflect.DeepEqual(program, programJoined) {
 		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", program, programJoined)
 	}
+	t.Fatal("JoinSimpleEntries not currently implemented")
 }

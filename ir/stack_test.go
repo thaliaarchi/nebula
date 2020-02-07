@@ -35,8 +35,8 @@ type stackTest struct {
 
 func TestPush(t *testing.T) {
 	for i, test := range []stackValTest{
-		{&Stack{nil, nil, 0, 0}, &Stack{[]*Val{v0}, nil, 0, 0}, v0},
-		{&Stack{[]*Val{v0, v1}, []*Val{vn1}, 0, 0}, &Stack{[]*Val{v0, v1, v3}, []*Val{vn1}, 0, 0}, v3},
+		{&Stack{nil, nil, 0, 0, nil}, &Stack{[]*Val{v0}, nil, 0, 0, nil}, v0},
+		{&Stack{[]*Val{v0, v1}, []*Val{vn1}, 0, 0, nil}, &Stack{[]*Val{v0, v1, v3}, []*Val{vn1}, 0, 0, nil}, v3},
 	} {
 		test.Stack.Push(test.Val)
 		stackEqual(t, i, test.Stack, test.Want)
@@ -45,9 +45,9 @@ func TestPush(t *testing.T) {
 
 func TestPop(t *testing.T) {
 	for i, test := range []stackValTest{
-		{&Stack{nil, nil, 0, 0}, &Stack{nil, []*Val{vn1}, 1, 1}, vn1},
-		{&Stack{nil, []*Val{nil, nil, vn3}, 3, 7}, &Stack{nil, []*Val{nil, nil, vn3, vn4}, 4, 7}, vn4},
-		{&Stack{[]*Val{v0, v1}, nil, 0, 0}, &Stack{[]*Val{v0}, nil, 0, 0}, v1},
+		{&Stack{nil, nil, 0, 0, nil}, &Stack{nil, []*Val{vn1}, 1, 1, nil}, vn1},
+		{&Stack{nil, []*Val{nil, nil, vn3}, 3, 7, nil}, &Stack{nil, []*Val{nil, nil, vn3, vn4}, 4, 7, nil}, vn4},
+		{&Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, &Stack{[]*Val{v0}, nil, 0, 0, nil}, v1},
 	} {
 		valEqual(t, i, test.Stack.Pop(), test.Val)
 		stackEqual(t, i, test.Stack, test.Want)
@@ -56,11 +56,11 @@ func TestPop(t *testing.T) {
 
 func TestPopN(t *testing.T) {
 	for i, test := range []stackNTest{
-		{&Stack{nil, nil, 0, 0}, &Stack{nil, nil, 1, 1}, 1},
-		{&Stack{nil, nil, 3, 7}, &Stack{nil, nil, 5, 7}, 2},
-		{&Stack{[]*Val{v0, v1}, nil, 0, 0}, &Stack{[]*Val{v0}, nil, 0, 0}, 1},
-		{&Stack{[]*Val{v0, v1}, nil, 0, 0}, &Stack{[]*Val{}, nil, 2, 2}, 4},
-		{&Stack{[]*Val{v0, v1}, nil, 0, 0}, &Stack{[]*Val{v0, v1}, nil, 0, 0}, 0},
+		{&Stack{nil, nil, 0, 0, nil}, &Stack{nil, nil, 1, 1, nil}, 1},
+		{&Stack{nil, nil, 3, 7, nil}, &Stack{nil, nil, 5, 7, nil}, 2},
+		{&Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, &Stack{[]*Val{v0}, nil, 0, 0, nil}, 1},
+		{&Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, &Stack{[]*Val{}, nil, 2, 2, nil}, 4},
+		{&Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, &Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, 0},
 	} {
 		test.Stack.PopN(test.N)
 		stackEqual(t, i, test.Stack, test.Want)
@@ -73,15 +73,15 @@ func TestPopN(t *testing.T) {
 
 func TestSwap(t *testing.T) {
 	for i, test := range []stackTest{
-		{&Stack{nil, nil, 0, 0}, &Stack{[]*Val{vn1, vn2}, []*Val{vn1, vn2}, 2, 2}},
-		{&Stack{nil, nil, 2, 7}, &Stack{[]*Val{vn3, vn4}, []*Val{nil, nil, vn3, vn4}, 4, 7}},
-		{&Stack{[]*Val{v0, v1}, nil, 0, 0}, &Stack{[]*Val{v1, v0}, nil, 0, 0}},
-		{&Stack{[]*Val{v2}, nil, 1, 1}, &Stack{[]*Val{v2, vn2}, []*Val{nil, vn2}, 2, 2}},
+		{&Stack{nil, nil, 0, 0, nil}, &Stack{[]*Val{vn1, vn2}, []*Val{vn1, vn2}, 2, 2, nil}},
+		{&Stack{nil, nil, 2, 7, nil}, &Stack{[]*Val{vn3, vn4}, []*Val{nil, nil, vn3, vn4}, 4, 7, nil}},
+		{&Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, &Stack{[]*Val{v1, v0}, nil, 0, 0, nil}},
+		{&Stack{[]*Val{v2}, nil, 1, 1, nil}, &Stack{[]*Val{v2, vn2}, []*Val{nil, vn2}, 2, 2, nil}},
 
-		{&Stack{[]*Val{vn1, vn2}, []*Val{vn1, vn2}, 2, 2}, &Stack{[]*Val{}, []*Val{vn1, vn2}, 0, 2}},
-		{&Stack{[]*Val{vn3, vn4}, []*Val{nil, nil, vn3, vn4}, 4, 7}, &Stack{[]*Val{}, []*Val{nil, nil, vn3, vn4}, 2, 7}},
-		{&Stack{[]*Val{v1, v0}, nil, 0, 0}, &Stack{[]*Val{v0, v1}, nil, 0, 0}},
-		{&Stack{[]*Val{v2, vn2}, []*Val{nil, vn2}, 2, 2}, &Stack{[]*Val{v2}, []*Val{nil, vn2}, 1, 2}},
+		{&Stack{[]*Val{vn1, vn2}, []*Val{vn1, vn2}, 2, 2, nil}, &Stack{[]*Val{}, []*Val{vn1, vn2}, 0, 2, nil}},
+		{&Stack{[]*Val{vn3, vn4}, []*Val{nil, nil, vn3, vn4}, 4, 7, nil}, &Stack{[]*Val{}, []*Val{nil, nil, vn3, vn4}, 2, 7, nil}},
+		{&Stack{[]*Val{v1, v0}, nil, 0, 0, nil}, &Stack{[]*Val{v0, v1}, nil, 0, 0, nil}},
+		{&Stack{[]*Val{v2, vn2}, []*Val{nil, vn2}, 2, 2, nil}, &Stack{[]*Val{v2}, []*Val{nil, vn2}, 1, 2, nil}},
 	} {
 		test.Stack.Swap()
 		stackEqual(t, i, test.Stack, test.Want)
@@ -90,10 +90,10 @@ func TestSwap(t *testing.T) {
 
 func TestSimplify(t *testing.T) {
 	for i, test := range []stackTest{
-		{&Stack{nil, nil, 0, 0}, &Stack{nil, nil, 0, 0}},
-		{&Stack{[]*Val{v0, v1}, nil, 0, 0}, &Stack{[]*Val{v0, v1}, nil, 0, 0}},
-		{&Stack{[]*Val{vn1, vn2}, []*Val{vn1, vn2}, 1, 2}, &Stack{[]*Val{vn2}, []*Val{vn1, vn2}, 0, 2}},
-		{&Stack{[]*Val{vn3, vn2, v0}, []*Val{nil, vn2, vn3}, 3, 3}, &Stack{[]*Val{v0}, []*Val{nil, vn2, vn3}, 1, 3}},
+		{&Stack{nil, nil, 0, 0, nil}, &Stack{nil, nil, 0, 0, nil}},
+		{&Stack{[]*Val{v0, v1}, nil, 0, 0, nil}, &Stack{[]*Val{v0, v1}, nil, 0, 0, nil}},
+		{&Stack{[]*Val{vn1, vn2}, []*Val{vn1, vn2}, 1, 2, nil}, &Stack{[]*Val{vn2}, []*Val{vn1, vn2}, 0, 2, nil}},
+		{&Stack{[]*Val{vn3, vn2, v0}, []*Val{nil, vn2, vn3}, 3, 3, nil}, &Stack{[]*Val{v0}, []*Val{nil, vn2, vn3}, 1, 3, nil}},
 	} {
 		test.Stack.simplify()
 		stackEqual(t, i, test.Stack, test.Want)
@@ -126,6 +126,6 @@ func checkPanic(t *testing.T, testIndex int, want interface{}, mightPanic func()
 }
 
 func makeVal(n int) *Val {
-	val := Val(&StackVal{n})
+	val := Val(&SSAVal{n})
 	return &val
 }

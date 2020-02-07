@@ -68,9 +68,11 @@ func EmitLLVMIR(program *ir.Program, conf Config) llvm.Module {
 	for _, block := range program.Blocks {
 		llvmBlock := blocks[block]
 		b.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
-		idents, stackLen := d.loadStack(b, block)
+		d.checkStack(b, block)
+		idents := make(map[ir.Val]llvm.Value)
+		stackLen := b.CreateLoad(d.StackLen, "stack_len")
 		for _, node := range block.Nodes {
-			d.emitNode(b, node, idents)
+			d.emitNode(b, node, idents, stackLen)
 		}
 		d.updateStack(b, block, idents, stackLen)
 		d.emitTerminator(b, block, idents, blocks)
@@ -133,44 +135,18 @@ func (d *defs) declareGlobals(ctx llvm.Context, module llvm.Module, blocks []*ir
 	}
 }
 
-func (d *defs) loadStack(b llvm.Builder, block *ir.BasicBlock) (map[ir.Val]llvm.Value, llvm.Value) {
-	idents := make(map[ir.Val]llvm.Value)
+func (d *defs) checkStack(b llvm.Builder, block *ir.BasicBlock) {
 	if block.Stack.Access > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(block.Stack.Access), false)
 		b.CreateCall(d.CheckStackFunc, []llvm.Value{n, d.blockName(b, block)}, "")
 	}
-	stackLen := b.CreateLoad(d.StackLen, "stack_len")
-
-	for _, val := range block.Stack.Under {
-		if val != nil {
-			switch v := (*val).(type) {
-			case *ir.SSAVal:
-				panic(fmt.Sprintf("codegen: ssa vals not currently supported: %v", v)) // TODO
-			case *ir.StackVal:
-				name := fmt.Sprintf("s%d", v.Pos)
-				n := llvm.ConstInt(llvm.Int64Type(), uint64(-v.Pos), false)
-				idx := b.CreateSub(stackLen, n, name+".idx")
-				gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
-				idents[v] = b.CreateLoad(gep, name)
-			case *ir.ConstVal:
-				if i64, ok := bigint.ToInt64(v.Int); ok {
-					idents[v] = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
-				} else {
-					panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
-				}
-			default:
-				panic("codegen: unrecognized val type")
-			}
-		}
-	}
-	return idents, stackLen
 }
 
-func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Value) {
+func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Value, stackLen llvm.Value) {
 	switch inst := node.(type) {
 	case *ir.BinaryExpr:
-		lhs := lookupVal(*inst.LHS, idents)
-		rhs := lookupVal(*inst.RHS, idents)
+		lhs := lookupVal(inst.LHS, idents)
+		rhs := lookupVal(inst.RHS, idents)
 		var val llvm.Value
 		switch inst.Op {
 		case ir.Add:
@@ -202,17 +178,23 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 	case *ir.UnaryExpr:
 		switch inst.Op {
 		case ir.Neg:
-			val := lookupVal(*inst.Val, idents)
+			val := lookupVal(inst.Val, idents)
 			idents[*inst.Assign] = b.CreateSub(zero, val, "neg")
 		default:
 			panic("codegen: unrecognized unary op")
 		}
-	case *ir.LoadExpr:
-		addr := d.heapAddr(b, *inst.Addr, idents)
+	case *ir.LoadStackExpr:
+		name := fmt.Sprintf("s%d", inst.Pos)
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Pos), false)
+		idx := b.CreateSub(stackLen, n, name+".idx")
+		gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
+		idents[*inst.Assign] = b.CreateLoad(gep, name)
+	case *ir.LoadHeapExpr:
+		addr := d.heapAddr(b, inst.Addr, idents)
 		idents[*inst.Assign] = b.CreateLoad(addr, "retrieve")
-	case *ir.StoreStmt:
-		addr := d.heapAddr(b, *inst.Addr, idents)
-		val := lookupVal(*inst.Val, idents)
+	case *ir.StoreHeapStmt:
+		addr := d.heapAddr(b, inst.Addr, idents)
+		val := lookupVal(inst.Val, idents)
 		b.CreateStore(val, addr)
 	case *ir.PrintStmt:
 		var f llvm.Value
@@ -224,7 +206,7 @@ func (d *defs) emitNode(b llvm.Builder, node ir.Node, idents map[ir.Val]llvm.Val
 		default:
 			panic("codegen: unrecognized print op")
 		}
-		val := lookupVal(*inst.Val, idents)
+		val := lookupVal(inst.Val, idents)
 		b.CreateCall(f, []llvm.Value{val}, "")
 	case *ir.ReadExpr:
 		var f llvm.Value
@@ -250,28 +232,12 @@ func (d *defs) updateStack(b llvm.Builder, block *ir.BasicBlock, idents map[ir.V
 		stackLen = b.CreateSub(stackLen, n, "stack_len_pop")
 	}
 	for i, val := range block.Stack.Vals {
-		var s llvm.Value
-		switch v := (*val).(type) {
-		case *ir.SSAVal, *ir.StackVal:
-			if ident, ok := idents[v]; ok {
-				s = ident
-			} else {
-				panic(fmt.Sprintf("codegen: val not in scope of %s: %v", block.Name(), *val))
-			}
-		case *ir.ConstVal:
-			if i64, ok := bigint.ToInt64(v.Int); ok {
-				s = llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
-			} else {
-				panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
-			}
-		default:
-			panic("codegen: unrecognized val type")
-		}
+		v := lookupVal(val, idents)
 		name := fmt.Sprintf("s%d", i)
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
 		idx := b.CreateAdd(stackLen, n, name+"idx")
 		gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
-		b.CreateStore(s, gep)
+		b.CreateStore(v, gep)
 	}
 	if push := len(block.Stack.Vals); push > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
@@ -293,7 +259,7 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 	case *ir.JmpStmt:
 		b.CreateBr(blocks[term.Dest])
 	case *ir.JmpCondStmt:
-		val := idents[*term.Cond]
+		val := lookupVal(term.Cond, idents)
 		var cond llvm.Value
 		switch term.Op {
 		case ir.Jz:
@@ -323,7 +289,7 @@ func (d *defs) emitTerminator(b llvm.Builder, block *ir.BasicBlock, idents map[i
 	}
 }
 
-func (d *defs) heapAddr(b llvm.Builder, val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
+func (d *defs) heapAddr(b llvm.Builder, val *ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
 	addr := lookupVal(val, idents)
 	return b.CreateInBoundsGEP(d.Heap, []llvm.Value{zero, addr}, "gep")
 }
@@ -332,18 +298,18 @@ func (d *defs) blockName(b llvm.Builder, block *ir.BasicBlock) llvm.Value {
 	return b.CreateInBoundsGEP(d.BlockNames[block], []llvm.Value{zero, zero}, "name")
 }
 
-func lookupVal(val ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
-	switch v := val.(type) {
-	case *ir.SSAVal, *ir.StackVal:
-		if v, ok := idents[val]; ok {
+func lookupVal(val *ir.Val, idents map[ir.Val]llvm.Value) llvm.Value {
+	switch v := (*val).(type) {
+	case *ir.SSAVal:
+		if v, ok := idents[v]; ok {
 			return v
 		}
-		panic(fmt.Sprintf("codegen: val not found: %v", val))
+		panic(fmt.Sprintf("codegen: val not found: %v", v))
 	case *ir.ConstVal:
 		if i64, ok := bigint.ToInt64(v.Int); ok {
 			return llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
 		}
-		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", val))
+		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
 	default:
 		panic("codegen: unrecognized val type")
 	}

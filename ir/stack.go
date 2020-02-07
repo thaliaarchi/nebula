@@ -12,8 +12,9 @@ import (
 type Stack struct {
 	Vals   []*Val // Values in the current stack frame
 	Under  []*Val // Values under the current stack frame
-	Pops   int    // Number of items popped below stack
-	Access int    // Number of items accessed below stack
+	Pops   int    // Number of items popped below current stack frame
+	Access int    // Number of items accessed below current stack frame
+	Block  *BasicBlock
 }
 
 // Push pushes a value to the stack.
@@ -114,8 +115,11 @@ func (s *Stack) At(n int) *Val {
 		s.Under = append(s.Under, make([]*Val, id-len(s.Under))...)
 	}
 	if s.Under[id-1] == nil {
-		v := Val(&StackVal{-id})
-		s.Under[id-1] = &v
+		val := Val(&SSAVal{-id})
+		if s.Block != nil {
+			s.Block.AppendNode(&LoadStackExpr{Assign: &val, Pos: id})
+		}
+		s.Under[id-1] = &val
 	}
 	return s.Under[id-1]
 }
@@ -139,6 +143,8 @@ func (s *Stack) AtExists(n int) (*Val, bool) {
 
 // LookupUnderflow replaces vals referencing the preceding stack frame
 // with the defined val.
+// TODO update to new IR structure
+/*
 func (s *Stack) LookupUnderflow(prev *Stack) {
 	for _, val := range s.Under {
 		if val != nil {
@@ -152,6 +158,7 @@ func (s *Stack) LookupUnderflow(prev *Stack) {
 }
 
 // Concat joins two stacks.
+// TODO update to new IR structure
 func (s *Stack) Concat(next *Stack) {
 	for _, val := range next.Under {
 		if val != nil {
@@ -169,20 +176,22 @@ func (s *Stack) Concat(next *Stack) {
 	s.PopN(next.Pops)
 	s.Vals = append(s.Vals, next.Vals...)
 }
+*/
 
 // simplify cleans up low elements.
+// TODO update to new IR structure
 func (s *Stack) simplify() {
-	i := 0
-	for ; i < len(s.Vals); i++ {
-		if s.Pops <= 0 {
-			break
-		}
-		if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Pos != -s.Pops {
-			break
-		}
-		s.Pops--
-	}
-	s.Vals = s.Vals[i:]
+	// i := 0
+	// for ; i < len(s.Vals); i++ {
+	// 	if s.Pops <= 0 {
+	// 		break
+	// 	}
+	// 	if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Pos != -s.Pops {
+	// 		break
+	// 	}
+	// 	s.Pops--
+	// }
+	// s.Vals = s.Vals[i:]
 }
 
 // Len returns the number of items on the stack.

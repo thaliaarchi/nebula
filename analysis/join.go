@@ -6,23 +6,24 @@ import "github.com/andrewarchi/nebula/ir"
 // entry block.
 // TODO: this does not repect the graph dependency ordering.
 func JoinSimpleEntries(p *ir.Program) {
-	j := 0
-	for i, block := range p.Blocks {
-		if len(block.Entries) == 1 && block.Entries[0] != nil {
-			entry := block.Entries[0]
-			if _, ok := entry.Terminator.(*ir.JmpStmt); ok {
-				Join(p, entry, block)
-				continue
-			} else {
-				block.Stack.LookupUnderflow(&entry.Stack)
-			}
-		}
-		p.Blocks[j] = p.Blocks[i]
-		j++
-	}
-	p.Blocks = p.Blocks[:j]
+	// j := 0
+	// for i, block := range p.Blocks {
+	// 	if len(block.Entries) == 1 && block.Entries[0] != nil {
+	// 		entry := block.Entries[0]
+	// 		if _, ok := entry.Terminator.(*ir.JmpStmt); ok {
+	// 			Join(p, entry, block)
+	// 			continue
+	// 		} else {
+	// 			block.Stack.LookupUnderflow(&entry.Stack)
+	// 		}
+	// 	}
+	// 	p.Blocks[j] = p.Blocks[i]
+	// 	j++
+	// }
+	// p.Blocks = p.Blocks[:j]
 }
 
+/*
 // Join concatenates two basic blocks.
 func Join(p *ir.Program, prev, next *ir.BasicBlock) {
 	prev.Stack.Concat(&next.Stack)
@@ -51,3 +52,4 @@ func replaceUnique(blocks []*ir.BasicBlock, block, replace *ir.BasicBlock) {
 		}
 	}
 }
+*/
