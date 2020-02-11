@@ -1,34 +1,13 @@
 # Nebula
 
-Nebula is an optimizing compiler for the Whitespace programming
-language.
+Nebula is an optimizing compiler for stack-oriented programming
+languages that targets LLVM IR.
 
-This project is evolving very rapidly.
-
-## Usage
-
-Requirements
+## Requirements
 
 - Go 1.13 or later
 - LLVM source
 - Graphviz to render graphs
-
-```sh
-go get -d github.com/andrewarchi/nebula
-cd nebula
-go get ./...
-go build
-./nebula programs/interpret.out.ws ir
-./nebula programs/interpret.out.ws dot | dot -Tpng > graph.png
-```
-
-### Compiling using Nebula
-
-```sh
-cd build
-./compile.sh ../programs/99_bottles.out.ws 99_bottles
-./99_bottles
-```
 
 ## Project Goals
 

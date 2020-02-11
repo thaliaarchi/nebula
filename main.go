@@ -73,21 +73,25 @@ func init() {
 func main() {
 	flag.Parse()
 	args := flag.Args()
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "No program provided.")
+		incorrectUsage()
+	}
 	if len(args) != 1 {
-		usage()
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, "Too many arguments provided.")
+		incorrectUsage()
 	}
 
 	modeAction, ok := modeActions[mode]
 	if !ok {
-		usage()
-		os.Exit(2)
+		fmt.Fprintf(os.Stderr, "Unrecognized mode: %s\n", mode)
+		incorrectUsage()
 	}
 
 	filename := args[0]
 	program, err := ws.LexProgram(filename, packed)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "Lex error: %v\n", err)
 		os.Exit(1)
 	}
 	modeAction(program)
@@ -99,6 +103,11 @@ func usage() {
 	fmt.Fprintf(w, usageHeader, cmd)
 	flag.PrintDefaults()
 	fmt.Fprintf(w, usageFooter, cmd, cmd, cmd, cmd)
+}
+
+func incorrectUsage() {
+	fmt.Fprintf(os.Stderr, "Run %s -help for usage.\n", os.Args[0])
+	os.Exit(2)
 }
 
 func convertSSA(p *ws.Program) *ir.Program {

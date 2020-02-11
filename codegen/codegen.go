@@ -233,7 +233,7 @@ func (d *defs) updateStack(b llvm.Builder, block *ir.BasicBlock, idents map[ir.V
 		v := lookupVal(val, idents)
 		name := fmt.Sprintf("s%d", i)
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
-		idx := b.CreateAdd(stackLen, n, name+"idx")
+		idx := b.CreateAdd(stackLen, n, name+".idx")
 		gep := b.CreateInBoundsGEP(d.Stack, []llvm.Value{zero, idx}, name+".gep")
 		b.CreateStore(v, gep)
 	}
