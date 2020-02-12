@@ -10,9 +10,8 @@ import (
 // or identities.
 func FoldConstArith(p *ir.Program) {
 	for _, block := range p.Blocks {
-		j := 0
-		for i := 0; i < len(block.Nodes); i++ {
-			node := block.Nodes[i]
+		i := 0
+		for _, node := range block.Nodes {
 			switch n := node.(type) {
 			case *ir.BinaryExpr:
 				val, neg := foldBinaryExpr(p, n)
@@ -30,10 +29,10 @@ func FoldConstArith(p *ir.Program) {
 					}
 				}
 			}
-			block.Nodes[j] = node
-			j++
+			block.Nodes[i] = node
+			i++
 		}
-		block.Nodes = block.Nodes[:j]
+		block.Nodes = block.Nodes[:i]
 	}
 }
 

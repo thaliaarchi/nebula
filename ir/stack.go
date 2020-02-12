@@ -181,8 +181,8 @@ func (s *Stack) Concat(next *Stack) {
 // simplify cleans up low elements.
 // TODO update to new IR structure
 func (s *Stack) simplify() {
-	// i := 0
-	// for ; i < len(s.Vals); i++ {
+	// var i int
+	// for i = range s.Vals {
 	// 	if s.Pops <= 0 {
 	// 		break
 	// 	}

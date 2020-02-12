@@ -25,9 +25,9 @@ func ControlFlowGraph(p *ir.Program) graph.Graph {
 // dependencies between nodes.
 func DependenceGraph(block *ir.BasicBlock) graph.Graph {
 	g := graph.NewGraph(uint(len(block.Nodes)))
-	for i := range block.Nodes {
-		for j := i + 1; j < len(block.Nodes); j++ {
-			if Dependent(block.Nodes[i], block.Nodes[j]) {
+	for i, ni := range block.Nodes {
+		for j, nj := range block.Nodes[i+1:] {
+			if Dependent(ni, nj) {
 				g.AddUndirected(uint(i), uint(j))
 			}
 		}
