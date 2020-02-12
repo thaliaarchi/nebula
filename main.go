@@ -155,5 +155,10 @@ func printDOT(p *ws.Program) {
 }
 
 func printMatrix(p *ws.Program) {
-	fmt.Print(graph.FormatMatrix(analysis.ControlFlowGraph(convertSSA(p))))
+	program := convertSSA(p)
+	labels := make([]string, len(program.Blocks))
+	for i, block := range program.Blocks {
+		labels[i] = block.Name()
+	}
+	fmt.Print(graph.FormatGridLabeled(analysis.ControlFlowGraph(program), labels))
 }
