@@ -1,84 +1,80 @@
-; Shell sort (adapted)
-; http://rosettacode.org/wiki/Sorting_algorithms/Shell_sort/Whitespace
+; This is used as the index into the heap while reading, after which it
+; holds the number of elements to sort. We shall henceforth call him n.
+push 0
 
-    ; This is used as the index into the heap while reading, after which
-    ; it holds the number of elements to sort. We shall henceforth call
-    ; him n.
-    push 0
-
-l0:
-    dup      ; Storing input is destructive          [n n]
-    dup      ; so we dup the index twice.            [n n n]
-    readi    ; Read a number into the heap.          [n n]
-    retrieve ; Get it onto the stack.                [n #]
-    push 1   ; Detect when -1 is supplied as input   [n # 1]
-    add      ; to simulate EOF                       [n #+1]
-    jz   l1  ; and stop reading.                     [n]
-    push 1   ; Otherwise,                            [n 1]
-    add      ; increment                             [n+=1]
-    jmp  l0  ; and go again.                         [n]
-l1:
-    dup      ; Initialize h (outermost loop) to  n.  [n h]
-    push 0   ; Buffer to enable clean i < n exit.    [n h 0]
-l2:
-    drop     ; Drop that 0 or an extraneous i.       [n h]
-    push 2   ; Constant 2-gap because reasons.       [n h 2]
-    div      ; h /= 2                                [n h/=2]
-    dup      ; Branch checks eat stack.              [n h h]
-    jz   l6  ; If h is 0, we're all sorted.          [n h]
-    dup      ; Initialize i (middle loop) to h.      [n h i]
-l3:
-    dup      ; We need a copy of i to play with.     [n h i i]
-    copy 3   ; Get n for i < n check.                [n h i i n]
-    sub      ; i is never greater than n, but        [n h i i-n]
-    jz   l2  ; exit the loop if they're equal.       [n h i]
-    dup      ; Loading eats stack and we need i.     [n h i i]
-    retrieve ; k = a[i]                              [n h i k]
-    copy 1   ; j = i                                 [n h i k j]
-l4:
-    dup      ; Copy j the first of many times.       [n h i k j j]
-    copy 4   ; Grab h from way down there.           [n h i k j j h]
-    sub      ; Check first condition.                [n h i k j j-h]
-    jn   l5  ; j >= h failed, exit loop.             [n h i k j]
-    dup      ; Retrieve j and h again; dup would     [n h i k j j]
-    copy 4   ; have complicated the stack for 5.     [n h i k j j h]
-    sub      ; Prepare for retrieval, then           [n h i k j j-h]
-    retrieve ; grab a[j - h], which we'll call x.    [n h i k j x]
-    copy 2   ; Get k to check k < x.                 [n h i k j x k]
-    push 1   ; <, not <= so handle the 0 case        [n h i k j x k+1]
-    add      ; by incrementing k                     [n h i k j x k+=1]
-    sub      ; before subtracting it from x.         [n h i k j x-k]
-    jn   l5  ; k < x failed, exit loop.              [n h i k j]
-    dup      ; Another j.                            [n h i k j j]
-    dup      ; Guess which variable we need.         [n h i k j j j]
-    copy 5   ; Grab a copy of h                      [n h i k j j j h]
-    sub      ; to subtract it from j                 [n h i k j j j-h]
-    retrieve ; to retrieve a[j - h]                  [n h i k j j x]
-    store    ; and swap it into j, a[j] = a[j - h]   [n h i k j]
-    copy 3   ; Grab one more h                       [n h i k j h]
-    sub      ; to decrement the loop variable        [n h i k j-=h]
-    jmp  l4  ; and go again.
-l5:
-    swap     ; Prepare for second swap.              [n h i j k]
-    store    ; a[j] = k                              [n h i]
-    push 1   ; Do the middle loop's afterthought.    [n h i 1]
-    add      ; i++                                   [n h i+=1]
-    jmp  l3
-l6:
-    drop     ; It's just you now, n.                 [n]
-    push 0   ; A counter so we can print ascending.  [n c]
-l7:
-    dup      ; Need to load and then increment.      [n c c]
-    retrieve ; Grab the next sorted element.         [n c a[c]]
-    printi   ; Display it.                           [n c]
-    push 10  ; Legibly, of course.                   [n c 10]
-    printc   ; With a newline.                       [n c]
-    push 1   ; Increment                             [n c 1]
-    add      ; the counter.                          [n c+=1]
-    dup      ; We might need it for another run.     [n c c]
-    copy 2   ; Load the total                        [n c c n]
-    sub      ; and see if we're finished.            [n c c-n]
-    jn   l7  ; Negative means go again.              [n c]
-    drop     ; Otherwise, exit                       [n]
-    drop     ; nice and clean.                       []
-    end
+0:
+    dup     ; Storing input is destructive          [n n]
+    dup     ; so we dup the index twice.            [n n n]
+    inum    ; Read a number into the heap.          [n n]
+    load    ; Get it onto the stack.                [n #]
+    push 1  ; Detect when -1 is supplied as input   [n # 1]
+    add     ; to simulate EOF                       [n #+1]
+    jz   1  ; and stop reading.                     [n]
+    push 1  ; Otherwise,                            [n 1]
+    add     ; increment                             [n+=1]
+    jump 0  ; and go again.                         [n]
+1:
+    dup     ; Initialize h (outermost loop) to  n.  [n h]
+    push 0  ; Buffer to enable clean i < n exit.    [n h 0]
+2:
+    pop     ; Drop that 0 or an extraneous i.       [n h]
+    push 2  ; Constant 2-gap because reasons.       [n h 2]
+    div     ; h /= 2                                [n h/=2]
+    dup     ; Branch checks eat stack.              [n h h]
+    jz   6  ; If h is 0, we're all sorted.          [n h]
+    dup     ; Initialize i (middle loop) to h.      [n h i]
+3:
+    dup     ; We need a copy of i to play with.     [n h i i]
+    copy 3  ; Get n for i < n check.                [n h i i n]
+    sub     ; i is never greater than n, but        [n h i i-n]
+    jz   2  ; exit the loop if they're equal.       [n h i]
+    dup     ; Loading eats stack and we need i.     [n h i i]
+    load    ; k = a[i]                              [n h i k]
+    copy 1  ; j = i                                 [n h i k j]
+4:
+    dup     ; Copy j the first of many times.       [n h i k j j]
+    copy 4  ; Grab h from way down there.           [n h i k j j h]
+    sub     ; Check first condition.                [n h i k j j-h]
+    jn   5  ; j >= h failed, exit loop.             [n h i k j]
+    dup     ; Retrieve j and h again; dup would     [n h i k j j]
+    copy 4  ; have complicated the stack for 5.     [n h i k j j h]
+    sub     ; Prepare for retrieval, then           [n h i k j j-h]
+    load    ; grab a[j - h], which we'll call x.    [n h i k j x]
+    copy 2  ; Get k to check k < x.                 [n h i k j x k]
+    push 1  ; <, not <= so handle the 0 case        [n h i k j x k+1]
+    add     ; by incrementing k                     [n h i k j x k+=1]
+    sub     ; before subtracting it from x.         [n h i k j x-k]
+    jn   5  ; k < x failed, exit loop.              [n h i k j]
+    dup     ; Another j.                            [n h i k j j]
+    dup     ; Guess which variable we need.         [n h i k j j j]
+    copy 5  ; Grab a copy of h                      [n h i k j j j h]
+    sub     ; to subtract it from j                 [n h i k j j j-h]
+    load    ; to retrive a[j - h]                   [n h i k j j x]
+    store   ; and swap it into j, a[j] = a[j - h]   [n h i k j]
+    copy 3  ; Grab one more h                       [n h i k j h]
+    sub     ; to decrement the loop variable        [n h i k j-=h]
+    jump 4  ; and go again.
+5:
+    swap    ; Prepare for second swap.              [n h i j k]
+    store   ; a[j] = k                              [n h i]
+    push 1  ; Do the middle loop's afterthought.    [n h i 1]
+    add     ; i++                                   [n h i+=1]
+    jump 3
+6:
+    pop     ; It's just you now, n.                 [n]
+    push 0  ; A counter so we can print ascending.  [n c]
+7:
+    dup     ; Need to load and then increment.      [n c c]
+    load    ; Grab the next sorted element.         [n c a[c]]
+    onum    ; Display it.                           [n c]
+    push 10 ; Legibly, of course.                   [n c 10]
+    ochr    ; With a newline.                       [n c]
+    push 1  ; Increment                             [n c 1]
+    add     ; the counter.                          [n c+=1]
+    dup     ; We might need it for another run.     [n c c]
+    copy 2  ; Load the total                        [n c c n]
+    sub     ; and see if we're finished.            [n c c-n]
+    jn   7  ; Negative means go again.              [n c]
+    pop     ; Otherwise, exit                       [n]
+    pop     ; nice and clean.                       []
+    exit

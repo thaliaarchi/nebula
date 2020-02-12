@@ -1,31 +1,16 @@
-; Terminal control/Cursor positioning (adapted)
-; http://rosettacode.org/wiki/Terminal_control/Cursor_positioning#Whitespace
+push "Hello"	;The characters are pushed onto the stack in reverse order
+push "[6;3H"
+push 27		;ESC
 
-    push 'o'           ; The characters are pushed onto the stack in reverse order
-    push 'l'
-    push 'l'
-    push 'e'
-    push 'H'
+push 11		;Number of characters to print
+call 0		;Calls print-string function
+exit
 
-    push 'H'           ; "[6;3H"
-    push '3'
-    push ';'
-    push '6'
-    push '['
-    push 27            ; ESC
+0:
+  dup jumpz 1	;Return if counter is zero
+  exch prtc	;Swap counter with the next character and print it
+  push 1 sub	;Subtract one from counter
+  jump 0	;Loop back to print next character
 
-    push 11            ; Number of characters to print
-    call print_string
-    end
-
-print_string:
-    dup
-    jz done            ; Return if counter is zero
-    swap
-    printc             ; Swap counter with the next character and print it
-    push 1
-    sub                ; Subtract one from counter
-    jmp print_string   ; Loop back to print next character
-done:
-    drop               ; Pop counter
-    ret
+1:
+  pop ret	;Pop counter and return

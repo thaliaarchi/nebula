@@ -63,6 +63,12 @@ languages that targets LLVM IR.
   - Direct representation of WS instruction set
   - Follows WS language spec syntax
 
+## License
+
+The Nebula project is licensed under the [MIT License](LICENSE.md).
+Subdirectories with code under differing licenses are marked with
+separate license files.
+
 ## Naming
 
 Nebula's name is derived from the stellar gas clouds, nebulae. Nebulae
