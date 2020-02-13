@@ -21,9 +21,9 @@ func TestJoinSimpleEntries(t *testing.T) {
 		{Type: ws.Mod},                       // 5
 		{Type: ws.Slide, Arg: big.NewInt(2)}, // 6
 	}
-
 	file := token.NewFileSet().AddFile("test", -1, 0)
 	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
+
 	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -57,14 +57,19 @@ func TestJoinSimpleEntries(t *testing.T) {
 	blockJoined := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
+			&ir.CheckStackStmt{Access: 7},
+			&ir.LoadStackExpr{Assign: &sn1, Pos: 1},
 			&ir.BinaryExpr{Op: ir.Add, Assign: &s0, LHS: &sn1, RHS: &v1},
+			&ir.LoadStackExpr{Assign: &sn2, Pos: 2},
 			&ir.BinaryExpr{Op: ir.Mul, Assign: &s1, LHS: &sn2, RHS: &s0},
+			&ir.LoadStackExpr{Assign: &sn7, Pos: 7},
 			&ir.BinaryExpr{Op: ir.Mod, Assign: &s2, LHS: &s1, RHS: &sn7},
 		},
 		Terminator: &ir.ExitStmt{},
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
 	}
+	blockJoined.Stack.Block = blockJoined
 	programJoined := &ir.Program{
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockJoined},
@@ -77,5 +82,5 @@ func TestJoinSimpleEntries(t *testing.T) {
 	if !reflect.DeepEqual(program, programJoined) {
 		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", program, programJoined)
 	}
-	t.Fatal("JoinSimpleEntries not currently implemented")
+	t.Fatal("JoinSimpleEntries currently broken from restructure")
 }

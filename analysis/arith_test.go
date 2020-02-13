@@ -53,6 +53,8 @@ func TestFoldConstArith(t *testing.T) {
 		{Type: ws.Printi},                     // 17
 		{Type: ws.Printi},                     // 18
 	}
+	file := token.NewFileSet().AddFile("test", -1, 0)
+	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
 
 	v1 := ir.Val(&ir.ConstVal{Int: big.NewInt(1)})
 	v2 := ir.Val(&ir.ConstVal{Int: big.NewInt(2)})
@@ -130,6 +132,7 @@ func TestFoldConstArith(t *testing.T) {
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
 	}
+	blockStart.Stack.Block = blockStart
 	programStart := &ir.Program{
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockStart},
@@ -138,8 +141,6 @@ func TestFoldConstArith(t *testing.T) {
 		NextBlockID: 1,
 	}
 
-	file := token.NewFileSet().AddFile("test", -1, 0)
-	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
 	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
@@ -166,6 +167,7 @@ func TestFoldConstArith(t *testing.T) {
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
 	}
+	blockConst.Stack.Block = blockConst
 	programConst := &ir.Program{
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockConst},
