@@ -1,6 +1,7 @@
 package analysis // import "github.com/andrewarchi/nebula/analysis"
 
 import (
+	"go/token"
 	"math/big"
 	"reflect"
 	"testing"
@@ -21,7 +22,8 @@ func TestJoinSimpleEntries(t *testing.T) {
 		{Type: ws.Slide, Arg: big.NewInt(2)}, // 6
 	}
 
-	p := &ws.Program{Name: "test", Tokens: tokens, LabelNames: nil}
+	file := token.NewFileSet().AddFile("test", -1, 0)
+	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
 	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

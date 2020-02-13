@@ -2,6 +2,7 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 
 import (
 	"fmt"
+	"go/token"
 	"math/big"
 	"strings"
 
@@ -12,8 +13,8 @@ import (
 type Token struct {
 	Type  Type
 	Arg   *big.Int
-	Start Pos
-	End   Pos
+	Start token.Pos
+	End   token.Pos
 }
 
 // Format formats a token as Whitespace assembly.

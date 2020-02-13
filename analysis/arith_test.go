@@ -1,6 +1,7 @@
 package analysis // import "github.com/andrewarchi/nebula/analysis"
 
 import (
+	"go/token"
 	"math/big"
 	"reflect"
 	"testing"
@@ -137,13 +138,14 @@ func TestFoldConstArith(t *testing.T) {
 		NextBlockID: 1,
 	}
 
-	p := &ws.Program{Name: "test", Tokens: tokens, LabelNames: nil}
+	file := token.NewFileSet().AddFile("test", -1, 0)
+	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
 	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
 	if !reflect.DeepEqual(program, programStart) {
-		t.Errorf("token parse not equal\ngot:\n%v\nwant:\n%v", program, programStart)
+		t.Errorf("SSA conversion not equal\ngot:\n%v\nwant:\n%v", program, programStart)
 	}
 
 	constVals.Put(big.NewInt('A'), &vA)

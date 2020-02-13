@@ -3,7 +3,7 @@
 # Reference interpreter path
 wspace=wspace
 
-make all
+make all || exit
 
 function compare() {
   binary="$1"

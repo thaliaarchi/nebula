@@ -1,6 +1,7 @@
 package ws // import "github.com/andrewarchi/nebula/ws"
 
 import (
+	"go/token"
 	"strings"
 
 	"github.com/andrewarchi/nebula/bigint"
@@ -8,7 +9,7 @@ import (
 
 // Program is a sequence of tokens with source map information.
 type Program struct {
-	Name       string
+	File       *token.File
 	Tokens     []Token
 	LabelNames *bigint.Map // map[*big.Int]string
 }

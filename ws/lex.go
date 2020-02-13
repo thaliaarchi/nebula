@@ -3,20 +3,21 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 import (
 	"errors"
 	"fmt"
+	"go/token"
 	"io"
 	"math/big"
 )
 
-type lexer struct {
-	src    []byte
-	tokens []Token
-	line   int
-	col    int
-	offset int
-	pos    Pos
+// Lexer is a lexical analyzer for Whitespace source.
+type Lexer struct {
+	file        *token.File
+	src         []byte
+	offset      int
+	startOffset int
+	endOffset   int
 }
 
-type stateFn func(*lexer) error
+type stateFn func(*Lexer) (*Token, error)
 
 type states struct {
 	Space stateFn
@@ -31,64 +32,73 @@ const (
 	lf    = '\n'
 )
 
-var (
-	bigZero = big.NewInt(0)
-	bigOne  = big.NewInt(1)
-)
-
-// Lex lexically analyzes a Whitespace source to produce tokens.
-func Lex(src []byte) ([]Token, error) {
-	l := &lexer{
-		src:    src,
-		line:   1,
-		col:    1,
-		offset: 0,
-		pos:    Pos{"", 1, 1},
+// NewLexer constructs a Lexer scan a Whitespace source
+// file into tokens.
+func NewLexer(file *token.File, src []byte) *Lexer {
+	return &Lexer{
+		file:        file,
+		src:         src,
+		offset:      0,
+		startOffset: 0,
+		endOffset:   0,
 	}
+}
+
+// Lex scans a single Whitespace token.
+func (l *Lexer) Lex() (*Token, error) { // TODO return position of error
+	return lexInst(l)
+}
+
+// LexProgram scans a Whitespace source file into a Program.
+func (l *Lexer) LexProgram() (*Program, error) {
+	var tokens []Token
 	for {
-		err := lexInst(l)
+		tok, err := l.Lex()
 		if err != nil {
 			if err != io.EOF {
 				return nil, err
 			}
-			return l.tokens, nil
+			return &Program{l.file, tokens, nil}, nil
 		}
+		tokens = append(tokens, *tok)
 	}
 }
 
-func (l *lexer) next() (byte, bool) {
+func (l *Lexer) next() (byte, int, bool) {
 	for l.offset < len(l.src) {
-		c := l.src[l.offset]
+		offset := l.offset
 		l.offset++
-		switch c {
+		switch c := l.src[offset]; c {
 		case space, tab:
-			l.col++
-			return c, false
+			return c, offset, false
 		case lf:
-			l.line++
-			l.col = 1
-			return c, false
-		default:
-			l.col++
+			l.file.AddLine(offset)
+			return c, offset, false
 		}
 	}
-	return 0, true
+	return 0, 0, true
 }
 
-func (l *lexer) appendToken(typ Type, arg *big.Int) error {
-	l.tokens = append(l.tokens, Token{typ, arg, l.pos, Pos{"", l.line, l.col}})
-	return nil
+func (l *Lexer) appendToken(typ Type, arg *big.Int) (*Token, error) {
+	return &Token{
+		Type:  typ,
+		Arg:   arg,
+		Start: l.file.Pos(l.startOffset),
+		End:   l.file.Pos(l.endOffset),
+	}, nil
 }
 
 func transition(s states) stateFn {
-	return func(l *lexer) error {
-		l.pos = Pos{"", l.line, l.col}
-		c, eof := l.next()
+	return func(l *Lexer) (*Token, error) {
+		c, offset, eof := l.next()
 		if eof {
 			if s.Root {
-				return io.EOF
+				return nil, io.EOF
 			}
-			return io.ErrUnexpectedEOF
+			return nil, io.ErrUnexpectedEOF
+		}
+		if s.Root {
+			l.startOffset = offset
 		}
 		var state stateFn
 		switch c {
@@ -102,25 +112,31 @@ func transition(s states) stateFn {
 			panic("unreachable")
 		}
 		if state == nil {
-			return errors.New("invalid instruction") // TODO report instruction string
+			return nil, errors.New("invalid instruction") // TODO report instruction string
 		}
 		return state(l)
 	}
 }
 
+var (
+	bigZero = big.NewInt(0)
+	bigOne  = big.NewInt(1)
+)
+
 func lexNumber(typ Type, signed bool) stateFn {
-	return func(l *lexer) error {
+	return func(l *Lexer) (*Token, error) {
 		var negative bool
 		if signed {
-			tok, eof := l.next()
+			tok, offset, eof := l.next()
 			if eof {
-				return errors.New("unterminated number")
+				return nil, errors.New("unterminated number")
 			}
 			switch tok {
 			case space:
 			case tab:
 				negative = true
 			case lf:
+				l.endOffset = offset
 				return l.appendToken(typ, bigZero)
 			default:
 				panic("unreachable")
@@ -128,9 +144,9 @@ func lexNumber(typ Type, signed bool) stateFn {
 		}
 		num := new(big.Int)
 		for {
-			tok, eof := l.next()
+			tok, offset, eof := l.next()
 			if eof {
-				return fmt.Errorf("unterminated number: %d", num)
+				return nil, fmt.Errorf("unterminated number: %d", num)
 			}
 			switch tok {
 			case space:
@@ -141,6 +157,7 @@ func lexNumber(typ Type, signed bool) stateFn {
 				if negative {
 					num.Neg(num)
 				}
+				l.endOffset = offset
 				return l.appendToken(typ, num)
 			default:
 				panic("unreachable")
@@ -150,7 +167,7 @@ func lexNumber(typ Type, signed bool) stateFn {
 }
 
 func emitInst(typ Type) stateFn {
-	return func(l *lexer) error {
+	return func(l *Lexer) (*Token, error) {
 		return l.appendToken(typ, nil)
 	}
 }

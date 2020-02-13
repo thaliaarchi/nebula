@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/token"
 	"io/ioutil"
 	"os"
 
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/nebula/analysis"
-	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/codegen"
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/ws"
@@ -131,12 +131,15 @@ func lexProgram(filename string, bitPacked bool) (*ws.Program, error) {
 			return nil, err
 		}
 	}
-	tokens, err := ws.Lex(src)
+
+	fset := token.NewFileSet()
+	file := fset.AddFile(filename, -1, len(src))
+	lexer := ws.NewLexer(file, src)
+	program, err := lexer.LexProgram()
 	if err != nil {
 		return nil, err
 	}
 
-	var labelNames *bigint.Map
 	mapFilename := filename + ".map"
 	if info, err := os.Stat(mapFilename); err == nil && !info.IsDir() {
 		sourceMap, err := os.Open(mapFilename)
@@ -144,17 +147,12 @@ func lexProgram(filename string, bitPacked bool) (*ws.Program, error) {
 			return nil, err
 		}
 		defer sourceMap.Close()
-		labelNames, err = ws.ParseSourceMap(sourceMap)
+		program.LabelNames, err = ws.ParseSourceMap(sourceMap)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	return &ws.Program{
-		Name:       filename,
-		Tokens:     tokens,
-		LabelNames: labelNames,
-	}, nil
+	return program, nil
 }
 
 func convertSSA(p *ws.Program) *ir.Program {

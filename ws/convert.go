@@ -36,7 +36,7 @@ func needsImplicitEnd(tokens []Token) bool {
 
 func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	irp := &ir.Program{
-		Name:      p.Name,
+		Name:      p.File.Name(),
 		ConstVals: *bigint.NewMap(),
 	}
 	var branches []*big.Int
