@@ -1,7 +1,6 @@
 package ws // import "github.com/andrewarchi/nebula/ws"
 
 import (
-	"errors"
 	"fmt"
 	"go/token"
 	"io"
@@ -15,6 +14,13 @@ type Lexer struct {
 	offset      int
 	startOffset int
 	endOffset   int
+}
+
+// SyntaxError identifies the location of a syntactic error.
+type SyntaxError struct { // TODO report instruction string
+	Msg   string
+	Start token.Position
+	End   token.Position
 }
 
 type stateFn func(*Lexer) (*Token, error)
@@ -45,7 +51,7 @@ func NewLexer(file *token.File, src []byte) *Lexer {
 }
 
 // Lex scans a single Whitespace token.
-func (l *Lexer) Lex() (*Token, error) { // TODO return position of error
+func (l *Lexer) Lex() (*Token, error) {
 	return lexInst(l)
 }
 
@@ -64,22 +70,22 @@ func (l *Lexer) LexProgram() (*Program, error) {
 	}
 }
 
-func (l *Lexer) next() (byte, int, bool) {
+func (l *Lexer) next() (byte, bool) {
 	for l.offset < len(l.src) {
-		offset := l.offset
+		l.endOffset = l.offset
 		l.offset++
-		switch c := l.src[offset]; c {
+		switch c := l.src[l.endOffset]; c {
 		case space, tab:
-			return c, offset, false
+			return c, false
 		case lf:
-			l.file.AddLine(offset)
-			return c, offset, false
+			l.file.AddLine(l.offset)
+			return c, false
 		}
 	}
-	return 0, 0, true
+	return 0, true
 }
 
-func (l *Lexer) appendToken(typ Type, arg *big.Int) (*Token, error) {
+func (l *Lexer) emitToken(typ Type, arg *big.Int) (*Token, error) {
 	return &Token{
 		Type:  typ,
 		Arg:   arg,
@@ -88,17 +94,29 @@ func (l *Lexer) appendToken(typ Type, arg *big.Int) (*Token, error) {
 	}, nil
 }
 
+func (l *Lexer) error(msg string) (*Token, error) {
+	return nil, &SyntaxError{
+		Msg:   msg,
+		Start: l.file.PositionFor(l.file.Pos(l.startOffset), false),
+		End:   l.file.PositionFor(l.file.Pos(l.endOffset), false),
+	}
+}
+
+func (l *Lexer) errorf(format string, args ...interface{}) (*Token, error) {
+	return l.error(fmt.Sprintf(format, args...))
+}
+
 func transition(s states) stateFn {
 	return func(l *Lexer) (*Token, error) {
-		c, offset, eof := l.next()
+		c, eof := l.next()
 		if eof {
 			if s.Root {
 				return nil, io.EOF
 			}
-			return nil, io.ErrUnexpectedEOF
+			return l.error("incomplete instruction")
 		}
 		if s.Root {
-			l.startOffset = offset
+			l.startOffset = l.endOffset
 		}
 		var state stateFn
 		switch c {
@@ -112,7 +130,7 @@ func transition(s states) stateFn {
 			panic("unreachable")
 		}
 		if state == nil {
-			return nil, errors.New("invalid instruction") // TODO report instruction string
+			return l.error("invalid instruction")
 		}
 		return state(l)
 	}
@@ -127,26 +145,25 @@ func lexNumber(typ Type, signed bool) stateFn {
 	return func(l *Lexer) (*Token, error) {
 		var negative bool
 		if signed {
-			tok, offset, eof := l.next()
+			tok, eof := l.next()
 			if eof {
-				return nil, errors.New("unterminated number")
+				return l.error("unterminated number")
 			}
 			switch tok {
 			case space:
 			case tab:
 				negative = true
 			case lf:
-				l.endOffset = offset
-				return l.appendToken(typ, bigZero)
+				return l.emitToken(typ, bigZero)
 			default:
 				panic("unreachable")
 			}
 		}
 		num := new(big.Int)
 		for {
-			tok, offset, eof := l.next()
+			tok, eof := l.next()
 			if eof {
-				return nil, fmt.Errorf("unterminated number: %d", num)
+				return l.errorf("unterminated number: %d", num)
 			}
 			switch tok {
 			case space:
@@ -157,8 +174,7 @@ func lexNumber(typ Type, signed bool) stateFn {
 				if negative {
 					num.Neg(num)
 				}
-				l.endOffset = offset
-				return l.appendToken(typ, num)
+				return l.emitToken(typ, num)
 			default:
 				panic("unreachable")
 			}
@@ -168,8 +184,12 @@ func lexNumber(typ Type, signed bool) stateFn {
 
 func emitInst(typ Type) stateFn {
 	return func(l *Lexer) (*Token, error) {
-		return l.appendToken(typ, nil)
+		return l.emitToken(typ, nil)
 	}
+}
+
+func (err *SyntaxError) Error() string {
+	return fmt.Sprintf("syntax error: %s at %v - %v", err.Msg, err.Start, err.End)
 }
 
 var lexInst = transition(states{
