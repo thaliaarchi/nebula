@@ -27,6 +27,7 @@ var (
 		"":       emitIR,
 		"ws":     emitWS,
 		"wsa":    emitWSA,
+		"wsx":    emitWSX,
 		"ir":     emitIR,
 		"llvm":   emitLLVM,
 		"dot":    printDOT,
@@ -57,6 +58,7 @@ Examples:
 const modeUsage = `Output mode:
 * ws      emit Whitespace syntax
 * wsa     emit Whitespace AST
+* wsx     emit bit packed Whitespace
 * ir      emit Nebula IR (default)
 * llvm    emit LLVM IR
 * dot     print control flow graph as Graphviz DOT digraph
@@ -175,6 +177,10 @@ func emitWS(p *ws.Program) {
 
 func emitWSA(p *ws.Program) {
 	fmt.Print(p.Dump("    "))
+}
+
+func emitWSX(p *ws.Program) {
+	fmt.Print(string(ws.Pack([]byte(p.DumpWS()))))
 }
 
 func emitIR(p *ws.Program) {
