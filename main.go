@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/nebula/analysis"
+	"github.com/andrewarchi/nebula/bigint"
 	"github.com/andrewarchi/nebula/codegen"
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/ws"
@@ -89,7 +91,7 @@ func main() {
 	}
 
 	filename := args[0]
-	program, err := ws.LexProgram(filename, packed)
+	program, err := lexProgram(filename, packed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Lex error: %v\n", err)
 		os.Exit(1)
@@ -108,6 +110,49 @@ func usage() {
 func incorrectUsage() {
 	fmt.Fprintf(os.Stderr, "Run %s -help for usage.\n", os.Args[0])
 	os.Exit(2)
+}
+
+func lexProgram(filename string, bitPacked bool) (*ws.Program, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	src, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if bitPacked {
+		src, err = ws.Unpack(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+	tokens, err := ws.Lex(src)
+	if err != nil {
+		return nil, err
+	}
+
+	var labelNames *bigint.Map
+	mapFilename := filename + ".map"
+	if info, err := os.Stat(mapFilename); err == nil && !info.IsDir() {
+		sourceMap, err := os.Open(mapFilename)
+		if err != nil {
+			return nil, err
+		}
+		defer sourceMap.Close()
+		labelNames, err = ws.ParseSourceMap(sourceMap)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ws.Program{
+		Name:       filename,
+		Tokens:     tokens,
+		LabelNames: labelNames,
+	}, nil
 }
 
 func convertSSA(p *ws.Program) *ir.Program {

@@ -1,4 +1,4 @@
-package codegen
+package codegen // import "github.com/andrewarchi/nebula/codegen"
 
 import (
 	"fmt"

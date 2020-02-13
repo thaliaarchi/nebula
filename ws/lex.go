@@ -5,20 +5,46 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"os"
-
-	"github.com/andrewarchi/nebula/bigint"
 )
 
 type lexer struct {
-	r      SpaceReader
+	src    []byte
 	tokens []Token
+	line   int
+	col    int
+	offset int
 	pos    Pos
 }
 
+type stateFn func(*lexer) (stateFn, error)
+
+type states struct {
+	Space stateFn
+	Tab   stateFn
+	LF    stateFn
+	Root  bool
+}
+
+const (
+	space = ' '
+	tab   = '\t'
+	lf    = '\n'
+)
+
+var (
+	bigZero = big.NewInt(0)
+	bigOne  = big.NewInt(1)
+)
+
 // Lex lexically analyzes a Whitespace source to produce tokens.
-func Lex(r SpaceReader) ([]Token, error) {
-	l := &lexer{r: r}
+func Lex(src []byte) ([]Token, error) {
+	l := &lexer{
+		src:    src,
+		line:   1,
+		col:    1,
+		offset: 0,
+		pos:    Pos{"", 1, 1},
+	}
 	var err error
 	for state := lexInst; state != nil; {
 		state, err = state(l)
@@ -29,182 +55,133 @@ func Lex(r SpaceReader) ([]Token, error) {
 	return l.tokens, nil
 }
 
-func LexProgram(filename string, bitPacked bool) (*Program, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func (l *lexer) appendToken(typ Type, arg *big.Int) {
+	l.tokens = append(l.tokens, Token{typ, arg, l.pos, Pos{"", l.line, l.col}})
+}
 
-	var r SpaceReader
-	if bitPacked {
-		r = NewBitReader(f, filename)
-	} else {
-		r = NewTextReader(f, filename)
-	}
-	tokens, err := Lex(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var labelNames *bigint.Map
-	if info, err := os.Stat(filename + ".map"); err == nil && !info.IsDir() {
-		sourceMap, err := os.Open(filename + ".map")
-		if err != nil {
-			return nil, err
-		}
-		defer sourceMap.Close()
-		labelNames, err = ParseSourceMap(sourceMap)
-		if err != nil {
-			return nil, err
+func (l *lexer) next() (byte, bool) {
+	for l.offset < len(l.src) {
+		c := l.src[l.offset]
+		l.offset++
+		switch c {
+		case space, tab:
+			l.col++
+			return c, false
+		case lf:
+			l.line++
+			l.col = 1
+			return c, false
+		default:
+			l.col++
 		}
 	}
-
-	return &Program{
-		Name:       filename,
-		Tokens:     tokens,
-		LabelNames: labelNames,
-	}, nil
-}
-
-func (l *lexer) appendToken(typ Type, arg *big.Int, argPos Pos) {
-	l.tokens = append(l.tokens, Token{typ, arg, l.pos, argPos, l.r.Pos()})
-}
-
-type stateFn func(*lexer) (stateFn, error)
-
-type states struct {
-	Space stateFn
-	Tab   stateFn
-	LF    stateFn
-}
-
-func root(s states) stateFn {
-	return func(l *lexer) (stateFn, error) {
-		l.pos = l.r.Pos()
-		return l.nextState(s, true)
-	}
+	return 0, true
 }
 
 func transition(s states) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		return l.nextState(s, false)
-	}
-}
-
-func (l *lexer) nextState(s states, isRoot bool) (stateFn, error) {
-	tok, err := l.r.Next()
-	if err != nil {
-		return nil, err
-	}
-	switch tok {
-	case Space:
-		return s.Space, nil
-	case Tab:
-		return s.Tab, nil
-	case LF:
-		return s.LF, nil
-	case EOF:
-		if isRoot {
-			return nil, nil
+		l.pos = Pos{"", l.line, l.col}
+		c, eof := l.next()
+		if eof {
+			if s.Root {
+				return nil, nil
+			}
+			return nil, io.ErrUnexpectedEOF
 		}
-		return nil, io.ErrUnexpectedEOF
-	default:
-		panic("ws: unrecognized token")
+		switch c {
+		case space:
+			return s.Space, nil
+		case tab:
+			return s.Tab, nil
+		case lf:
+			return s.LF, nil
+		default:
+			panic("unreachable")
+		}
 	}
 }
 
 func emitInst(typ Type) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		l.appendToken(typ, nil, Pos{})
+		l.appendToken(typ, nil)
 		return lexInst, nil
 	}
 }
 
 func lexNumber(typ Type) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		argPos := l.r.Pos()
 		arg, err := l.lexSigned()
 		if err != nil {
 			return nil, err
 		}
-		l.appendToken(typ, arg, argPos)
+		l.appendToken(typ, arg)
 		return lexInst, nil
 	}
 }
 
 func lexLabel(typ Type) stateFn {
 	return func(l *lexer) (stateFn, error) {
-		argPos := l.r.Pos()
 		arg, err := l.lexUnsigned()
 		if err != nil {
 			return nil, err
 		}
-		l.appendToken(typ, arg, argPos)
+		l.appendToken(typ, arg)
 		return lexInst, nil
 	}
 }
 
-var (
-	bigZero = big.NewInt(0)
-	bigOne  = big.NewInt(1)
-)
-
 func (l *lexer) lexSigned() (*big.Int, error) {
-	tok, err := l.r.Next()
-	if err != nil {
-		return nil, err
+	tok, eof := l.next()
+	if eof {
+		return nil, errors.New("unterminated number")
 	}
 	switch tok {
-	case Space:
+	case space:
 		return l.lexUnsigned()
-	case Tab:
+	case tab:
 		num, err := l.lexUnsigned()
 		if err != nil {
 			return nil, err
 		}
 		num.Neg(num)
 		return num, nil
-	case LF:
+	case lf:
 		return bigZero, nil
-	case EOF:
-		return nil, errors.New("unterminated number")
 	default:
-		panic("ws: unrecognized token")
+		panic("unreachable")
 	}
 }
 
 func (l *lexer) lexUnsigned() (*big.Int, error) {
 	num := new(big.Int)
 	for {
-		tok, err := l.r.Next()
-		if err != nil {
-			return nil, err
+		tok, eof := l.next()
+		if eof {
+			return nil, fmt.Errorf("unterminated number: %d", num)
 		}
 		switch tok {
-		case Space:
+		case space:
 			num.Lsh(num, 1)
-		case Tab:
+		case tab:
 			num.Lsh(num, 1).Or(num, bigOne)
-		case LF:
+		case lf:
 			return num, nil
-		case EOF:
-			return nil, fmt.Errorf("unterminated number: %d", num)
 		default:
-			panic("ws: unrecognized token")
+			panic("unreachable")
 		}
 	}
 }
 
 func init() {
-	lexInst = root(states{
+	lexInst = transition(states{
 		Space: lexStack,
 		Tab: transition(states{
 			Space: lexArith,
 			Tab:   lexHeap,
 			LF:    lexIO,
 		}),
-		LF: lexFlow,
+		LF:   lexFlow,
+		Root: true,
 	})
 }
 

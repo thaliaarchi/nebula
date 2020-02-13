@@ -10,11 +10,10 @@ import (
 
 // Token is a lexical token in the Whitespace language.
 type Token struct {
-	Type     Type
-	Arg      *big.Int
-	StartPos Pos
-	ArgPos   Pos
-	EndPos   Pos
+	Type  Type
+	Arg   *big.Int
+	Start Pos
+	End   Pos
 }
 
 // Format formats a token as Whitespace assembly.
