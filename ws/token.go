@@ -110,7 +110,7 @@ const (
 	heapEnd
 
 	flowBeg
-	// Flow control instructions
+	// Control flow instructions
 	Label
 	Call
 	Jmp
@@ -138,7 +138,7 @@ func (typ Type) IsArith() bool { return arithBeg < typ && typ < arithEnd }
 // IsHeap returns true for tokens corresponding to heap access instructions.
 func (typ Type) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
 
-// IsFlow returns true for tokens corresponding to flow control instructions.
+// IsFlow returns true for tokens corresponding to control flow instructions.
 func (typ Type) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
 
 // IsIO returns true for tokens corresponding to i/o instructions.

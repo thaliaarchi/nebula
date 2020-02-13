@@ -46,8 +46,8 @@ var (
 	one  = llvm.ConstInt(llvm.Int64Type(), 1, false)
 )
 
-// EmitLLVMIR generates LLVM IR for the given program.
-func EmitLLVMIR(program *ir.Program, conf Config) llvm.Module {
+// EmitLLVMModule generates a LLVM IR module for the given program.
+func EmitLLVMModule(program *ir.Program, conf Config) llvm.Module {
 	ctx := llvm.GlobalContext()
 	b := ctx.NewBuilder()
 	module := ctx.NewModule(program.Name)

@@ -192,7 +192,7 @@ func emitLLVM(p *ws.Program) {
 		MaxHeapBound:    maxHeapBound,
 	}
 	program := convertSSA(p)
-	mod := codegen.EmitLLVMIR(program, conf)
+	mod := codegen.EmitLLVMModule(program, conf)
 	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}

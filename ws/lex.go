@@ -71,16 +71,21 @@ func (l *Lexer) LexProgram() (*Program, error) {
 }
 
 func (l *Lexer) next() (byte, bool) {
-	for l.offset < len(l.src) {
+	if l.offset < len(l.src) {
 		l.endOffset = l.offset
 		l.offset++
-		switch c := l.src[l.endOffset]; c {
-		case space, tab:
-			return c, false
-		case lf:
+		c := l.src[l.endOffset]
+		if c == '\n' {
 			l.file.AddLine(l.offset)
-			return c, false
 		}
+		return c, false
+	}
+	return 0, true
+}
+
+func (l *Lexer) peek() (byte, bool) {
+	if l.offset < len(l.src) {
+		return l.src[l.offset], false
 	}
 	return 0, true
 }
@@ -108,6 +113,7 @@ func (l *Lexer) errorf(format string, args ...interface{}) (*Token, error) {
 
 func transition(s states) stateFn {
 	return func(l *Lexer) (*Token, error) {
+	next:
 		c, eof := l.next()
 		if eof {
 			if s.Root {
@@ -127,7 +133,7 @@ func transition(s states) stateFn {
 		case lf:
 			state = s.LF
 		default:
-			panic("unreachable")
+			goto next
 		}
 		if state == nil {
 			return l.error("invalid instruction")
@@ -145,6 +151,7 @@ func lexNumber(typ Type, signed bool) stateFn {
 	return func(l *Lexer) (*Token, error) {
 		var negative bool
 		if signed {
+		next:
 			tok, eof := l.next()
 			if eof {
 				return l.error("unterminated number")
@@ -156,7 +163,7 @@ func lexNumber(typ Type, signed bool) stateFn {
 			case lf:
 				return l.emitToken(typ, bigZero)
 			default:
-				panic("unreachable")
+				goto next
 			}
 		}
 		num := new(big.Int)
@@ -175,8 +182,6 @@ func lexNumber(typ Type, signed bool) stateFn {
 					num.Neg(num)
 				}
 				return l.emitToken(typ, num)
-			default:
-				panic("unreachable")
 			}
 		}
 	}
