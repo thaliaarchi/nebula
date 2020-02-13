@@ -16,7 +16,7 @@ type lexer struct {
 	pos    Pos
 }
 
-type stateFn func(*lexer) (stateFn, error)
+type stateFn func(*lexer) error
 
 type states struct {
 	Space stateFn
@@ -45,18 +45,15 @@ func Lex(src []byte) ([]Token, error) {
 		offset: 0,
 		pos:    Pos{"", 1, 1},
 	}
-	var err error
-	for state := lexInst; state != nil; {
-		state, err = state(l)
+	for {
+		err := lexInst(l)
 		if err != nil {
-			return nil, err
+			if err != io.EOF {
+				return nil, err
+			}
+			return l.tokens, nil
 		}
 	}
-	return l.tokens, nil
-}
-
-func (l *lexer) appendToken(typ Type, arg *big.Int) {
-	l.tokens = append(l.tokens, Token{typ, arg, l.pos, Pos{"", l.line, l.col}})
 }
 
 func (l *lexer) next() (byte, bool) {
@@ -78,120 +75,102 @@ func (l *lexer) next() (byte, bool) {
 	return 0, true
 }
 
+func (l *lexer) appendToken(typ Type, arg *big.Int) error {
+	l.tokens = append(l.tokens, Token{typ, arg, l.pos, Pos{"", l.line, l.col}})
+	return nil
+}
+
 func transition(s states) stateFn {
-	return func(l *lexer) (stateFn, error) {
+	return func(l *lexer) error {
 		l.pos = Pos{"", l.line, l.col}
 		c, eof := l.next()
 		if eof {
 			if s.Root {
-				return nil, nil
+				return io.EOF
 			}
-			return nil, io.ErrUnexpectedEOF
+			return io.ErrUnexpectedEOF
 		}
+		var state stateFn
 		switch c {
 		case space:
-			return s.Space, nil
+			state = s.Space
 		case tab:
-			return s.Tab, nil
+			state = s.Tab
 		case lf:
-			return s.LF, nil
+			state = s.LF
 		default:
 			panic("unreachable")
+		}
+		if state == nil {
+			return errors.New("invalid instruction") // TODO report instruction string
+		}
+		return state(l)
+	}
+}
+
+func lexNumber(typ Type, signed bool) stateFn {
+	return func(l *lexer) error {
+		var negative bool
+		if signed {
+			tok, eof := l.next()
+			if eof {
+				return errors.New("unterminated number")
+			}
+			switch tok {
+			case space:
+			case tab:
+				negative = true
+			case lf:
+				return l.appendToken(typ, bigZero)
+			default:
+				panic("unreachable")
+			}
+		}
+		num := new(big.Int)
+		for {
+			tok, eof := l.next()
+			if eof {
+				return fmt.Errorf("unterminated number: %d", num)
+			}
+			switch tok {
+			case space:
+				num.Lsh(num, 1)
+			case tab:
+				num.Lsh(num, 1).Or(num, bigOne)
+			case lf:
+				if negative {
+					num.Neg(num)
+				}
+				return l.appendToken(typ, num)
+			default:
+				panic("unreachable")
+			}
 		}
 	}
 }
 
 func emitInst(typ Type) stateFn {
-	return func(l *lexer) (stateFn, error) {
-		l.appendToken(typ, nil)
-		return lexInst, nil
+	return func(l *lexer) error {
+		return l.appendToken(typ, nil)
 	}
 }
 
-func lexNumber(typ Type) stateFn {
-	return func(l *lexer) (stateFn, error) {
-		arg, err := l.lexSigned()
-		if err != nil {
-			return nil, err
-		}
-		l.appendToken(typ, arg)
-		return lexInst, nil
-	}
-}
-
-func lexLabel(typ Type) stateFn {
-	return func(l *lexer) (stateFn, error) {
-		arg, err := l.lexUnsigned()
-		if err != nil {
-			return nil, err
-		}
-		l.appendToken(typ, arg)
-		return lexInst, nil
-	}
-}
-
-func (l *lexer) lexSigned() (*big.Int, error) {
-	tok, eof := l.next()
-	if eof {
-		return nil, errors.New("unterminated number")
-	}
-	switch tok {
-	case space:
-		return l.lexUnsigned()
-	case tab:
-		num, err := l.lexUnsigned()
-		if err != nil {
-			return nil, err
-		}
-		num.Neg(num)
-		return num, nil
-	case lf:
-		return bigZero, nil
-	default:
-		panic("unreachable")
-	}
-}
-
-func (l *lexer) lexUnsigned() (*big.Int, error) {
-	num := new(big.Int)
-	for {
-		tok, eof := l.next()
-		if eof {
-			return nil, fmt.Errorf("unterminated number: %d", num)
-		}
-		switch tok {
-		case space:
-			num.Lsh(num, 1)
-		case tab:
-			num.Lsh(num, 1).Or(num, bigOne)
-		case lf:
-			return num, nil
-		default:
-			panic("unreachable")
-		}
-	}
-}
-
-func init() {
-	lexInst = transition(states{
-		Space: lexStack,
-		Tab: transition(states{
-			Space: lexArith,
-			Tab:   lexHeap,
-			LF:    lexIO,
-		}),
-		LF:   lexFlow,
-		Root: true,
-	})
-}
-
-var lexInst stateFn
+var lexInst = transition(states{
+	Space: lexStack,
+	Tab: transition(states{
+		Space: lexArith,
+		Tab:   lexHeap,
+		LF:    lexIO,
+	}),
+	LF:   lexFlow,
+	Root: true,
+})
 
 var lexStack = transition(states{
-	Space: lexNumber(Push),
+	Space: lexNumber(Push, true),
 	Tab: transition(states{
-		Space: lexNumber(Copy),
-		LF:    lexNumber(Slide),
+		Space: lexNumber(Copy, true),
+		LF:    lexNumber(Slide, true),
 	}),
 	LF: transition(states{
 		Space: emitInst(Dup),
@@ -230,13 +209,13 @@ var lexIO = transition(states{
 
 var lexFlow = transition(states{
 	Space: transition(states{
-		Space: lexLabel(Label),
-		Tab:   lexLabel(Call),
-		LF:    lexLabel(Jmp),
+		Space: lexNumber(Label, false),
+		Tab:   lexNumber(Call, false),
+		LF:    lexNumber(Jmp, false),
 	}),
 	Tab: transition(states{
-		Space: lexLabel(Jz),
-		Tab:   lexLabel(Jn),
+		Space: lexNumber(Jz, false),
+		Tab:   lexNumber(Jn, false),
 		LF:    emitInst(Ret),
 	}),
 	LF: transition(states{
