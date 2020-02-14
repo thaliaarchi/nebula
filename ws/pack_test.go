@@ -2,47 +2,39 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 
 import "testing"
 
-var (
-	unpacked = []byte{space, space, tab, tab, space, tab,
-		lf, space, lf, lf, tab, lf, tab, space, lf, lf, lf}
-	unpackedNoEnd = []byte{space, space, tab, tab, space, tab,
-		lf, space, lf, lf, tab, lf, tab, space}
-	packed = []byte{0b00101001, 0b01101111, 0b10111001, 0b11111000} // padded with three 0s
-
-	unpackedShort = []byte{lf, space, tab, space, lf}
-	packedShort   = []byte{0b11010011} // no padding
-
-	packedUnmatched = []byte{0b11010101} // unmatched 1
-)
+var tests = []struct{ unpacked, packed []byte }{
+	{ // no marker bit, no padding
+		[]byte{lf, space, tab, space, lf},
+		[]byte{0b11010011},
+	},
+	{ // no marker bit, padding
+		[]byte{space, space, tab, space, tab, tab, lf},
+		[]byte{0b00100101, 0b01100000},
+	},
+	{ // marker bit, no padding
+		[]byte{space, space, tab, tab, space, tab, lf, space, lf, lf, tab, lf, tab, space},
+		[]byte{0b00101001, 0b01101111, 0b10111001},
+	},
+	{ // marker bit, padding
+		[]byte{space, space, tab, tab, lf, tab, space, space, tab},
+		[]byte{0b00101011, 0b10001010},
+	},
+}
 
 func TestPack(t *testing.T) {
-	for i, test := range []struct{ unpacked, packed []byte }{
-		{unpacked, packed},
-		{unpackedNoEnd, packed},
-		{unpackedShort, packedShort},
-	} {
+	for i, test := range tests {
 		p := Pack(test.unpacked)
 		if string(p) != string(test.packed) {
-			t.Errorf("test %d: got %q, want %q", i, p, test.packed)
+			t.Errorf("test %d: got %b, want %b", i, p, test.packed)
 		}
 	}
 }
 
 func TestUnpack(t *testing.T) {
-	for i, test := range []struct{ packed, unpacked []byte }{
-		{packed, unpacked},
-		{packedShort, unpackedShort},
-	} {
-		u, err := Unpack(test.packed)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for i, test := range tests {
+		u := Unpack(test.packed)
 		if string(u) != string(test.unpacked) {
-			t.Errorf("test %d: got %q, want %q", i, u, test.unpacked)
+			t.Errorf("test %d: got %b, want %b", i, u, test.unpacked)
 		}
-	}
-	_, err := Unpack(packedUnmatched)
-	if err != ErrUnmatchedBit {
-		t.Errorf("got %v, want %v", err, ErrUnmatchedBit)
 	}
 }

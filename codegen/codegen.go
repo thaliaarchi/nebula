@@ -27,7 +27,7 @@ type defs struct {
 	BlockNames map[*ir.BasicBlock]llvm.Value
 }
 
-// Config stores configuration of allocation sizes for codegen.
+// Config contains allocation size configuration for codegen.
 type Config struct {
 	MaxStackLen     uint
 	MaxCallStackLen uint

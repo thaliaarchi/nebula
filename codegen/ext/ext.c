@@ -30,7 +30,7 @@ void flush() {
 // TODO change to procedure generated in IR to enable transformations.
 void check_stack(uint64_t n, char *location) {
   if (stack_len < n) {
-    fprintf(stderr, "stack underflow at %s\n", location);
+    fprintf(stderr, "data stack underflow at %s\n", location);
     fflush(stderr);
     exit(1);
   }

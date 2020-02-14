@@ -1,7 +1,5 @@
 package ws // import "github.com/andrewarchi/nebula/ws"
 
-import "errors"
-
 type packer struct {
 	text   []byte
 	bits   []byte
@@ -10,59 +8,49 @@ type packer struct {
 	bit    uint
 }
 
-// ErrUnmatchedBit is returned from Unpack when a 1 without a matching
-// bit is the last bit.
-var ErrUnmatchedBit = errors.New("unpack: unmatched 1 bit")
-
-// Pack bit packs a Whitespace source. If the final instruction does
-// not end in LF, the end instruction is appended.
+// Pack bit packs a Whitespace source.
 func Pack(src []byte) []byte {
 	p := packer{src, nil, 0, 0, 7}
+	appendOne := false
 	for {
 		c, eof := p.readByte()
 		if eof {
-			// Append end instruction to allow zero trimming.
-			if len(src) == 0 || src[len(src)-1] != lf {
-				p.writeBit(1)
-				p.writeBit(1)
-				p.writeBit(1)
-				p.writeBit(1)
-				p.writeBit(1)
+			if appendOne { // marker bit follows trailing zeros
 				p.writeBit(1)
 			}
-			if p.bit != 7 {
-				p.bits = append(p.bits, p.curr)
-			}
+			p.flushBits()
 			return p.bits
 		}
 		switch c {
 		case space:
 			p.writeBit(0)
+			appendOne = true
 		case tab:
 			p.writeBit(1)
 			p.writeBit(0)
+			appendOne = true
 		case lf:
 			p.writeBit(1)
 			p.writeBit(1)
+			appendOne = false
 		}
 	}
 }
 
-// Unpack expands a bit packed source. The final instruction must
-// end in LF.
-func Unpack(bits []byte) ([]byte, error) {
+// Unpack expands a bit packed source.
+func Unpack(bits []byte) []byte {
 	p := packer{nil, bits, 0, 0, 7}
 	for {
 		b, eof := p.readBit()
 		if eof {
-			return p.text, nil
+			return p.text
 		}
 		if !b {
 			p.writeByte(space)
 		} else {
 			b, eof = p.readBit()
-			if eof {
-				return nil, ErrUnmatchedBit
+			if eof { // marker bit
+				return p.text
 			}
 			if b {
 				p.writeByte(lf)
@@ -91,8 +79,7 @@ func (p *packer) readBit() (bool, bool) {
 		return false, true
 	}
 	c := p.bits[p.offset]
-	// Ignore trailing zeros on last byte as all
-	// control flow instructions end with LF (11).
+	// Ignore trailing zeros on last byte
 	if p.offset+1 == uint(len(p.bits)) && c<<(7-p.bit) == 0 {
 		return false, true
 	}
@@ -114,5 +101,11 @@ func (p *packer) writeBit(b byte) {
 		p.curr = 0
 	} else {
 		p.bit--
+	}
+}
+
+func (p *packer) flushBits() {
+	if p.bit != 7 && p.curr != 0 {
+		p.bits = append(p.bits, p.curr)
 	}
 }

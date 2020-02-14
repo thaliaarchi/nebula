@@ -126,10 +126,7 @@ func lexProgram(filename string, bitPacked bool) (*ws.Program, error) {
 	}
 
 	if bitPacked {
-		src, err = ws.Unpack(src)
-		if err != nil {
-			return nil, err
-		}
+		src = ws.Unpack(src)
 	}
 
 	fset := token.NewFileSet()
