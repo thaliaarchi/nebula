@@ -40,7 +40,8 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 		ConstVals: *bigint.NewMap(),
 	}
 	var branches []*big.Int
-	labels := bigint.NewMap() // map[*big.Int]int
+	labels := bigint.NewMap()           // map[*big.Int]int
+	labelUses := getLabelUses(p.Tokens) // map[*big.Int]struct{}
 	prevLabel := ""
 	labelIndex := 0
 
@@ -80,7 +81,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 
 		var branch *big.Int
 		for ; i < len(p.Tokens); i++ {
-			branch = appendInstruction(irp, &block, p.Tokens[i])
+			branch = appendInstruction(irp, &block, p.Tokens[i], labelUses)
 			if block.Terminator != nil {
 				if p.Tokens[i].Type == Label {
 					i--
@@ -103,7 +104,18 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	return irp, branches, labels, nil
 }
 
-func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token) *big.Int {
+func getLabelUses(tokens []Token) *bigint.Map {
+	labelUses := bigint.NewMap() // map[*big.Int]struct{}
+	for _, token := range tokens {
+		switch token.Type {
+		case Call, Jmp, Jz, Jn:
+			labelUses.Put(token.Arg, nil)
+		}
+	}
+	return labelUses
+}
+
+func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses *bigint.Map) *big.Int {
 	switch tok.Type {
 	case Push:
 		block.Stack.Push(p.LookupConst(tok.Arg))
@@ -150,8 +162,11 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token) *big.Int 
 		block.AppendNode(&ir.LoadHeapExpr{Assign: assign, Addr: addr})
 
 	case Label:
-		block.Terminator = &ir.JmpStmt{Op: ir.Fallthrough}
-		return tok.Arg
+		if _, ok := labelUses.Get(tok.Arg); ok {
+			block.Terminator = &ir.JmpStmt{Op: ir.Fallthrough}
+			return tok.Arg
+		}
+		// otherwise discard unused label
 	case Call:
 		block.Terminator = &ir.CallStmt{}
 		return tok.Arg

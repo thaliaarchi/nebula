@@ -75,7 +75,7 @@ func TestJoinSimpleEntries(t *testing.T) {
 		Blocks:      []*ir.BasicBlock{blockJoined},
 		Entry:       blockJoined,
 		ConstVals:   *constVals,
-		NextBlockID: 2,
+		NextBlockID: 1,
 	}
 
 	JoinSimpleEntries(program)
