@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/andrewarchi/graph"
 	"github.com/andrewarchi/nebula/analysis"
@@ -16,149 +17,122 @@ import (
 )
 
 var (
-	mode            string
-	maxStackLen     uint
-	maxCallStackLen uint
-	maxHeapBound    uint
-	noFold          bool
-	packed          bool
-
-	modeActions = map[string]func(*ws.Program){
-		"":       emitIR,
-		"ws":     emitWS,
-		"wsa":    emitWSA,
-		"wsx":    emitWSX,
-		"ir":     emitIR,
-		"llvm":   emitLLVM,
-		"dot":    printDOT,
-		"matrix": printMatrix,
+	name     string
+	flags    = flag.CommandLine
+	commands = map[string]func([]string){
+		"pack":   runPack,
+		"unpack": runUnpack,
+		"graph":  runGraph,
+		"ast":    runAST,
+		"ir":     runIR,
+		"llvm":   runLLVM,
+		"help":   runHelp,
 	}
 )
 
-const usageHeader = `Nebula is a compiler for stack-based languages targeting LLVM IR.
+const usageText = `Nebula is a compiler for stack-based languages targeting LLVM IR.
 
 Usage:
 
-	%s [options] <program>
+	%s <command> [arguments] <program>
 
-Options:
+The commands are:
 
-`
+	pack    compress program to bit packed format
+	unpack  uncompress program from bit packed format
+	graph   print Nebula IR control flow graph
+	ast     emit Whitespace AST
+	ir      emit Nebula IR
+	llvm    emit LLVM IR
 
-const usageFooter = `
+Use "%s help <command>" for more information about a command.
+
 Examples:
 
-	%s -mode=ir programs/pi.out.ws > pi.nir
-	%s -mode=llvm programs/ascii4.out.ws > ascii4.ll
-	%s -mode=llvm -heap=400000 programs/interpret.out.ws > interpret.ll
-	%s -mode=dot programs/interpret.out.ws | dot -Tpng > graph.png
+	%s ir programs/pi.out.ws > pi.nir
+	%s llvm programs/ascii4.out.ws > ascii4.ll
+	%s llvm -heap=400000 programs/interpret.out.ws > interpret.ll
+	%s graph programs/interpret.out.ws | dot -Tpng > graph.png
 
 `
 
-const modeUsage = `Output mode:
-* ws      emit Whitespace syntax
-* wsa     emit Whitespace AST
-* wsx     emit bit packed Whitespace
-* ir      emit Nebula IR (default)
-* llvm    emit LLVM IR
-* dot     print control flow graph as Graphviz DOT digraph
-* matrix  print control flow graph as Unicode matrix`
-
-func init() {
-	flag.Usage = usage
-	flag.StringVar(&mode, "mode", "", modeUsage)
-	flag.UintVar(&maxStackLen, "stack", codegen.DefaultMaxStackLen, "Maximum stack length for LLVM codegen")
-	flag.UintVar(&maxCallStackLen, "calls", codegen.DefaultMaxCallStackLen, "Maximum call stack length for LLVM codegen")
-	flag.UintVar(&maxHeapBound, "heap", codegen.DefaultMaxHeapBound, "Maximum heap address bound for LLVM codegen")
-	flag.BoolVar(&noFold, "nofold", false, "Disable constant folding")
-	flag.BoolVar(&packed, "packed", false, "Enable bit packed format for input file")
-}
-
 func main() {
-	flag.Parse()
-	args := flag.Args()
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "No program provided.")
-		incorrectUsage()
+	flags.Usage = usage
+	if len(os.Args) < 2 {
+		usage()
+		os.Exit(2)
 	}
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "Too many arguments provided.")
-		incorrectUsage()
-	}
-
-	modeAction, ok := modeActions[mode]
+	name = os.Args[0]
+	command := os.Args[1]
+	commandFn, ok := commands[command]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "Unrecognized mode: %s\n", mode)
-		incorrectUsage()
+		usageErrorf("Unrecognized command: %s\n", command)
 	}
-
-	filename := args[0]
-	program, err := lexProgram(filename, packed)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Lex error: %v\n", err)
-		os.Exit(1)
-	}
-	modeAction(program)
+	commandFn(os.Args[2:])
 }
 
 func usage() {
-	cmd := os.Args[0]
-	w := flag.CommandLine.Output()
-	fmt.Fprintf(w, usageHeader, cmd)
-	flag.PrintDefaults()
-	fmt.Fprintf(w, usageFooter, cmd, cmd, cmd, cmd)
+	fmt.Fprintf(flags.Output(), usageText, name, name, name, name, name, name)
+	flags.PrintDefaults()
 }
 
-func incorrectUsage() {
-	fmt.Fprintf(os.Stderr, "Run %s -help for usage.\n", os.Args[0])
-	os.Exit(2)
+func readFile(args []string) (string, []byte) {
+	if len(args) == 0 {
+		usageError("No program provided.")
+	}
+	if len(args) != 1 {
+		usageError("Too many arguments provided.")
+	}
+	filename := args[0]
+	src, err := ioutil.ReadFile(filename)
+	if err != nil {
+		exitError(err)
+	}
+	return filename, src
 }
 
-func lexProgram(filename string, bitPacked bool) (*ws.Program, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	src, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-
-	if bitPacked {
-		src = ws.Unpack(src)
-	}
-
+func lex(src []byte, filename string) *ws.Program {
 	fset := token.NewFileSet()
 	file := fset.AddFile(filename, -1, len(src))
 	lexer := ws.NewLexer(file, src)
 	program, err := lexer.LexProgram()
 	if err != nil {
-		return nil, err
+		exitError(err)
 	}
 
 	mapFilename := filename + ".map"
 	if info, err := os.Stat(mapFilename); err == nil && !info.IsDir() {
 		sourceMap, err := os.Open(mapFilename)
 		if err != nil {
-			return nil, err
+			exitError(err)
 		}
 		defer sourceMap.Close()
 		program.LabelNames, err = ws.ParseSourceMap(sourceMap)
 		if err != nil {
-			return nil, err
+			exitError(err)
 		}
 	}
-	return program, nil
+	return program
 }
 
-func convertSSA(p *ws.Program) *ir.Program {
+func lexFile(args []string) *ws.Program {
+	filename, src := readFile(args)
+	switch {
+	case strings.HasSuffix(filename, ".wsa"):
+		exitError("WSA lexing not implemented.")
+	case strings.HasSuffix(filename, ".wsx"):
+		src = ws.Unpack(src)
+	}
+	return lex(src, filename)
+}
+
+func convertSSA(p *ws.Program, noFold bool) *ir.Program {
 	program, err := p.ConvertSSA()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		if _, ok := err.(*ir.ErrorRetUnderflow); !ok {
-			os.Exit(1)
+			exitError(err)
 		}
+		fmt.Fprintln(os.Stderr, err)
 	}
 	if !noFold {
 		analysis.FoldConstArith(program)
@@ -166,45 +140,103 @@ func convertSSA(p *ws.Program) *ir.Program {
 	return program
 }
 
-func emitWS(p *ws.Program) {
-	fmt.Print(p.DumpWS())
+func runPack(args []string) {
+	filename, src := readFile(args)
+	if strings.HasSuffix(filename, ".wsa") {
+		exitError("WSA lexing not implemented.")
+	}
+	fmt.Print(string(ws.Pack(src)))
 }
 
-func emitWSA(p *ws.Program) {
-	fmt.Print(p.Dump("    "))
+func runUnpack(args []string) {
+	_, src := readFile(args)
+	fmt.Print(string(ws.Unpack(src)))
 }
 
-func emitWSX(p *ws.Program) {
-	fmt.Print(string(ws.Pack([]byte(p.DumpWS()))))
+func runGraph(args []string) {
+	ascii := *flags.Bool("ascii", false, "print as ASCII grid rather than DOT digraph.")
+	noFold := irFlags()
+	flags.Parse(args)
+
+	program := convertSSA(lexFile(flags.Args()), noFold)
+	if !ascii {
+		fmt.Print(program.DotDigraph())
+	} else {
+		labels := make([]string, len(program.Blocks))
+		for i, block := range program.Blocks {
+			labels[i] = block.Name()
+		}
+		fmt.Print(graph.FormatGridLabeled(analysis.ControlFlowGraph(program), labels))
+	}
 }
 
-func emitIR(p *ws.Program) {
-	fmt.Print(convertSSA(p).String())
+func runAST(args []string) {
+	format := *flags.String("format", "wsa", "output format; options: ws, wsa, wsx")
+	flags.Parse(args)
+	program := lexFile(args)
+	switch format {
+	case "ws":
+		fmt.Print(program.DumpWS())
+	case "wsa":
+		fmt.Print(program.Dump("    "))
+	case "wsx":
+		fmt.Print(string(ws.Pack([]byte(program.DumpWS()))))
+	default:
+		exitErrorf("Unrecognized format: %s", format)
+	}
 }
 
-func emitLLVM(p *ws.Program) {
-	conf := codegen.Config{
+func runIR(args []string) {
+	noFold := irFlags()
+	flags.Parse(args)
+
+	program := convertSSA(lexFile(flags.Args()), noFold)
+	fmt.Print(program.String())
+}
+
+func runLLVM(args []string) {
+	maxStackLen := *flags.Uint("stack", codegen.DefaultMaxStackLen, "maximum stack length for LLVM codegen")
+	maxCallStackLen := *flags.Uint("calls", codegen.DefaultMaxCallStackLen, "maximum call stack length for LLVM codegen")
+	maxHeapBound := *flags.Uint("heap", codegen.DefaultMaxHeapBound, "maximum heap address bound for LLVM codegen")
+	noFold := irFlags()
+	flags.Parse(args)
+
+	program := convertSSA(lexFile(flags.Args()), noFold)
+	mod := codegen.EmitLLVMModule(program, codegen.Config{
 		MaxStackLen:     maxStackLen,
 		MaxCallStackLen: maxCallStackLen,
 		MaxHeapBound:    maxHeapBound,
-	}
-	program := convertSSA(p)
-	mod := codegen.EmitLLVMModule(program, conf)
+	})
 	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	fmt.Print(mod.String())
 }
 
-func printDOT(p *ws.Program) {
-	fmt.Print(convertSSA(p).DotDigraph())
+func runHelp(args []string) {
+	usage()
 }
 
-func printMatrix(p *ws.Program) {
-	program := convertSSA(p)
-	labels := make([]string, len(program.Blocks))
-	for i, block := range program.Blocks {
-		labels[i] = block.Name()
-	}
-	fmt.Print(graph.FormatGridLabeled(analysis.ControlFlowGraph(program), labels))
+func irFlags() bool {
+	noFold := *flags.Bool("nofold", false, "disable constant folding")
+	return noFold
+}
+
+func exitError(msg interface{}) {
+	fmt.Fprintln(os.Stderr, msg)
+	os.Exit(1)
+}
+
+func exitErrorf(format string, args ...interface{}) {
+	exitError(fmt.Sprintf(format, args...))
+}
+
+func usageError(msg interface{}) {
+	fmt.Fprintln(os.Stderr, msg)
+	fmt.Fprintf(os.Stderr, "Run %s help for usage.\n", name)
+	os.Exit(2)
+}
+
+func usageErrorf(format string, args ...interface{}) {
+	usageError(fmt.Sprintf(format, args...))
 }
