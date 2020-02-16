@@ -68,6 +68,6 @@ cat programs/hello_world.ws >> tmp.ws
 printf '\0' >> tmp.ws
 
 echo "hello_world:"
-time build/interpret < tmp.ws
+time build/interpret < tmp.ws &&
 time "$wspace" programs/interpret.out.ws < tmp.ws
 rm tmp.ws

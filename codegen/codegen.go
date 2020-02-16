@@ -74,7 +74,7 @@ func EmitLLVMModule(program *ir.Program, config Config) llvm.Module {
 }
 
 func (m *moduleBuilder) declareFuncs() {
-	mainTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
+	mainTyp := llvm.FunctionType(llvm.Int32Type(), []llvm.Type{}, false)
 	m.main = llvm.AddFunction(m.module, "main", mainTyp)
 
 	printcTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type()}, false)
@@ -302,7 +302,7 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 			br.AddDest(m.blocks[dest])
 		}
 	case *ir.ExitStmt:
-		m.b.CreateRetVoid()
+		m.b.CreateRet(llvm.ConstInt(llvm.Int32Type(), 0, false))
 	default:
 		panic("codegen: unrecognized terminator type")
 	}
