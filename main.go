@@ -1,3 +1,4 @@
+// Nebula is a compiler for stack-based languages targeting LLVM IR.
 package main
 
 import (
@@ -17,7 +18,7 @@ import (
 )
 
 var (
-	name string
+	name = os.Args[0]
 
 	ascii           bool
 	format          string
@@ -26,6 +27,7 @@ var (
 	maxCallStackLen uint
 	maxHeapBound    uint
 
+	commands    map[string]commandConfig
 	packFlags   = flag.NewFlagSet("pack", flag.ExitOnError)
 	unpackFlags = flag.NewFlagSet("unpack", flag.ExitOnError)
 	graphFlags  = flag.NewFlagSet("graph", flag.ExitOnError)
@@ -33,22 +35,15 @@ var (
 	irFlags     = flag.NewFlagSet("ir", flag.ExitOnError)
 	llvmFlags   = flag.NewFlagSet("llvm", flag.ExitOnError)
 	helpFlags   = flag.NewFlagSet("help", flag.ExitOnError)
-
-	commands = map[string]struct {
-		run   func([]string)
-		flags *flag.FlagSet
-	}{
-		"pack":   {runPack, packFlags},
-		"unpack": {runUnpack, unpackFlags},
-		"graph":  {runGraph, graphFlags},
-		"ast":    {runAST, astFlags},
-		"ir":     {runIR, irFlags},
-		"llvm":   {runLLVM, llvmFlags},
-		"help":   {runHelp, helpFlags},
-	}
 )
 
-const usageText = `Nebula is a compiler for stack-based languages targeting LLVM IR.
+type commandConfig struct {
+	run   func([]string)
+	flags *flag.FlagSet
+}
+
+const (
+	usageText = `Nebula is a compiler for stack-based languages targeting LLVM IR.
 
 Usage:
 
@@ -73,9 +68,44 @@ Examples:
 	%s graph programs/interpret.out.ws | dot -Tpng > graph.png
 
 `
+	packHeader   = "Pack compresses a program to the bit packed format."
+	unpackHeader = "Unpack decompresses a program from the bit packed format."
+	graphHeader  = "Graph prints the control flow graph of a program's Nebula IR."
+	astHeader    = "AST emits a program's AST in Whitespace syntax."
+	irHeader     = "IR emits the Nebula IR of a program."
+	llvmHeader   = "LLVM emits the LLVM IR of a program."
+)
 
-func init() {
-	// flags.Usage = usage
+func main() {
+	if len(os.Args) < 2 {
+		usage()
+		os.Exit(2)
+	}
+	initFlags()
+	commandName := os.Args[1]
+	command, ok := commands[commandName]
+	if !ok {
+		helpFlags.Parse(os.Args[1:]) // print usage if a help flag given
+		usageErrorf("%s %s: unknown command", name, commandName)
+	}
+	command.flags.Parse(os.Args[2:])
+	command.run(command.flags.Args())
+}
+
+func usage() {
+	fmt.Fprintf(os.Stderr, usageText, name, name, name, name, name, name)
+}
+
+func initFlags() {
+	commands = map[string]commandConfig{
+		"pack":   {runPack, packFlags},
+		"unpack": {runUnpack, unpackFlags},
+		"graph":  {runGraph, graphFlags},
+		"ast":    {runAST, astFlags},
+		"ir":     {runIR, irFlags},
+		"llvm":   {runLLVM, llvmFlags},
+		"help":   {runHelp, helpFlags},
+	}
 	graphFlags.BoolVar(&ascii, "ascii", false, "print as ASCII grid rather than DOT digraph.")
 	astFlags.StringVar(&format, "format", "wsa", "output format; options: ws, wsa, wsx")
 	llvmFlags.UintVar(&maxStackLen, "stack", codegen.DefaultMaxStackLen, "maximum stack length for LLVM codegen")
@@ -84,30 +114,31 @@ func init() {
 	addIRFlags(graphFlags)
 	addIRFlags(irFlags)
 	addIRFlags(llvmFlags)
+	setUsage(packFlags, "pack <program>", packHeader, false)
+	setUsage(unpackFlags, "unpack <program>", unpackHeader, false)
+	setUsage(graphFlags, "graph [-ascii] [-nofold] <program>", graphHeader, true)
+	setUsage(astFlags, "ast [-format=f] <program>", astHeader, true)
+	setUsage(irFlags, "ir [-nofold] <program>", irHeader, true)
+	setUsage(llvmFlags, "llvm [-nofold] [-stack=n] [-calls=n] [-heap=n] <program>", llvmHeader, true)
+	helpFlags.Usage = usage
 }
 
 func addIRFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&noFold, "nofold", false, "disable constant folding")
 }
 
-func main() {
-	if len(os.Args) < 2 {
-		usage()
-		os.Exit(2)
+func setUsage(flags *flag.FlagSet, usage, header string, printFlags bool) {
+	flags.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s %s\n", name, usage)
+		if header != "" {
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, header)
+		}
+		if printFlags {
+			fmt.Fprint(os.Stderr, "\nOptions:\n\n")
+			flags.PrintDefaults()
+		}
 	}
-	name = os.Args[0]
-	commandName := os.Args[1]
-	command, ok := commands[commandName]
-	if !ok {
-		usageErrorf("Unrecognized command: %s\n", commandName)
-	}
-	command.flags.Parse(os.Args[2:])
-	command.run(command.flags.Args())
-}
-
-func usage() {
-	fmt.Fprintf(os.Stderr, usageText, name, name, name, name, name, name)
-	// flags.PrintDefaults()
 }
 
 func readFile(args []string) (string, []byte) {
@@ -176,8 +207,11 @@ func convertSSA(p *ws.Program, noFold bool) *ir.Program {
 
 func runPack(args []string) {
 	filename, src := readFile(args)
-	if strings.HasSuffix(filename, ".wsa") {
+	switch {
+	case strings.HasSuffix(filename, ".wsa"):
 		exitError("WSA lexing not implemented.")
+	case strings.HasSuffix(filename, ".wsx"):
+		usageError("Program is already packed.")
 	}
 	fmt.Print(string(ws.Pack(src)))
 }
@@ -210,7 +244,7 @@ func runAST(args []string) {
 	case "wsx":
 		fmt.Print(string(ws.Pack([]byte(program.DumpWS()))))
 	default:
-		exitErrorf("Unrecognized format: %s", format)
+		exitErrorf("Unknown format: %s.", format)
 	}
 }
 
@@ -233,7 +267,15 @@ func runLLVM(args []string) {
 }
 
 func runHelp(args []string) {
+	if len(args) == 1 {
+		command, ok := commands[args[0]]
+		if ok {
+			command.flags.Usage()
+			os.Exit(2)
+		}
+	}
 	usage()
+	os.Exit(2)
 }
 
 func exitError(msg interface{}) {
@@ -247,7 +289,7 @@ func exitErrorf(format string, args ...interface{}) {
 
 func usageError(msg interface{}) {
 	fmt.Fprintln(os.Stderr, msg)
-	fmt.Fprintf(os.Stderr, "Run %s help for usage.\n", name)
+	fmt.Fprintf(os.Stderr, "Run '%s help' for usage.\n", name)
 	os.Exit(2)
 }
 
