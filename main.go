@@ -17,16 +17,34 @@ import (
 )
 
 var (
-	name     string
-	flags    = flag.CommandLine
-	commands = map[string]func([]string){
-		"pack":   runPack,
-		"unpack": runUnpack,
-		"graph":  runGraph,
-		"ast":    runAST,
-		"ir":     runIR,
-		"llvm":   runLLVM,
-		"help":   runHelp,
+	name string
+
+	ascii           bool
+	format          string
+	noFold          bool
+	maxStackLen     uint
+	maxCallStackLen uint
+	maxHeapBound    uint
+
+	packFlags   = flag.NewFlagSet("pack", flag.ExitOnError)
+	unpackFlags = flag.NewFlagSet("unpack", flag.ExitOnError)
+	graphFlags  = flag.NewFlagSet("graph", flag.ExitOnError)
+	astFlags    = flag.NewFlagSet("ast", flag.ExitOnError)
+	irFlags     = flag.NewFlagSet("ir", flag.ExitOnError)
+	llvmFlags   = flag.NewFlagSet("llvm", flag.ExitOnError)
+	helpFlags   = flag.NewFlagSet("help", flag.ExitOnError)
+
+	commands = map[string]struct {
+		run   func([]string)
+		flags *flag.FlagSet
+	}{
+		"pack":   {runPack, packFlags},
+		"unpack": {runUnpack, unpackFlags},
+		"graph":  {runGraph, graphFlags},
+		"ast":    {runAST, astFlags},
+		"ir":     {runIR, irFlags},
+		"llvm":   {runLLVM, llvmFlags},
+		"help":   {runHelp, helpFlags},
 	}
 )
 
@@ -56,24 +74,40 @@ Examples:
 
 `
 
+func init() {
+	// flags.Usage = usage
+	graphFlags.BoolVar(&ascii, "ascii", false, "print as ASCII grid rather than DOT digraph.")
+	astFlags.StringVar(&format, "format", "wsa", "output format; options: ws, wsa, wsx")
+	llvmFlags.UintVar(&maxStackLen, "stack", codegen.DefaultMaxStackLen, "maximum stack length for LLVM codegen")
+	llvmFlags.UintVar(&maxCallStackLen, "calls", codegen.DefaultMaxCallStackLen, "maximum call stack length for LLVM codegen")
+	llvmFlags.UintVar(&maxHeapBound, "heap", codegen.DefaultMaxHeapBound, "maximum heap address bound for LLVM codegen")
+	addIRFlags(graphFlags)
+	addIRFlags(irFlags)
+	addIRFlags(llvmFlags)
+}
+
+func addIRFlags(flags *flag.FlagSet) {
+	flags.BoolVar(&noFold, "nofold", false, "disable constant folding")
+}
+
 func main() {
-	flags.Usage = usage
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
 	}
 	name = os.Args[0]
-	command := os.Args[1]
-	commandFn, ok := commands[command]
+	commandName := os.Args[1]
+	command, ok := commands[commandName]
 	if !ok {
-		usageErrorf("Unrecognized command: %s\n", command)
+		usageErrorf("Unrecognized command: %s\n", commandName)
 	}
-	commandFn(os.Args[2:])
+	command.flags.Parse(os.Args[2:])
+	command.run(command.flags.Args())
 }
 
 func usage() {
-	fmt.Fprintf(flags.Output(), usageText, name, name, name, name, name, name)
-	flags.PrintDefaults()
+	fmt.Fprintf(os.Stderr, usageText, name, name, name, name, name, name)
+	// flags.PrintDefaults()
 }
 
 func readFile(args []string) (string, []byte) {
@@ -154,11 +188,7 @@ func runUnpack(args []string) {
 }
 
 func runGraph(args []string) {
-	ascii := *flags.Bool("ascii", false, "print as ASCII grid rather than DOT digraph.")
-	noFold := irFlags()
-	flags.Parse(args)
-
-	program := convertSSA(lexFile(flags.Args()), noFold)
+	program := convertSSA(lexFile(args), noFold)
 	if !ascii {
 		fmt.Print(program.DotDigraph())
 	} else {
@@ -171,8 +201,6 @@ func runGraph(args []string) {
 }
 
 func runAST(args []string) {
-	format := *flags.String("format", "wsa", "output format; options: ws, wsa, wsx")
-	flags.Parse(args)
 	program := lexFile(args)
 	switch format {
 	case "ws":
@@ -187,21 +215,12 @@ func runAST(args []string) {
 }
 
 func runIR(args []string) {
-	noFold := irFlags()
-	flags.Parse(args)
-
-	program := convertSSA(lexFile(flags.Args()), noFold)
+	program := convertSSA(lexFile(args), noFold)
 	fmt.Print(program.String())
 }
 
 func runLLVM(args []string) {
-	maxStackLen := *flags.Uint("stack", codegen.DefaultMaxStackLen, "maximum stack length for LLVM codegen")
-	maxCallStackLen := *flags.Uint("calls", codegen.DefaultMaxCallStackLen, "maximum call stack length for LLVM codegen")
-	maxHeapBound := *flags.Uint("heap", codegen.DefaultMaxHeapBound, "maximum heap address bound for LLVM codegen")
-	noFold := irFlags()
-	flags.Parse(args)
-
-	program := convertSSA(lexFile(flags.Args()), noFold)
+	program := convertSSA(lexFile(args), noFold)
 	mod := codegen.EmitLLVMModule(program, codegen.Config{
 		MaxStackLen:     maxStackLen,
 		MaxCallStackLen: maxCallStackLen,
@@ -215,11 +234,6 @@ func runLLVM(args []string) {
 
 func runHelp(args []string) {
 	usage()
-}
-
-func irFlags() bool {
-	noFold := *flags.Bool("nofold", false, "disable constant folding")
-	return noFold
 }
 
 func exitError(msg interface{}) {
