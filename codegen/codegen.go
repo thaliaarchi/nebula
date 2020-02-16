@@ -239,7 +239,11 @@ func (m *moduleBuilder) emitNode(node ir.Node, block *ir.BasicBlock, stackLen ll
 }
 
 func (m *moduleBuilder) updateStack(block *ir.BasicBlock, stackLen llvm.Value) {
-	if pop := block.Stack.Pops; pop > 0 {
+	pop := block.Stack.Pops
+	if pop < 0 {
+		panic("codegen: negative pop")
+	}
+	if pop > 0 {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(pop), false)
 		stackLen = m.b.CreateSub(stackLen, n, "stack_len_pop")
 	}
@@ -251,11 +255,14 @@ func (m *moduleBuilder) updateStack(block *ir.BasicBlock, stackLen llvm.Value) {
 		gep := m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
 		m.b.CreateStore(v, gep)
 	}
-	if push := len(block.Stack.Vals); push > 0 {
-		n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
-		stackLen = m.b.CreateAdd(stackLen, n, "stack_len_push")
+	push := len(block.Stack.Vals)
+	if pop != push {
+		if push > 0 {
+			n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
+			stackLen = m.b.CreateAdd(stackLen, n, "stack_len_push")
+		}
+		m.b.CreateStore(stackLen, m.stackLen)
 	}
-	m.b.CreateStore(stackLen, m.stackLen)
 }
 
 func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
