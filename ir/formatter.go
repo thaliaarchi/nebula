@@ -91,12 +91,14 @@ func (f *formatter) FormatNode(node Node) string {
 		return fmt.Sprintf("%s = %v %s", f.FormatDef(&n.Def), n.Op, f.FormatUse(n.Val))
 	case *LoadStackExpr:
 		return fmt.Sprintf("%s = loadstack %d", f.FormatDef(&n.Def), n.Pos)
-	case *LoadHeapExpr:
-		return fmt.Sprintf("%s = load *%s", f.FormatDef(&n.Def), f.FormatUse(n.Addr))
-	case *StoreHeapStmt:
-		return fmt.Sprintf("store *%s %s", f.FormatUse(n.Addr), f.FormatUse(n.Val))
+	case *StoreStackStmt:
+		return fmt.Sprintf("storestack %d %s", n.Pos, f.FormatUse(n.Val))
 	case *CheckStackStmt:
 		return fmt.Sprintf("checkstack %d", n.Access)
+	case *LoadHeapExpr:
+		return fmt.Sprintf("%s = loadheap *%s", f.FormatDef(&n.Def), f.FormatUse(n.Addr))
+	case *StoreHeapStmt:
+		return fmt.Sprintf("storeheap *%s %s", f.FormatUse(n.Addr), f.FormatUse(n.Val))
 	case *PrintStmt:
 		return fmt.Sprintf("%v %s", n.Op, f.FormatUse(n.Val))
 	case *ReadExpr:

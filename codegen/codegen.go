@@ -190,16 +190,10 @@ func (m *moduleBuilder) emitNode(node ir.Node, block *ir.BasicBlock, stackLen ll
 			panic("codegen: unrecognized unary op")
 		}
 	case *ir.LoadStackExpr:
-		name := fmt.Sprintf("s%d", inst.Pos)
-		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Pos), false)
-		idx := m.b.CreateSub(stackLen, n, name+".idx")
-		gep := m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
-		m.idents[&inst.Def] = m.b.CreateLoad(gep, name)
-	case *ir.LoadHeapExpr:
-		addr := m.heapAddr(inst.Addr)
-		m.idents[&inst.Def] = m.b.CreateLoad(addr, "retrieve")
-	case *ir.StoreHeapStmt:
-		addr := m.heapAddr(inst.Addr)
+		addr := m.stackAddr(inst.Pos, stackLen)
+		m.idents[&inst.Def] = m.b.CreateLoad(addr, "loadstack")
+	case *ir.StoreStackStmt:
+		addr := m.stackAddr(inst.Pos, stackLen)
 		val := m.lookupUse(inst.Val)
 		m.b.CreateStore(val, addr)
 	case *ir.CheckStackStmt:
@@ -208,6 +202,13 @@ func (m *moduleBuilder) emitNode(node ir.Node, block *ir.BasicBlock, stackLen ll
 		}
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Access), false)
 		m.b.CreateCall(m.checkStack, []llvm.Value{n, m.blockName(block)}, "")
+	case *ir.LoadHeapExpr:
+		addr := m.heapAddr(inst.Addr)
+		m.idents[&inst.Def] = m.b.CreateLoad(addr, "loadheap")
+	case *ir.StoreHeapStmt:
+		addr := m.heapAddr(inst.Addr)
+		val := m.lookupUse(inst.Val)
+		m.b.CreateStore(val, addr)
 	case *ir.PrintStmt:
 		var f llvm.Value
 		switch inst.Op {
@@ -325,6 +326,13 @@ func (m *moduleBuilder) lookupVal(val ir.Value) llvm.Value {
 		}
 		panic(fmt.Sprintf("codegen: def not found: %v", v))
 	}
+}
+
+func (m *moduleBuilder) stackAddr(pos int, stackLen llvm.Value) llvm.Value {
+	name := fmt.Sprintf("s%d", pos)
+	n := llvm.ConstInt(llvm.Int64Type(), uint64(pos), false)
+	idx := m.b.CreateSub(stackLen, n, name+".idx")
+	return m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
 }
 
 func (m *moduleBuilder) heapAddr(val *ir.ValueUse) llvm.Value {

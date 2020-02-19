@@ -142,6 +142,25 @@ func (*LoadStackExpr) node()  {}
 func (*LoadStackExpr) expr()  {}
 func (*LoadStackExpr) value() {}
 
+// StoreStackStmt is a statement that stores a value at a position in
+// the stack.
+type StoreStackStmt struct {
+	Pos int
+	Val *ValueUse
+}
+
+func (*StoreStackStmt) node() {}
+func (*StoreStackStmt) stmt() {}
+func (*StoreStackStmt) user() {}
+
+// CheckStackStmt is a statement that asserts the stack length.
+type CheckStackStmt struct {
+	Access int
+}
+
+func (*CheckStackStmt) node() {}
+func (*CheckStackStmt) stmt() {}
+
 // LoadHeapExpr is an expression that loads a value at an address
 // from the heap.
 type LoadHeapExpr struct {
@@ -164,14 +183,6 @@ type StoreHeapStmt struct {
 func (*StoreHeapStmt) node() {}
 func (*StoreHeapStmt) stmt() {}
 func (*StoreHeapStmt) user() {}
-
-// CheckStackStmt is a statement that asserts the stack length.
-type CheckStackStmt struct {
-	Access int
-}
-
-func (*CheckStackStmt) node() {}
-func (*CheckStackStmt) stmt() {}
 
 // PrintStmt is an expression that prints a value to stdout.
 type PrintStmt struct {
@@ -454,6 +465,9 @@ func (b *BinaryExpr) Operand(n int) *ValueUse { return getOperand2(n, b.LHS, b.R
 
 // Operand returns the nth operand, panicking if out of range.
 func (u *UnaryExpr) Operand(n int) *ValueUse { return getOperand1(n, u.Val) }
+
+// Operand returns the nth operand, panicking if out of range.
+func (l *StoreStackStmt) Operand(n int) *ValueUse { return getOperand1(n, l.Val) }
 
 // Operand returns the nth operand, panicking if out of range.
 func (l *LoadHeapExpr) Operand(n int) *ValueUse { return getOperand1(n, l.Addr) }
