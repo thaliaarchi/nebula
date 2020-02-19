@@ -48,6 +48,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	for i := 0; i < len(p.Tokens); i++ {
 		var block ir.BasicBlock
 		block.ID = len(irp.Blocks)
+		block.Stack.LoadHandler = block.AppendNode
 		if len(irp.Blocks) > 0 {
 			prev := irp.Blocks[len(irp.Blocks)-1]
 			prev.Next = &block

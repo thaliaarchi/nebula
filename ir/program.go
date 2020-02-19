@@ -195,12 +195,6 @@ func (block *BasicBlock) AppendNode(node Node) {
 	block.Nodes = append(block.Nodes, node)
 }
 
-// HandleLoad appends a stack load instruction upon load of value under
-// current stack frame.
-func (block *BasicBlock) HandleLoad(load Node) {
-	block.AppendNode(load)
-}
-
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {

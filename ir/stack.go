@@ -10,18 +10,16 @@ import (
 // block are represented as negative numbers. Operations are expressed
 // in terms of push and pop.
 type Stack struct {
-	Vals    []Value // Values in the current stack frame
-	Under   []Value // Values under the current stack frame
-	Pops    int     // Number of items popped below current stack frame
-	Access  int     // Number of items accessed below current stack frame
-	Handler LoadHandler
+	Vals        []Value // Values in the current stack frame
+	Under       []Value // Values under the current stack frame
+	Pops        int     // Number of items popped below current stack frame
+	Access      int     // Number of items accessed below current stack frame
+	LoadHandler LoadHandler
 }
 
 // LoadHandler is a handler registered to watch loads of values under
 // the current stack frame.
-type LoadHandler interface {
-	HandleLoad(load Node)
-}
+type LoadHandler func(load Node)
 
 // Push pushes a value to the stack.
 func (s *Stack) Push(val Value) {
@@ -122,8 +120,8 @@ func (s *Stack) At(n int) Value {
 	}
 	if s.Under[id-1] == nil {
 		load := &LoadStackExpr{Def: &ValueDef{}, Pos: id}
-		if s.Handler != nil {
-			s.Handler.HandleLoad(load)
+		if s.LoadHandler != nil {
+			s.LoadHandler(load)
 		}
 		s.Under[id-1] = load
 	}
