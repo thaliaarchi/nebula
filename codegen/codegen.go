@@ -180,12 +180,12 @@ func (m *moduleBuilder) emitNode(node ir.Node, block *ir.BasicBlock, stackLen ll
 		default:
 			panic("codegen: unrecognized binary op")
 		}
-		m.idents[inst.Def] = val
+		m.idents[&inst.Def] = val
 	case *ir.UnaryExpr:
 		switch inst.Op {
 		case ir.Neg:
 			val := m.lookupUse(inst.Val)
-			m.idents[inst.Def] = m.b.CreateSub(zero, val, "neg")
+			m.idents[&inst.Def] = m.b.CreateSub(zero, val, "neg")
 		default:
 			panic("codegen: unrecognized unary op")
 		}
@@ -194,10 +194,10 @@ func (m *moduleBuilder) emitNode(node ir.Node, block *ir.BasicBlock, stackLen ll
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Pos), false)
 		idx := m.b.CreateSub(stackLen, n, name+".idx")
 		gep := m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
-		m.idents[inst.Def] = m.b.CreateLoad(gep, name)
+		m.idents[&inst.Def] = m.b.CreateLoad(gep, name)
 	case *ir.LoadHeapExpr:
 		addr := m.heapAddr(inst.Addr)
-		m.idents[inst.Def] = m.b.CreateLoad(addr, "retrieve")
+		m.idents[&inst.Def] = m.b.CreateLoad(addr, "retrieve")
 	case *ir.StoreHeapStmt:
 		addr := m.heapAddr(inst.Addr)
 		val := m.lookupUse(inst.Val)
@@ -230,7 +230,7 @@ func (m *moduleBuilder) emitNode(node ir.Node, block *ir.BasicBlock, stackLen ll
 		default:
 			panic("codegen: unrecognized read op")
 		}
-		m.idents[inst.Def] = m.b.CreateCall(f, []llvm.Value{}, "read")
+		m.idents[&inst.Def] = m.b.CreateCall(f, []llvm.Value{}, "read")
 	case *ir.FlushStmt:
 		m.b.CreateCall(m.flush, []llvm.Value{}, "")
 	default:

@@ -86,13 +86,13 @@ func (f *formatter) FormatNode(node Node) string {
 		b.WriteByte(']')
 		return b.String()
 	case *BinaryExpr:
-		return fmt.Sprintf("%s = %v %s %s", f.FormatDef(n.Def), n.Op, f.FormatUse(n.LHS), f.FormatUse(n.RHS))
+		return fmt.Sprintf("%s = %v %s %s", f.FormatDef(&n.Def), n.Op, f.FormatUse(n.LHS), f.FormatUse(n.RHS))
 	case *UnaryExpr:
-		return fmt.Sprintf("%s = %v %s", f.FormatDef(n.Def), n.Op, f.FormatUse(n.Val))
+		return fmt.Sprintf("%s = %v %s", f.FormatDef(&n.Def), n.Op, f.FormatUse(n.Val))
 	case *LoadStackExpr:
-		return fmt.Sprintf("%s = loadstack %d", f.FormatDef(n.Def), n.Pos)
+		return fmt.Sprintf("%s = loadstack %d", f.FormatDef(&n.Def), n.Pos)
 	case *LoadHeapExpr:
-		return fmt.Sprintf("%s = load *%s", f.FormatDef(n.Def), f.FormatUse(n.Addr))
+		return fmt.Sprintf("%s = load *%s", f.FormatDef(&n.Def), f.FormatUse(n.Addr))
 	case *StoreHeapStmt:
 		return fmt.Sprintf("store *%s %s", f.FormatUse(n.Addr), f.FormatUse(n.Val))
 	case *CheckStackStmt:
@@ -100,7 +100,7 @@ func (f *formatter) FormatNode(node Node) string {
 	case *PrintStmt:
 		return fmt.Sprintf("%v %s", n.Op, f.FormatUse(n.Val))
 	case *ReadExpr:
-		return fmt.Sprintf("%s = %v", f.FormatDef(n.Def), n.Op)
+		return fmt.Sprintf("%s = %v", f.FormatDef(&n.Def), n.Op)
 	case *FlushStmt:
 		return "flush"
 	default:

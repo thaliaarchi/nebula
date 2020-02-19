@@ -33,16 +33,16 @@ func TestJoinSimpleEntries(t *testing.T) {
 	constVals := bigint.NewMap()
 	constVals.Put(big.NewInt(1), &c1)
 
-	load1 := &ir.LoadStackExpr{Def: &ir.ValueDef{}, Pos: 1}
-	add := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Add}
+	load1 := &ir.LoadStackExpr{Pos: 1}
+	add := &ir.BinaryExpr{Op: ir.Add}
 	ir.AddUse(load1, add, 0)
 	ir.AddUse(c1, add, 1)
-	load2 := &ir.LoadStackExpr{Def: &ir.ValueDef{}, Pos: 2}
-	mul := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Mul}
+	load2 := &ir.LoadStackExpr{Pos: 2}
+	mul := &ir.BinaryExpr{Op: ir.Mul}
 	ir.AddUse(load2, mul, 0)
 	ir.AddUse(add, mul, 1)
-	load7 := &ir.LoadStackExpr{Def: &ir.ValueDef{}, Pos: 7}
-	mod := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Mod}
+	load7 := &ir.LoadStackExpr{Pos: 7}
+	mod := &ir.BinaryExpr{Op: ir.Mod}
 	ir.AddUse(mul, mod, 0)
 	ir.AddUse(load7, mod, 1)
 
@@ -82,9 +82,11 @@ func TestJoinSimpleEntries(t *testing.T) {
 		ConstVals:   constVals,
 		NextBlockID: 1,
 	}
-	stack.Handler = blockJoined
+	// stack.LoadHandler = blockJoined.AppendNode
 
 	JoinSimpleEntries(program)
+	program.Entry.Stack.LoadHandler = nil // for equality
+
 	if !reflect.DeepEqual(program, programJoined) {
 		t.Errorf("join not equal\ngot:\n%v\nwant:\n%v", program, programJoined)
 	}

@@ -162,7 +162,7 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		block.AppendNode(store)
 	case Retrieve:
 		addr := stack.Pop()
-		load := &ir.LoadHeapExpr{Def: &ir.ValueDef{}}
+		load := &ir.LoadHeapExpr{}
 		ir.AddUse(addr, load, 0)
 		stack.Push(load)
 		block.AppendNode(load)
@@ -206,7 +206,7 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 
 func appendArith(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
 	rhs, lhs := stack.Pop(), stack.Pop()
-	bin := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: op}
+	bin := &ir.BinaryExpr{Op: op}
 	ir.AddUse(lhs, bin, 0)
 	ir.AddUse(rhs, bin, 1)
 	stack.Push(bin)
@@ -230,7 +230,7 @@ func appendPrint(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
 
 func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
 	addr := stack.Pop()
-	read := &ir.ReadExpr{Def: &ir.ValueDef{}, Op: op}
+	read := &ir.ReadExpr{Op: op}
 	store := &ir.StoreHeapStmt{}
 	ir.AddUse(addr, store, 0)
 	ir.AddUse(read, store, 1)

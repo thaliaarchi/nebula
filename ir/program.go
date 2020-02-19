@@ -185,7 +185,7 @@ func (p *Program) LookupConst(c *big.Int) Value {
 	if val, ok := p.ConstVals.Get(c); ok {
 		return val.(Value)
 	}
-	val := &ConstVal{Def: &ValueDef{}, Int: c}
+	val := &ConstVal{Int: c}
 	p.ConstVals.Put(c, val)
 	return val
 }

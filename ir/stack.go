@@ -119,7 +119,7 @@ func (s *Stack) At(n int) Value {
 		s.Under = append(s.Under, make([]Value, id-len(s.Under))...)
 	}
 	if s.Under[id-1] == nil {
-		load := &LoadStackExpr{Def: &ValueDef{}, Pos: id}
+		load := &LoadStackExpr{Pos: id}
 		if s.LoadHandler != nil {
 			s.LoadHandler(load)
 		}

@@ -76,16 +76,16 @@ func TestFoldConstArith(t *testing.T) {
 	constVals.Put(big.NewInt(-32), cn32)
 	constVals.Put(big.NewInt('a'), ca)
 
-	mul := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Mul}
+	mul := &ir.BinaryExpr{Op: ir.Mul}
 	ir.AddUse(c10, mul, 0)
 	ir.AddUse(c2, mul, 1)
-	add1 := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Add}
+	add1 := &ir.BinaryExpr{Op: ir.Add}
 	ir.AddUse(c3, add1, 0)
 	ir.AddUse(mul, add1, 1)
-	sub := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Sub}
+	sub := &ir.BinaryExpr{Op: ir.Sub}
 	ir.AddUse(cC, sub, 0)
 	ir.AddUse(c1, sub, 1)
-	add2 := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Add}
+	add2 := &ir.BinaryExpr{Op: ir.Add}
 	ir.AddUse(cn32, add2, 0)
 	ir.AddUse(ca, add2, 1)
 	printAdd2 := &ir.PrintStmt{Op: ir.Printc}
@@ -156,12 +156,15 @@ func TestFoldConstArith(t *testing.T) {
 		ConstVals:   constVals,
 		NextBlockID: 1,
 	}
-	stack.Handler = blockStart
+	// stack.LoadHandler = blockStart.AppendNode
 
 	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
+	loadHandler := program.Entry.Stack.LoadHandler
+	program.Entry.Stack.LoadHandler = nil // for equality
+
 	if !reflect.DeepEqual(program, programStart) {
 		t.Errorf("SSA conversion not equal\ngot:\n%v\nwant:\n%v", program, programStart)
 	}
@@ -185,6 +188,15 @@ func TestFoldConstArith(t *testing.T) {
 	print23 := &ir.PrintStmt{Op: ir.Printi}
 	ir.AddUse(c23, print23, 0)
 
+	mul.LHS.Remove()
+	mul.RHS.Remove()
+	add1.LHS.Remove()
+	add1.RHS.Remove()
+	sub.LHS.Remove()
+	sub.RHS.Remove()
+	add2.LHS.Remove()
+	add2.RHS.Remove()
+
 	blockConst := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
@@ -205,9 +217,12 @@ func TestFoldConstArith(t *testing.T) {
 		ConstVals:   constVals,
 		NextBlockID: 1,
 	}
-	stack.Handler = blockConst
+	// stack.LoadHandler = blockConst.AppendNode
 
+	program.Entry.Stack.LoadHandler = loadHandler
 	FoldConstArith(program)
+	program.Entry.Stack.LoadHandler = nil // for equality
+
 	if !reflect.DeepEqual(program, programConst) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}

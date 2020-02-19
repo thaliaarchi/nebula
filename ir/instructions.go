@@ -56,7 +56,7 @@ type User interface {
 
 // ConstVal is a constant integer value.
 type ConstVal struct {
-	Def *ValueDef
+	Def ValueDef
 	Int *big.Int
 }
 
@@ -65,7 +65,7 @@ func (*ConstVal) value() {}
 // PhiExpr is an SSA φ node. It contains a list of edges to values in
 // predecessor blocks.
 type PhiExpr struct {
-	Def   *ValueDef
+	Def   ValueDef
 	Edges []PhiEdge
 }
 
@@ -82,7 +82,7 @@ func (*PhiExpr) user()  {}
 
 // BinaryExpr is an expression with two operands.
 type BinaryExpr struct {
-	Def *ValueDef
+	Def ValueDef
 	Op  OpType
 	LHS *ValueUse
 	RHS *ValueUse
@@ -95,7 +95,7 @@ func (*BinaryExpr) user()  {}
 
 // UnaryExpr is an expression with one operand.
 type UnaryExpr struct {
-	Def *ValueDef
+	Def ValueDef
 	Op  OpType
 	Val *ValueUse
 }
@@ -108,7 +108,7 @@ func (*UnaryExpr) user()  {}
 // LoadStackExpr is an expression that loads a value from under the
 // current stack frame. A position of 1 is the top of the stack.
 type LoadStackExpr struct {
-	Def *ValueDef
+	Def ValueDef
 	Pos int
 }
 
@@ -119,7 +119,7 @@ func (*LoadStackExpr) value() {}
 // LoadHeapExpr is an expression that loads a value at an address
 // from the heap.
 type LoadHeapExpr struct {
-	Def  *ValueDef
+	Def  ValueDef
 	Addr *ValueUse
 }
 
@@ -159,7 +159,7 @@ func (*PrintStmt) user() {}
 
 // ReadExpr is an expression that reads a value from stdin.
 type ReadExpr struct {
-	Def *ValueDef
+	Def ValueDef
 	Op  OpType
 }
 
@@ -361,25 +361,25 @@ func (use *ValueUse) ReplaceVal(val Value) {
 // Value methods
 
 // ValueDef returns the definition information of a Value.
-func (c *ConstVal) ValueDef() *ValueDef { return c.Def }
+func (c *ConstVal) ValueDef() *ValueDef { return &c.Def }
 
 // ValueDef returns the definition information of a Value.
-func (phi *PhiExpr) ValueDef() *ValueDef { return phi.Def }
+func (phi *PhiExpr) ValueDef() *ValueDef { return &phi.Def }
 
 // ValueDef returns the definition information of a Value.
-func (b *BinaryExpr) ValueDef() *ValueDef { return b.Def }
+func (b *BinaryExpr) ValueDef() *ValueDef { return &b.Def }
 
 // ValueDef returns the definition information of a Value.
-func (u *UnaryExpr) ValueDef() *ValueDef { return u.Def }
+func (u *UnaryExpr) ValueDef() *ValueDef { return &u.Def }
 
 // ValueDef returns the definition information of a Value.
-func (l *LoadStackExpr) ValueDef() *ValueDef { return l.Def }
+func (l *LoadStackExpr) ValueDef() *ValueDef { return &l.Def }
 
 // ValueDef returns the definition information of a Value.
-func (l *LoadHeapExpr) ValueDef() *ValueDef { return l.Def }
+func (l *LoadHeapExpr) ValueDef() *ValueDef { return &l.Def }
 
 // ValueDef returns the definition information of a Value.
-func (r *ReadExpr) ValueDef() *ValueDef { return r.Def }
+func (r *ReadExpr) ValueDef() *ValueDef { return &r.Def }
 
 // User methods
 

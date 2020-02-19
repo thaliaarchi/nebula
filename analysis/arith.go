@@ -20,17 +20,20 @@ func FoldConstArith(p *ir.Program) {
 				if neg {
 					expr := &ir.UnaryExpr{Op: ir.Neg}
 					ir.AddUse(val, expr, 0)
-					n.Def.ReplaceSelf(expr)
 					n.LHS.Remove()
 					n.RHS.Remove()
+					n.Def.ReplaceSelf(expr)
 					node = expr
 				} else if val != nil {
+					n.LHS.Remove()
+					n.RHS.Remove()
 					n.Def.ReplaceSelf(val)
 					continue
 				}
 			case *ir.UnaryExpr:
 				if n.Op == ir.Neg {
 					if lhs, ok := n.Val.Val.(*ir.ConstVal); ok {
+						n.Val.Remove()
 						n.Def.ReplaceSelf(p.LookupConst(new(big.Int).Neg(lhs.Int)))
 						continue
 					}
