@@ -144,15 +144,15 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		stack.Slide(n)
 
 	case Add:
-		appendArith(block, stack, ir.Add)
+		appendBinary(block, stack, ir.Add)
 	case Sub:
-		appendArith(block, stack, ir.Sub)
+		appendBinary(block, stack, ir.Sub)
 	case Mul:
-		appendArith(block, stack, ir.Mul)
+		appendBinary(block, stack, ir.Mul)
 	case Div:
-		appendArith(block, stack, ir.Div)
+		appendBinary(block, stack, ir.Div)
 	case Mod:
-		appendArith(block, stack, ir.Mod)
+		appendBinary(block, stack, ir.Mod)
 
 	case Store:
 		val, addr := stack.Pop(), stack.Pop()
@@ -204,7 +204,7 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 	return nil
 }
 
-func appendArith(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+func appendBinary(block *ir.BasicBlock, stack *ir.Stack, op ir.BinaryOp) {
 	rhs, lhs := stack.Pop(), stack.Pop()
 	bin := &ir.BinaryExpr{Op: op}
 	ir.AddUse(lhs, bin, 0)
@@ -213,14 +213,14 @@ func appendArith(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
 	block.AppendNode(bin)
 }
 
-func appendJmpCond(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+func appendJmpCond(block *ir.BasicBlock, stack *ir.Stack, op ir.JmpCondOp) {
 	cond := stack.Pop()
 	jmp := &ir.JmpCondTerm{Op: op}
 	ir.AddUse(cond, jmp, 0)
 	block.Terminator = jmp
 }
 
-func appendPrint(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+func appendPrint(block *ir.BasicBlock, stack *ir.Stack, op ir.PrintOp) {
 	val := stack.Pop()
 	print := &ir.PrintStmt{Op: op}
 	ir.AddUse(val, print, 0)
@@ -228,7 +228,7 @@ func appendPrint(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
 	// block.AppendNode(&ir.FlushStmt{})
 }
 
-func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.ReadOp) {
 	addr := stack.Pop()
 	read := &ir.ReadExpr{Op: op}
 	store := &ir.StoreHeapStmt{}

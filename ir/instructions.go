@@ -83,7 +83,7 @@ func (*PhiExpr) user()  {}
 // BinaryExpr is an expression with two operands.
 type BinaryExpr struct {
 	Def ValueDef
-	Op  OpType
+	Op  BinaryOp
 	LHS *ValueUse
 	RHS *ValueUse
 }
@@ -93,10 +93,28 @@ func (*BinaryExpr) expr()  {}
 func (*BinaryExpr) value() {}
 func (*BinaryExpr) user()  {}
 
+// BinaryOp is the kind of operator for a binary expression.
+type BinaryOp uint8
+
+// Binary operations.
+const (
+	Add BinaryOp = iota
+	Sub
+	Mul
+	Div
+	Mod
+	Shl
+	LShr
+	AShr
+	And
+	Or
+	Xor
+)
+
 // UnaryExpr is an expression with one operand.
 type UnaryExpr struct {
 	Def ValueDef
-	Op  OpType
+	Op  UnaryOp
 	Val *ValueUse
 }
 
@@ -104,6 +122,14 @@ func (*UnaryExpr) node()  {}
 func (*UnaryExpr) expr()  {}
 func (*UnaryExpr) value() {}
 func (*UnaryExpr) user()  {}
+
+// UnaryOp is the kind of operator for a unary expression.
+type UnaryOp uint8
+
+// Unary operations.
+const (
+	Neg UnaryOp = iota
+)
 
 // LoadStackExpr is an expression that loads a value from under the
 // current stack frame. A position of 1 is the top of the stack.
@@ -149,7 +175,7 @@ func (*CheckStackStmt) stmt() {}
 
 // PrintStmt is an expression that prints a value to stdout.
 type PrintStmt struct {
-	Op  OpType
+	Op  PrintOp
 	Val *ValueUse
 }
 
@@ -157,15 +183,34 @@ func (*PrintStmt) node() {}
 func (*PrintStmt) stmt() {}
 func (*PrintStmt) user() {}
 
+// PrintOp is the kind of operator for a print statement.
+type PrintOp uint8
+
+// Print operations.
+const (
+	Printc PrintOp = iota
+	Printi
+	Prints
+)
+
 // ReadExpr is an expression that reads a value from stdin.
 type ReadExpr struct {
 	Def ValueDef
-	Op  OpType
+	Op  ReadOp
 }
 
 func (*ReadExpr) node()  {}
 func (*ReadExpr) expr()  {}
 func (*ReadExpr) value() {}
+
+// ReadOp is the kind of operator for a read expression.
+type ReadOp uint8
+
+// Read operations.
+const (
+	Readc ReadOp = iota
+	Readi
+)
 
 // FlushStmt is a statement that flushes stdout.
 type FlushStmt struct{}
@@ -185,17 +230,26 @@ func (*CallTerm) terminator() {}
 
 // JmpTerm is a terminator that unconditionally jumps to a block.
 type JmpTerm struct {
-	Op   OpType
+	Op   JmpOp
 	Dest *BasicBlock
 }
 
 func (*JmpTerm) node()       {}
 func (*JmpTerm) terminator() {}
 
+// JmpOp is the kind of operator for a jump terminator.
+type JmpOp uint8
+
+// Jump operations.
+const (
+	Jmp JmpOp = iota
+	Fallthrough
+)
+
 // JmpCondTerm is a terminator that conditionally jumps to one of
 // two blocks.
 type JmpCondTerm struct {
-	Op   OpType
+	Op   JmpCondOp
 	Cond *ValueUse
 	Then *BasicBlock
 	Else *BasicBlock
@@ -204,6 +258,15 @@ type JmpCondTerm struct {
 func (*JmpCondTerm) node()       {}
 func (*JmpCondTerm) terminator() {}
 func (*JmpCondTerm) user()       {}
+
+// JmpCondOp is the kind of operator for a conditional jump terminator.
+type JmpCondOp uint8
+
+// Conditional jump operations.
+const (
+	Jz JmpCondOp = iota
+	Jn
+)
 
 // RetTerm is a terminator that returns to the caller.
 type RetTerm struct{}
@@ -217,42 +280,7 @@ type ExitTerm struct{}
 func (*ExitTerm) node()       {}
 func (*ExitTerm) terminator() {}
 
-// OpType is the kind of operator in a node.
-type OpType uint8
-
-// Operators for nodes with multiple types.
-const (
-	Illegal OpType = iota
-
-	Add
-	Sub
-	Mul
-	Div
-	Mod
-	Shl
-	LShr
-	AShr
-	And
-	Or
-	Xor
-
-	Neg
-
-	Printc
-	Printi
-	Prints
-
-	Readc
-	Readi
-
-	Jmp
-	Fallthrough
-
-	Jz
-	Jn
-)
-
-func (op OpType) String() string {
+func (op BinaryOp) String() string {
 	switch op {
 	case Add:
 		return "add"
@@ -264,8 +292,6 @@ func (op OpType) String() string {
 		return "div"
 	case Mod:
 		return "mod"
-	case Neg:
-		return "neg"
 	case Shl:
 		return "shl"
 	case LShr:
@@ -278,20 +304,52 @@ func (op OpType) String() string {
 		return "or"
 	case Xor:
 		return "xor"
+	}
+	return "illegal"
+}
+
+func (op UnaryOp) String() string {
+	switch op {
+	case Neg:
+		return "neg"
+	}
+	return "illegal"
+}
+
+func (op PrintOp) String() string {
+	switch op {
 	case Printc:
 		return "printc"
 	case Printi:
 		return "printi"
 	case Prints:
 		return "prints"
+	}
+	return "illegal"
+}
+
+func (op ReadOp) String() string {
+	switch op {
 	case Readc:
 		return "readc"
 	case Readi:
 		return "readi"
+	}
+	return "illegal"
+}
+
+func (op JmpOp) String() string {
+	switch op {
 	case Jmp:
 		return "jmp"
 	case Fallthrough:
 		return "fallthrough"
+	}
+	return "illegal"
+}
+
+func (op JmpCondOp) String() string {
+	switch op {
 	case Jz:
 		return "jz"
 	case Jn:
