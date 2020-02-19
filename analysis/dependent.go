@@ -59,7 +59,7 @@ func isIO(node ir.Node) bool {
 // RHS.
 func canThrow(node ir.Node) bool {
 	if n, ok := node.(*ir.BinaryExpr); ok && n.Op == ir.Div {
-		_, ok := (*n.RHS).(*ir.ConstVal)
+		_, ok := n.RHS.Val.(*ir.ConstVal)
 		return !ok
 	}
 	return false
@@ -69,41 +69,13 @@ func canThrow(node ir.Node) bool {
 // node A.
 func references(a, b ir.Node) bool {
 	if expr, ok := a.(ir.Expr); ok {
-		var assign *ir.Val
-		switch node := expr.(type) {
-		case *ir.BinaryExpr:
-			assign = node.Assign
-		case *ir.UnaryExpr:
-			assign = node.Assign
-		case *ir.LoadStackExpr:
-			assign = node.Assign
-		case *ir.LoadHeapExpr:
-			assign = node.Assign
-		case *ir.ReadExpr:
-			assign = node.Assign
-		}
-
-		switch node := b.(type) {
-		case *ir.BinaryExpr:
-			return node.Assign == assign || node.LHS == assign || node.RHS == assign
-		case *ir.UnaryExpr:
-			return node.Assign == assign || node.Val == assign
-		case *ir.LoadStackExpr:
-			return node.Assign == assign
-		case *ir.LoadHeapExpr:
-			return node.Assign == assign || node.Addr == assign
-		case *ir.StoreHeapStmt:
-			return node.Addr == assign || node.Val == assign
-		case *ir.CheckStackStmt:
-			return false
-		case *ir.PrintStmt:
-			return node.Val == assign
-		case *ir.ReadExpr:
-			return node.Assign == assign
-		case *ir.FlushStmt:
-			return false
-		default:
-			panic("analysis: unrecognized node type")
+		if user, ok := b.(ir.User); ok {
+			n := user.NumOperand()
+			for i := 0; i < n; i++ {
+				if user.Operand(i).Val == expr {
+					return true
+				}
+			}
 		}
 	}
 	return false

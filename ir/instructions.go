@@ -71,8 +71,8 @@ type PhiExpr struct {
 
 // PhiEdge is a reference to a value in a predecessor block.
 type PhiEdge struct {
-	ValueUse *ValueUse
-	Block    *BasicBlock
+	Val   *ValueUse
+	Block *BasicBlock
 }
 
 func (*PhiExpr) node()  {}
@@ -305,6 +305,59 @@ func (phi *PhiExpr) AddIncoming(use *ValueUse, block *BasicBlock) {
 	phi.Edges = append(phi.Edges, PhiEdge{use, block})
 }
 
+// AddUse adds a use edge to the value and user.
+func AddUse(val Value, user User, operand int) {
+	use := &ValueUse{Val: val, User: user, Operand: operand}
+	def := val.ValueDef()
+	def.Uses = append(def.Uses, use)
+	user.SetOperand(operand, use)
+}
+
+// RemoveUse removes a use from the use list.
+func (def *ValueDef) RemoveUse(use *ValueUse) {
+	if len(def.Uses) == 0 {
+		return
+	}
+	i := 0
+	for i = range def.Uses {
+		if def.Uses[i] == use {
+			break
+		}
+	}
+	for ; i+1 < len(def.Uses); i++ {
+		def.Uses[i] = def.Uses[i+1]
+	}
+	def.Uses = def.Uses[:len(def.Uses)-1]
+}
+
+// ReplaceUse replaces a use in the use list with another.
+func (def *ValueDef) ReplaceUse(oldUse, newUse *ValueUse) {
+	for i := range def.Uses {
+		if def.Uses[i] == oldUse {
+			def.Uses[i] = newUse
+		}
+	}
+}
+
+// ReplaceSelf replaces all uses of itself with another value.
+func (def *ValueDef) ReplaceSelf(val Value) {
+	for _, use := range def.Uses {
+		use.Val = val
+	}
+}
+
+func (use *ValueUse) Remove() {
+	use.Val.ValueDef().RemoveUse(use)
+}
+
+// ReplaceVal replaces the used value with another.
+func (use *ValueUse) ReplaceVal(val Value) {
+	if use.Val != val {
+		use.Val.ValueDef().RemoveUse(use)
+		use.Val = val
+	}
+}
+
 // Value methods
 
 // ValueDef returns the definition information of a Value.
@@ -335,7 +388,7 @@ func (phi *PhiExpr) Operand(n int) *ValueUse {
 	if n < 0 || n > len(phi.Edges) {
 		panic(invalidOperand(n))
 	}
-	return phi.Edges[n].ValueUse
+	return phi.Edges[n].Val
 }
 
 // Operand returns the nth operand, panicking if out of range.
@@ -361,7 +414,7 @@ func (phi *PhiExpr) SetOperand(n int, use *ValueUse) {
 	if n < 0 || n > len(phi.Edges) {
 		panic(invalidOperand(n))
 	}
-	phi.Edges[n].ValueUse = use
+	phi.Edges[n].Val = use
 }
 
 // SetOperand sets the nth operand, panicking if out of range.

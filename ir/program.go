@@ -14,7 +14,7 @@ type Program struct {
 	Name        string
 	Blocks      []*BasicBlock
 	Entry       *BasicBlock
-	ConstVals   bigint.Map // map[*big.Int]*Val
+	ConstVals   *bigint.Map // map[*big.Int]*Val
 	NextBlockID int
 }
 
@@ -59,15 +59,16 @@ func (p *Program) ConnectEdges(branches []*big.Int, labels *bigint.Map /* map[*b
 			callee.Entries = append(callee.Entries, block)
 
 			switch term := block.Terminator.(type) {
-			case *CallStmt:
+			case *CallTerm:
 				term.Dest = callee
-			case *JmpStmt:
+				term.Next = p.Blocks[i+1]
+			case *JmpTerm:
 				term.Dest = callee
-			case *JmpCondStmt:
+			case *JmpCondTerm:
 				term.Then = callee
 				term.Else = block.Next
 				block.Next.Entries = append(block.Next.Entries, block)
-			case *RetStmt, ExitStmt:
+			case *RetTerm, *ExitTerm:
 			default:
 				panic("ir: unrecognized terminator type")
 			}
@@ -89,22 +90,22 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 	block.Callers = append(block.Callers, caller)
 	var errs *ErrorRetUnderflow
 	switch term := block.Terminator.(type) {
-	case *CallStmt:
+	case *CallTerm:
 		errs = errs.addTrace(term.Dest.connectCaller(block), block)
-		errs = errs.addTrace(block.Next.connectCaller(caller), block)
-		block.Next.Entries = appendUnique(block.Next.Entries, block.Returns...)
-	case *JmpStmt:
+		errs = errs.addTrace(term.Next.connectCaller(caller), block)
+		term.Next.Entries = appendUnique(term.Next.Entries, block.Returns...)
+	case *JmpTerm:
 		errs = errs.addTrace(term.Dest.connectCaller(caller), block)
-	case *JmpCondStmt:
+	case *JmpCondTerm:
 		errs = errs.addTrace(term.Then.connectCaller(caller), block)
 		errs = errs.addTrace(term.Else.connectCaller(caller), block)
-	case *RetStmt:
+	case *RetTerm:
 		if caller == nil {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
 		} else {
 			caller.Returns = append(caller.Returns, block)
 		}
-	case *ExitStmt:
+	case *ExitTerm:
 	default:
 		panic("ir: unrecognized terminator type")
 	}
@@ -180,19 +181,13 @@ func (p *Program) Digraph() digraph.Digraph {
 
 // LookupConst creates a val for a constant with matching constants
 // having the same val.
-func (p *Program) LookupConst(c *big.Int) *Val {
+func (p *Program) LookupConst(c *big.Int) Value {
 	if val, ok := p.ConstVals.Get(c); ok {
-		return val.(*Val)
+		return val.(Value)
 	}
-	val := Val(&ConstVal{c})
-	p.ConstVals.Put(c, &val)
-	return &val
-}
-
-// NextVal creates a unique stack val.
-func (p *Program) NextVal() *Val {
-	val := Val(&SSAVal{})
-	return &val
+	val := &ConstVal{Def: &ValueDef{}, Int: c}
+	p.ConstVals.Put(c, val)
+	return val
 }
 
 // AppendNode appends a node to the block.
@@ -200,22 +195,28 @@ func (block *BasicBlock) AppendNode(node Node) {
 	block.Nodes = append(block.Nodes, node)
 }
 
+// HandleLoad appends a stack load instruction upon load of value under
+// current stack frame.
+func (block *BasicBlock) HandleLoad(load Node) {
+	block.AppendNode(load)
+}
+
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {
-	case *CallStmt:
+	case *CallTerm:
 		return []*BasicBlock{term.Dest}
-	case *JmpStmt:
+	case *JmpTerm:
 		return []*BasicBlock{term.Dest}
-	case *JmpCondStmt:
+	case *JmpCondTerm:
 		return []*BasicBlock{term.Then, term.Else}
-	case *RetStmt:
+	case *RetTerm:
 		exits := make([]*BasicBlock, len(block.Callers))
 		for i, caller := range block.Callers {
 			exits[i] = caller.Next
 		}
 		return exits
-	case *ExitStmt:
+	case *ExitTerm:
 		return nil
 	default:
 		panic("ir: unrecognized terminator type")
@@ -258,7 +259,7 @@ func (p *Program) DotDigraph() string {
 				fmt.Fprintf(&b, " r%d", len(block.Stack.Under))
 			}
 			b.WriteByte('"')
-			if _, ok := block.Terminator.(*ExitStmt); ok {
+			if _, ok := block.Terminator.(*ExitTerm); ok {
 				b.WriteString(" peripheries=2")
 			}
 			b.WriteString("];\n")
@@ -269,18 +270,18 @@ func (p *Program) DotDigraph() string {
 	fmt.Fprintf(&b, "  entry -> block_%d;\n", p.Entry.ID)
 	for _, block := range p.Blocks {
 		switch term := block.Terminator.(type) {
-		case *CallStmt:
+		case *CallTerm:
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, term.Dest.ID)
-		case *JmpStmt:
+		case *JmpTerm:
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"jmp\"];\n", block.ID, term.Dest.ID)
-		case *JmpCondStmt:
+		case *JmpCondTerm:
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, term.Then.ID)
 			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, term.Else.ID)
-		case *RetStmt:
+		case *RetTerm:
 			for _, caller := range block.Callers {
 				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\\n%s\"];\n", block.ID, caller.Next.ID, caller.Name())
 			}
-		case *ExitStmt:
+		case *ExitTerm:
 		default:
 			panic("ir: unrecognized terminator type")
 		}

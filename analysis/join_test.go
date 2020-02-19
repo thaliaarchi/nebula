@@ -29,54 +29,60 @@ func TestJoinSimpleEntries(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	v1 := ir.Val(&ir.ConstVal{Int: big.NewInt(1)})
-	s0 := ir.Val(&ir.SSAVal{})
-	s1 := ir.Val(&ir.SSAVal{})
-	s2 := ir.Val(&ir.SSAVal{})
-	sn1 := ir.Val(&ir.SSAVal{ID: -1})
-	sn2 := ir.Val(&ir.SSAVal{ID: -2})
-	sn7 := ir.Val(&ir.SSAVal{ID: -7})
+	c1 := &ir.ConstVal{Int: big.NewInt(1)}
+	constVals := bigint.NewMap()
+	constVals.Put(big.NewInt(1), &c1)
+
+	load1 := &ir.LoadStackExpr{Def: &ir.ValueDef{}, Pos: 1}
+	add := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Add}
+	ir.AddUse(load1, add, 0)
+	ir.AddUse(c1, add, 1)
+	load2 := &ir.LoadStackExpr{Def: &ir.ValueDef{}, Pos: 2}
+	mul := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Mul}
+	ir.AddUse(load2, mul, 0)
+	ir.AddUse(add, mul, 1)
+	load7 := &ir.LoadStackExpr{Def: &ir.ValueDef{}, Pos: 7}
+	mod := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: ir.Mod}
+	ir.AddUse(mul, mod, 0)
+	ir.AddUse(load7, mod, 1)
 
 	var stack ir.Stack
-	stack.Push(&v1) // 0
+	stack.Push(c1)  // 0
 	stack.Pop()     // 1
 	stack.Pop()     // 1
-	stack.Push(&s0) // 1
+	stack.Push(add) // 1
 	stack.Pop()     // 2
 	stack.Pop()     // 2
-	stack.Push(&s1) // 2
+	stack.Push(mul) // 2
 	stack.Copy(5)   // 4
 	stack.Pop()     // 5
 	stack.Pop()     // 5
-	stack.Push(&s2) // 5
+	stack.Push(mod) // 5
 	stack.Slide(2)  // 6
-
-	constVals := bigint.NewMap()
-	constVals.Put(big.NewInt(1), &v1)
 
 	blockJoined := &ir.BasicBlock{
 		Stack: stack,
 		Nodes: []ir.Node{
 			&ir.CheckStackStmt{Access: 7},
-			&ir.LoadStackExpr{Assign: &sn1, Pos: 1},
-			&ir.BinaryExpr{Op: ir.Add, Assign: &s0, LHS: &sn1, RHS: &v1},
-			&ir.LoadStackExpr{Assign: &sn2, Pos: 2},
-			&ir.BinaryExpr{Op: ir.Mul, Assign: &s1, LHS: &sn2, RHS: &s0},
-			&ir.LoadStackExpr{Assign: &sn7, Pos: 7},
-			&ir.BinaryExpr{Op: ir.Mod, Assign: &s2, LHS: &s1, RHS: &sn7},
+			load1,
+			add,
+			load2,
+			mul,
+			load7,
+			mod,
 		},
-		Terminator: &ir.ExitStmt{},
+		Terminator: &ir.ExitTerm{},
 		Entries:    []*ir.BasicBlock{nil},
 		Callers:    []*ir.BasicBlock{nil},
 	}
-	blockJoined.Stack.Block = blockJoined
 	programJoined := &ir.Program{
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockJoined},
 		Entry:       blockJoined,
-		ConstVals:   *constVals,
+		ConstVals:   constVals,
 		NextBlockID: 1,
 	}
+	stack.Handler = blockJoined
 
 	JoinSimpleEntries(program)
 	if !reflect.DeepEqual(program, programJoined) {

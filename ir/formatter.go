@@ -6,13 +6,13 @@ import (
 )
 
 type formatter struct {
-	ids    map[*SSAVal]int
+	ids    map[*ValueDef]int
 	nextID int
 }
 
 func newFormatter() *formatter {
 	return &formatter{
-		ids:    make(map[*SSAVal]int),
+		ids:    make(map[*ValueDef]int),
 		nextID: 0,
 	}
 }
@@ -65,76 +65,89 @@ func (f *formatter) FormatBlock(block *BasicBlock) string {
 	}
 
 	b.WriteString("    ")
-	b.WriteString(f.FormatNode(block.Terminator))
+	b.WriteString(f.FormatTerminator(block.Terminator))
 	b.WriteByte('\n')
 	return b.String()
 }
 
 func (f *formatter) FormatNode(node Node) string {
 	switch n := node.(type) {
-	case *BinaryExpr:
-		return fmt.Sprintf("%s = %v %s %s", f.FormatVal(n.Assign), n.Op, f.FormatVal(n.LHS), f.FormatVal(n.RHS))
-	case *UnaryExpr:
-		return fmt.Sprintf("%s = %v %s", f.FormatVal(n.Assign), n.Op, f.FormatVal(n.Val))
-	case *LoadStackExpr:
-		return fmt.Sprintf("%s = loadstack %d", f.FormatVal(n.Assign), n.Pos)
-	case *LoadHeapExpr:
-		return fmt.Sprintf("%s = load *%s", f.FormatVal(n.Assign), f.FormatVal(n.Addr))
-	case *StoreHeapStmt:
-		return fmt.Sprintf("store *%s %s", f.FormatVal(n.Addr), f.FormatVal(n.Val))
-	case *CheckStackStmt:
-		return fmt.Sprintf("checkstack %d", n.Access)
-	case *PrintStmt:
-		return fmt.Sprintf("%v %s", n.Op, f.FormatVal(n.Val))
-	case *ReadExpr:
-		return fmt.Sprintf("%s = %v", f.FormatVal(n.Assign), n.Op)
-	case *FlushStmt:
-		return "flush"
-	case *CallStmt:
-		return fmt.Sprintf("call %s", n.Dest.Name())
-	case *JmpStmt:
-		return fmt.Sprintf("%v %s", n.Op, n.Dest.Name())
-	case *JmpCondStmt:
-		return fmt.Sprintf("%v %s %s %s", n.Op, f.FormatVal(n.Cond), n.Then.Name(), n.Else.Name())
-	case *RetStmt:
-		return "ret"
-	case *ExitStmt:
-		return "exit"
-	default:
-		panic("ir: unrecognized node type")
-	}
-}
-
-func (f *formatter) FormatVal(val *Val) string {
-	switch v := (*val).(type) {
-	case *SSAVal:
-		var id int
-		if vid, ok := f.ids[v]; ok {
-			id = vid
-		} else {
-			id = f.nextID
-			f.ids[v] = f.nextID
-			f.nextID++
-		}
-		return fmt.Sprintf("%%%d", id)
-	case *ConstVal:
-		return v.Int.String()
-	case *PhiVal:
+	case *PhiExpr:
 		var b strings.Builder
 		b.WriteString("phi [")
-		for i, ref := range v.Refs {
+		for i, edge := range n.Edges {
 			if i != 0 {
 				b.WriteString(", ")
 			}
-			b.WriteString(f.FormatVal(ref.Val))
+			b.WriteString(f.FormatUse(edge.Val))
 			b.WriteByte(' ')
-			b.WriteString(ref.Block.Name())
+			b.WriteString(edge.Block.Name())
 		}
 		b.WriteByte(']')
 		return b.String()
+	case *BinaryExpr:
+		return fmt.Sprintf("%s = %v %s %s", f.FormatDef(n.Def), n.Op, f.FormatUse(n.LHS), f.FormatUse(n.RHS))
+	case *UnaryExpr:
+		return fmt.Sprintf("%s = %v %s", f.FormatDef(n.Def), n.Op, f.FormatUse(n.Val))
+	case *LoadStackExpr:
+		return fmt.Sprintf("%s = loadstack %d", f.FormatDef(n.Def), n.Pos)
+	case *LoadHeapExpr:
+		return fmt.Sprintf("%s = load *%s", f.FormatDef(n.Def), f.FormatUse(n.Addr))
+	case *StoreHeapStmt:
+		return fmt.Sprintf("store *%s %s", f.FormatUse(n.Addr), f.FormatUse(n.Val))
+	case *CheckStackStmt:
+		return fmt.Sprintf("checkstack %d", n.Access)
+	case *PrintStmt:
+		return fmt.Sprintf("%v %s", n.Op, f.FormatUse(n.Val))
+	case *ReadExpr:
+		return fmt.Sprintf("%s = %v", f.FormatDef(n.Def), n.Op)
+	case *FlushStmt:
+		return "flush"
 	default:
-		panic("ir: unrecognized val type")
+		panic("ir: unknown node type")
 	}
+}
+
+func (f *formatter) FormatTerminator(term Terminator) string {
+	switch t := term.(type) {
+	case *CallTerm:
+		return fmt.Sprintf("call %s", t.Dest.Name())
+	case *JmpTerm:
+		return fmt.Sprintf("%v %s", t.Op, t.Dest.Name())
+	case *JmpCondTerm:
+		return fmt.Sprintf("%v %s %s %s", t.Op, f.FormatUse(t.Cond), t.Then.Name(), t.Else.Name())
+	case *RetTerm:
+		return "ret"
+	case *ExitTerm:
+		return "exit"
+	default:
+		panic("ir: unknown terminator type")
+	}
+}
+
+func (f *formatter) FormatVal(val Value) string {
+	switch v := val.(type) {
+	case *ConstVal:
+		return v.Int.String()
+	default:
+		return f.FormatDef(v.ValueDef())
+	}
+}
+
+func (f *formatter) FormatDef(def *ValueDef) string {
+	var id int
+	if vid, ok := f.ids[def]; ok {
+		id = vid
+	} else {
+		id = f.nextID
+		f.ids[def] = f.nextID
+		f.nextID++
+	}
+	return fmt.Sprintf("%%%d", id)
+}
+
+func (f *formatter) FormatUse(use *ValueUse) string {
+	return f.FormatVal(use.Val)
 }
 
 func formatBlockSlice(blocks []*BasicBlock) string {

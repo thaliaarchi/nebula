@@ -10,7 +10,7 @@ func JoinSimpleEntries(p *ir.Program) {
 	// for i, block := range p.Blocks {
 	// 	if len(block.Entries) == 1 && block.Entries[0] != nil {
 	// 		entry := block.Entries[0]
-	// 		if _, ok := entry.Terminator.(*ir.JmpStmt); ok {
+	// 		if _, ok := entry.Terminator.(*ir.JmpTerm); ok {
 	// 			Join(p, entry, block)
 	// 			continue
 	// 		} else {

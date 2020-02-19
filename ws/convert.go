@@ -28,7 +28,7 @@ func needsImplicitEnd(tokens []Token) bool {
 		return true
 	}
 	switch tokens[len(tokens)-1].Type {
-	case Call, Jmp, Ret, End:
+	case Jmp, Ret, End:
 		return false
 	}
 	return true
@@ -37,7 +37,7 @@ func needsImplicitEnd(tokens []Token) bool {
 func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	irp := &ir.Program{
 		Name:      p.File.Name(),
-		ConstVals: *bigint.NewMap(),
+		ConstVals: bigint.NewMap(),
 	}
 	var branches []*big.Int
 	labels := bigint.NewMap()           // map[*big.Int]int
@@ -48,7 +48,6 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	for i := 0; i < len(p.Tokens); i++ {
 		var block ir.BasicBlock
 		block.ID = len(irp.Blocks)
-		block.Stack.Block = &block
 		if len(irp.Blocks) > 0 {
 			prev := irp.Blocks[len(irp.Blocks)-1]
 			prev.Next = &block
@@ -116,11 +115,12 @@ func getLabelUses(tokens []Token) *bigint.Map {
 }
 
 func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses *bigint.Map) *big.Int {
+	stack := &block.Stack
 	switch tok.Type {
 	case Push:
-		block.Stack.Push(p.LookupConst(tok.Arg))
+		stack.Push(p.LookupConst(tok.Arg))
 	case Dup:
-		block.Stack.Dup()
+		stack.Dup()
 	case Copy:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
@@ -128,11 +128,11 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		} else if n < 0 {
 			panic(fmt.Sprintf("ws: copy argument negative: %v", tok.Arg))
 		}
-		block.Stack.Copy(n)
+		stack.Copy(n)
 	case Swap:
-		block.Stack.Swap()
+		stack.Swap()
 	case Drop:
-		block.Stack.Drop()
+		stack.Drop()
 	case Slide:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
@@ -140,60 +140,62 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		} else if n < 0 {
 			panic(fmt.Sprintf("ws: slide argument negative: %v", tok.Arg))
 		}
-		block.Stack.Slide(n)
+		stack.Slide(n)
 
 	case Add:
-		appendArith(p, block, ir.Add)
+		appendArith(block, stack, ir.Add)
 	case Sub:
-		appendArith(p, block, ir.Sub)
+		appendArith(block, stack, ir.Sub)
 	case Mul:
-		appendArith(p, block, ir.Mul)
+		appendArith(block, stack, ir.Mul)
 	case Div:
-		appendArith(p, block, ir.Div)
+		appendArith(block, stack, ir.Div)
 	case Mod:
-		appendArith(p, block, ir.Mod)
+		appendArith(block, stack, ir.Mod)
 
 	case Store:
-		val, addr := block.Stack.Pop(), block.Stack.Pop()
-		block.AppendNode(&ir.StoreHeapStmt{Addr: addr, Val: val})
+		val, addr := stack.Pop(), stack.Pop()
+		store := &ir.StoreHeapStmt{}
+		ir.AddUse(addr, store, 0)
+		ir.AddUse(val, store, 1)
+		block.AppendNode(store)
 	case Retrieve:
-		addr, assign := block.Stack.Pop(), p.NextVal()
-		block.Stack.Push(assign)
-		block.AppendNode(&ir.LoadHeapExpr{Assign: assign, Addr: addr})
+		addr := stack.Pop()
+		load := &ir.LoadHeapExpr{Def: &ir.ValueDef{}}
+		ir.AddUse(addr, load, 0)
+		stack.Push(load)
+		block.AppendNode(load)
 
 	case Label:
-		if _, ok := labelUses.Get(tok.Arg); ok {
-			block.Terminator = &ir.JmpStmt{Op: ir.Fallthrough}
+		if _, ok := labelUses.Get(tok.Arg); ok { // split blocks at used labels
+			block.Terminator = &ir.JmpTerm{Op: ir.Fallthrough}
 			return tok.Arg
 		}
-		// otherwise discard unused label
 	case Call:
-		block.Terminator = &ir.CallStmt{}
+		block.Terminator = &ir.CallTerm{}
 		return tok.Arg
 	case Jmp:
-		block.Terminator = &ir.JmpStmt{Op: ir.Jmp}
+		block.Terminator = &ir.JmpTerm{Op: ir.Jmp}
 		return tok.Arg
 	case Jz:
-		block.Terminator = &ir.JmpCondStmt{Op: ir.Jz, Cond: block.Stack.Pop()}
+		appendJmpCond(block, stack, ir.Jz)
 		return tok.Arg
 	case Jn:
-		block.Terminator = &ir.JmpCondStmt{Op: ir.Jn, Cond: block.Stack.Pop()}
+		appendJmpCond(block, stack, ir.Jn)
 		return tok.Arg
 	case Ret:
-		block.Terminator = &ir.RetStmt{}
+		block.Terminator = &ir.RetTerm{}
 	case End:
-		block.Terminator = &ir.ExitStmt{}
+		block.Terminator = &ir.ExitTerm{}
 
 	case Printc:
-		block.AppendNode(&ir.PrintStmt{Op: ir.Printc, Val: block.Stack.Pop()})
-		// block.AppendNode(&ir.FlushStmt{})
+		appendPrint(block, stack, ir.Printc)
 	case Printi:
-		block.AppendNode(&ir.PrintStmt{Op: ir.Printi, Val: block.Stack.Pop()})
-		// block.AppendNode(&ir.FlushStmt{})
+		appendPrint(block, stack, ir.Printi)
 	case Readc:
-		appendRead(p, block, ir.Readc)
+		appendRead(block, stack, ir.Readc)
 	case Readi:
-		appendRead(p, block, ir.Readi)
+		appendRead(block, stack, ir.Readi)
 
 	default:
 		panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
@@ -201,26 +203,36 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 	return nil
 }
 
-func appendArith(p *ir.Program, block *ir.BasicBlock, op ir.OpType) {
-	rhs, lhs := block.Stack.Pop(), block.Stack.Pop()
-	assign := p.NextVal()
-	block.Stack.Push(assign)
-	block.AppendNode(&ir.BinaryExpr{
-		Op:     op,
-		Assign: assign,
-		LHS:    lhs,
-		RHS:    rhs,
-	})
+func appendArith(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+	rhs, lhs := stack.Pop(), stack.Pop()
+	bin := &ir.BinaryExpr{Def: &ir.ValueDef{}, Op: op}
+	ir.AddUse(lhs, bin, 0)
+	ir.AddUse(rhs, bin, 1)
+	stack.Push(bin)
+	block.AppendNode(bin)
 }
 
-func appendRead(p *ir.Program, block *ir.BasicBlock, op ir.OpType) {
-	addr, assign := block.Stack.Pop(), p.NextVal()
-	block.AppendNode(&ir.ReadExpr{
-		Op:     op,
-		Assign: assign,
-	})
-	block.AppendNode(&ir.StoreHeapStmt{
-		Addr: addr,
-		Val:  assign,
-	})
+func appendJmpCond(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+	cond := stack.Pop()
+	jmp := &ir.JmpCondTerm{Op: op}
+	ir.AddUse(cond, jmp, 0)
+	block.Terminator = jmp
+}
+
+func appendPrint(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+	val := stack.Pop()
+	print := &ir.PrintStmt{Op: op}
+	ir.AddUse(val, print, 0)
+	block.AppendNode(print)
+	// block.AppendNode(&ir.FlushStmt{})
+}
+
+func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.OpType) {
+	addr := stack.Pop()
+	read := &ir.ReadExpr{Def: &ir.ValueDef{}, Op: op}
+	store := &ir.StoreHeapStmt{}
+	ir.AddUse(addr, store, 0)
+	ir.AddUse(read, store, 1)
+	block.AppendNode(read)
+	block.AppendNode(store)
 }

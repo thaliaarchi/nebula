@@ -10,21 +10,27 @@ import (
 // block are represented as negative numbers. Operations are expressed
 // in terms of push and pop.
 type Stack struct {
-	Vals   []*Val // Values in the current stack frame
-	Under  []*Val // Values under the current stack frame
-	Pops   int    // Number of items popped below current stack frame
-	Access int    // Number of items accessed below current stack frame
-	Block  *BasicBlock
+	Vals    []Value // Values in the current stack frame
+	Under   []Value // Values under the current stack frame
+	Pops    int     // Number of items popped below current stack frame
+	Access  int     // Number of items accessed below current stack frame
+	Handler LoadHandler
+}
+
+// LoadHandler is a handler registered to watch loads of values under
+// the current stack frame.
+type LoadHandler interface {
+	HandleLoad(load Node)
 }
 
 // Push pushes a value to the stack.
-func (s *Stack) Push(val *Val) {
+func (s *Stack) Push(val Value) {
 	s.Vals = append(s.Vals, val)
 }
 
 // Pop pops an item from the stack and returns the val of the removed
 // item.
-func (s *Stack) Pop() *Val {
+func (s *Stack) Pop() Value {
 	val := s.Top()
 	s.Drop()
 	return val
@@ -64,14 +70,14 @@ func (s *Stack) Drop() {
 }
 
 // Dup pushes a copy of the top item to the stack.
-func (s *Stack) Dup() *Val {
+func (s *Stack) Dup() Value {
 	top := s.Top()
 	s.Vals = append(s.Vals, top)
 	return top
 }
 
 // Copy pushes a copy of the nth item to the stack.
-func (s *Stack) Copy(n int) *Val {
+func (s *Stack) Copy(n int) Value {
 	if n < 0 {
 		panic(fmt.Sprintf("stack: copy index must be positive: %d", n))
 	}
@@ -98,12 +104,12 @@ func (s *Stack) Slide(n int) {
 }
 
 // Top returns the val of the top item on the stack.
-func (s *Stack) Top() *Val {
+func (s *Stack) Top() Value {
 	return s.At(0)
 }
 
 // At returns the val of the nth item on the stack.
-func (s *Stack) At(n int) *Val {
+func (s *Stack) At(n int) Value {
 	if n < len(s.Vals) {
 		return s.Vals[len(s.Vals)-n-1]
 	}
@@ -112,31 +118,29 @@ func (s *Stack) At(n int) *Val {
 		s.Access = id
 	}
 	if id > len(s.Under) {
-		s.Under = append(s.Under, make([]*Val, id-len(s.Under))...)
+		s.Under = append(s.Under, make([]Value, id-len(s.Under))...)
 	}
 	if s.Under[id-1] == nil {
-		val := Val(&SSAVal{-id})
-		if s.Block != nil {
-			s.Block.AppendNode(&LoadStackExpr{Assign: &val, Pos: id})
+		load := &LoadStackExpr{Def: &ValueDef{}, Pos: id}
+		if s.Handler != nil {
+			s.Handler.HandleLoad(load)
 		}
-		s.Under[id-1] = &val
+		s.Under[id-1] = load
 	}
 	return s.Under[id-1]
 }
 
 // AtExists returns the val of the nth item on the stack or false if
 // the lookup would cause an underflow access.
-func (s *Stack) AtExists(n int) (*Val, bool) {
-	var val *Val
+func (s *Stack) AtExists(n int) (Value, bool) {
+	var val Value
 	if n < len(s.Vals) {
 		val = s.Vals[len(s.Vals)-n-1]
 	} else if n < len(s.Under)-len(s.Vals) {
 		val = s.Under[len(s.Under)-len(s.Vals)-n-1]
 	}
 	if val != nil {
-		if _, ok := (*val).(*SSAVal); ok {
-			return val, true
-		}
+		return val, true
 	}
 	return nil, false
 }
@@ -207,7 +211,7 @@ func (s *Stack) String() string {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString(f.FormatVal(val))
+		b.WriteString(f.FormatDef(val.ValueDef()))
 	}
 	fmt.Fprintf(&b, "], pop %d, access %d [", s.Pops, s.Access)
 	first := true
@@ -216,7 +220,7 @@ func (s *Stack) String() string {
 			if !first {
 				b.WriteByte(' ')
 			}
-			b.WriteString(f.FormatVal(val))
+			b.WriteString(f.FormatDef(val.ValueDef()))
 			first = false
 		}
 	}
