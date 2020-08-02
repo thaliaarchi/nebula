@@ -12,46 +12,46 @@ import (
 )
 
 func TestFoldConstArith(t *testing.T) {
-	// push 1    ; 0
-	// push 3    ; 1
-	// push 10   ; 2
-	// push 2    ; 3
-	// mul       ; 4
-	// add       ; 5
-	// swap      ; 6
-	// push 'C'  ; 7
-	// dup       ; 8
-	// copy 2    ; 9
-	// sub       ; 10
-	// push -32  ; 11
-	// push 'a'  ; 12
-	// add       ; 13
-	// printc    ; 14
+	// push 1    ; 1
+	// push 3    ; 2
+	// push 10   ; 3
+	// push 2    ; 4
+	// mul       ; 5
+	// add       ; 6
+	// swap      ; 7
+	// push 'C'  ; 8
+	// dup       ; 9
+	// copy 2    ; 10
+	// sub       ; 11
+	// push -32  ; 12
+	// push 'a'  ; 13
+	// add       ; 14
 	// printc    ; 15
 	// printc    ; 16
-	// printi    ; 17
+	// printc    ; 17
 	// printi    ; 18
+	// printi    ; 19
 
 	tokens := []ws.Token{
-		{Type: ws.Push, Arg: big.NewInt(1), Start: 0, End: 0},     // 0
-		{Type: ws.Push, Arg: big.NewInt(3), Start: 1, End: 1},     // 1
-		{Type: ws.Push, Arg: big.NewInt(10), Start: 2, End: 2},    // 2
-		{Type: ws.Push, Arg: big.NewInt(2), Start: 3, End: 3},     // 3
-		{Type: ws.Mul, Start: 4, End: 4},                          // 4
-		{Type: ws.Add, Start: 5, End: 5},                          // 5
-		{Type: ws.Swap, Start: 6, End: 6},                         // 6
-		{Type: ws.Push, Arg: big.NewInt('C'), Start: 7, End: 7},   // 7
-		{Type: ws.Dup, Start: 8, End: 8},                          // 8
-		{Type: ws.Copy, Arg: big.NewInt(2), Start: 9, End: 9},     // 9
-		{Type: ws.Sub, Start: 10, End: 10},                        // 10
-		{Type: ws.Push, Arg: big.NewInt(-32), Start: 11, End: 11}, // 11
-		{Type: ws.Push, Arg: big.NewInt('a'), Start: 12, End: 12}, // 12
-		{Type: ws.Add, Start: 13, End: 13},                        // 13
-		{Type: ws.Printc, Start: 14, End: 14},                     // 14
+		{Type: ws.Push, Arg: big.NewInt(1), Start: 1, End: 1},     // 1
+		{Type: ws.Push, Arg: big.NewInt(3), Start: 2, End: 2},     // 2
+		{Type: ws.Push, Arg: big.NewInt(10), Start: 3, End: 3},    // 3
+		{Type: ws.Push, Arg: big.NewInt(2), Start: 4, End: 4},     // 4
+		{Type: ws.Mul, Start: 5, End: 5},                          // 5
+		{Type: ws.Add, Start: 6, End: 6},                          // 6
+		{Type: ws.Swap, Start: 7, End: 7},                         // 7
+		{Type: ws.Push, Arg: big.NewInt('C'), Start: 8, End: 8},   // 8
+		{Type: ws.Dup, Start: 9, End: 9},                          // 9
+		{Type: ws.Copy, Arg: big.NewInt(2), Start: 10, End: 10},   // 10
+		{Type: ws.Sub, Start: 11, End: 11},                        // 11
+		{Type: ws.Push, Arg: big.NewInt(-32), Start: 12, End: 12}, // 12
+		{Type: ws.Push, Arg: big.NewInt('a'), Start: 13, End: 13}, // 13
+		{Type: ws.Add, Start: 14, End: 14},                        // 14
 		{Type: ws.Printc, Start: 15, End: 15},                     // 15
 		{Type: ws.Printc, Start: 16, End: 16},                     // 16
-		{Type: ws.Printi, Start: 17, End: 17},                     // 17
+		{Type: ws.Printc, Start: 17, End: 17},                     // 17
 		{Type: ws.Printi, Start: 18, End: 18},                     // 18
+		{Type: ws.Printi, Start: 19, End: 19},                     // 19
 	}
 	file := token.NewFileSet().AddFile("test", -1, 0)
 	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
@@ -65,27 +65,27 @@ func TestFoldConstArith(t *testing.T) {
 		bign32 = big.NewInt(-32)
 		biga   = big.NewInt('a')
 
-		push1     = ir.NewIntConst(big1, 0)
-		push3     = ir.NewIntConst(big3, 1)
-		push10    = ir.NewIntConst(big10, 2)
-		push2     = ir.NewIntConst(big2, 3)
-		mul       = ir.NewBinaryExpr(ir.Mul, push10, push2, 4)
-		add1      = ir.NewBinaryExpr(ir.Add, push3, mul, 5)
-		pushC     = ir.NewIntConst(bigC, 7)
-		sub       = ir.NewBinaryExpr(ir.Sub, pushC, push1, 10)
-		pushn32   = ir.NewIntConst(bign32, 11)
-		pusha     = ir.NewIntConst(biga, 12)
-		add2      = ir.NewBinaryExpr(ir.Add, pushn32, pusha, 13)
-		printAdd2 = ir.NewPrintStmt(ir.Printc, add2, 14)
-		flushAdd2 = ir.NewFlushStmt(14)
-		printSub  = ir.NewPrintStmt(ir.Printc, sub, 15)
-		flushSub  = ir.NewFlushStmt(15)
-		printC    = ir.NewPrintStmt(ir.Printc, pushC, 16)
-		flushC    = ir.NewFlushStmt(16)
-		print1    = ir.NewPrintStmt(ir.Printi, push1, 17)
-		flush1    = ir.NewFlushStmt(17)
-		printAdd1 = ir.NewPrintStmt(ir.Printi, add1, 18)
-		flushAdd1 = ir.NewFlushStmt(18)
+		push1     = ir.NewIntConst(big1, 1)
+		push3     = ir.NewIntConst(big3, 2)
+		push10    = ir.NewIntConst(big10, 3)
+		push2     = ir.NewIntConst(big2, 4)
+		mul       = ir.NewBinaryExpr(ir.Mul, push10, push2, 5)
+		add1      = ir.NewBinaryExpr(ir.Add, push3, mul, 6)
+		pushC     = ir.NewIntConst(bigC, 8)
+		sub       = ir.NewBinaryExpr(ir.Sub, pushC, push1, 11)
+		pushn32   = ir.NewIntConst(bign32, 12)
+		pusha     = ir.NewIntConst(biga, 13)
+		add2      = ir.NewBinaryExpr(ir.Add, pushn32, pusha, 14)
+		printAdd2 = ir.NewPrintStmt(ir.Printc, add2, 15)
+		flushAdd2 = ir.NewFlushStmt(15)
+		printSub  = ir.NewPrintStmt(ir.Printc, sub, 16)
+		flushSub  = ir.NewFlushStmt(16)
+		printC    = ir.NewPrintStmt(ir.Printc, pushC, 17)
+		flushC    = ir.NewFlushStmt(17)
+		print1    = ir.NewPrintStmt(ir.Printi, push1, 18)
+		flush1    = ir.NewFlushStmt(18)
+		printAdd1 = ir.NewPrintStmt(ir.Printi, add1, 19)
+		flushAdd1 = ir.NewFlushStmt(19)
 	)
 
 	constVals := bigint.NewMap()
@@ -179,10 +179,10 @@ func TestFoldConstArith(t *testing.T) {
 		bigA  = big.NewInt('A')
 		bigB  = big.NewInt('B')
 
-		fold20 = ir.NewIntConst(big20, 4)
-		fold23 = ir.NewIntConst(big23, 5)
-		foldB  = ir.NewIntConst(bigB, 10)
-		foldA  = ir.NewIntConst(bigA, 13)
+		fold20 = ir.NewIntConst(big20, 5)
+		fold23 = ir.NewIntConst(big23, 6)
+		foldB  = ir.NewIntConst(bigB, 11)
+		foldA  = ir.NewIntConst(bigA, 14)
 	)
 
 	constVals.Put(big.NewInt(20), fold20)
