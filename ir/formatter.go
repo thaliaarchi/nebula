@@ -140,11 +140,11 @@ func writeStackPos(b *strings.Builder, inst Inst) {
 	var pos int
 	switch s := inst.(type) {
 	case *LoadStackExpr:
-		pos = s.Pos
+		pos = s.StackPos
 	case *StoreStackStmt:
-		pos = s.Pos
+		pos = s.StackPos
 	case *CheckStackStmt:
-		pos = s.Size
+		pos = s.StackSize
 	default:
 		return
 	}

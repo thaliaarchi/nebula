@@ -2,6 +2,7 @@ package ws // import "github.com/andrewarchi/nebula/ws"
 
 import (
 	"fmt"
+	"go/token"
 	"math/big"
 
 	"github.com/andrewarchi/nebula/bigint"
@@ -76,7 +77,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 			i++
 		}
 
-		checkStack := ir.NewCheckStackStmt(-1, ir.SourceTODO)
+		checkStack := ir.NewCheckStackStmt(-1, -1) // TODO source position
 		block.AppendNode(checkStack)
 
 		var branch *big.Int
@@ -91,7 +92,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 		}
 
 		if block.Stack.Access > 0 {
-			checkStack.Size = block.Stack.Access
+			checkStack.StackSize = block.Stack.Access
 		} else {
 			block.Nodes = block.Nodes[1:]
 		}
@@ -119,7 +120,7 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 	stack := &block.Stack
 	switch tok.Type {
 	case Push:
-		stack.Push(p.LookupConst(tok.Arg))
+		stack.Push(p.LookupConst(tok.Arg, tok.Start))
 	case Dup:
 		stack.Dup()
 	case Copy:
@@ -144,57 +145,57 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		stack.Slide(n)
 
 	case Add:
-		appendBinary(block, stack, ir.Add)
+		appendBinary(block, stack, ir.Add, tok.Start)
 	case Sub:
-		appendBinary(block, stack, ir.Sub)
+		appendBinary(block, stack, ir.Sub, tok.Start)
 	case Mul:
-		appendBinary(block, stack, ir.Mul)
+		appendBinary(block, stack, ir.Mul, tok.Start)
 	case Div:
-		appendBinary(block, stack, ir.Div)
+		appendBinary(block, stack, ir.Div, tok.Start)
 	case Mod:
-		appendBinary(block, stack, ir.Mod)
+		appendBinary(block, stack, ir.Mod, tok.Start)
 
 	case Store:
 		val, addr := stack.Pop(), stack.Pop()
-		block.AppendNode(ir.NewStoreHeapStmt(addr, val, ir.SourceTODO))
+		block.AppendNode(ir.NewStoreHeapStmt(addr, val, tok.Start))
 	case Retrieve:
 		addr := stack.Pop()
-		load := ir.NewLoadHeapExpr(addr, ir.SourceTODO)
+		load := ir.NewLoadHeapExpr(addr, tok.Start)
 		stack.Push(load)
 		block.AppendNode(load)
 
 	case Label:
 		if _, ok := labelUses.Get(tok.Arg); ok { // split blocks at used labels
-			block.Terminator = &ir.JmpTerm{Op: ir.Fallthrough}
+			block.Terminator = ir.NewJmpTerm(ir.Fallthrough, nil, tok.Start)
 			return tok.Arg
 		}
 	case Call:
-		block.Terminator = &ir.CallTerm{}
+		block.Terminator = ir.NewCallTerm(nil, nil, tok.Start)
 		return tok.Arg
 	case Jmp:
-		block.Terminator = &ir.JmpTerm{Op: ir.Jmp}
+		block.Terminator = ir.NewJmpTerm(ir.Jmp, nil, tok.Start)
 		return tok.Arg
 	case Jz:
-		block.Terminator = ir.NewJmpCondTerm(ir.Jz, stack.Pop(), nil, nil, ir.SourceTODO)
+		block.Terminator = ir.NewJmpCondTerm(ir.Jz, stack.Pop(), nil, nil, tok.Start)
 		return tok.Arg
 	case Jn:
-		block.Terminator = ir.NewJmpCondTerm(ir.Jn, stack.Pop(), nil, nil, ir.SourceTODO)
+		block.Terminator = ir.NewJmpCondTerm(ir.Jn, stack.Pop(), nil, nil, tok.Start)
 		return tok.Arg
 	case Ret:
-		block.Terminator = ir.NewRetTerm(ir.SourceTODO)
+		block.Terminator = ir.NewRetTerm(tok.Start)
 	case End:
-		block.Terminator = ir.NewExitTerm(ir.SourceTODO)
+		block.Terminator = ir.NewExitTerm(tok.Start)
 
 	case Printc:
-		block.AppendNode(ir.NewPrintStmt(ir.Printc, stack.Pop(), ir.SourceTODO))
-		block.AppendNode(ir.NewFlushStmt(ir.SourceTODO))
+		block.AppendNode(ir.NewPrintStmt(ir.Printc, stack.Pop(), tok.Start))
+		block.AppendNode(ir.NewFlushStmt(tok.Start))
 	case Printi:
-		block.AppendNode(ir.NewPrintStmt(ir.Printi, stack.Pop(), ir.SourceTODO))
-		block.AppendNode(ir.NewFlushStmt(ir.SourceTODO))
+		block.AppendNode(ir.NewPrintStmt(ir.Printi, stack.Pop(), tok.Start))
+		block.AppendNode(ir.NewFlushStmt(tok.Start))
 	case Readc:
-		appendRead(block, stack, ir.Readc)
+		appendRead(block, stack, ir.Readc, tok.Start)
 	case Readi:
-		appendRead(block, stack, ir.Readi)
+		appendRead(block, stack, ir.Readi, tok.Start)
 
 	default:
 		panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
@@ -202,17 +203,17 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 	return nil
 }
 
-func appendBinary(block *ir.BasicBlock, stack *ir.Stack, op ir.BinaryOp) {
+func appendBinary(block *ir.BasicBlock, stack *ir.Stack, op ir.BinaryOp, pos token.Pos) {
 	rhs, lhs := stack.Pop(), stack.Pop()
-	bin := ir.NewBinaryExpr(op, lhs, rhs, ir.SourceTODO)
+	bin := ir.NewBinaryExpr(op, lhs, rhs, pos)
 	stack.Push(bin)
 	block.AppendNode(bin)
 }
 
-func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.ReadOp) {
+func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.ReadOp, pos token.Pos) {
 	addr := stack.Pop()
-	read := ir.NewReadExpr(op, ir.SourceTODO)
-	store := ir.NewStoreHeapStmt(addr, read, ir.SourceTODO)
+	read := ir.NewReadExpr(op, pos)
+	store := ir.NewStoreHeapStmt(addr, read, pos)
 	block.AppendNode(read)
 	block.AppendNode(store)
 }

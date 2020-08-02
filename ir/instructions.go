@@ -4,18 +4,21 @@
 //
 package ir // import "github.com/andrewarchi/nebula/ir"
 
-import "math/big"
+import (
+	"go/token"
+	"math/big"
+)
 
 // Inst is an instruction with a source location.
 type Inst interface {
-	Source() *Source
+	Pos() token.Pos
 	OpString() string
 }
 
 // Value is an expression or constant with a set of uses.
 type Value interface {
 	Uses() *[]*ValueUse
-	Source() *Source
+	Pos() token.Pos
 }
 
 // User is an instruction that uses values.
@@ -65,34 +68,23 @@ func (use *ValueUse) SetUser(user User, operand uint) {
 	use.UserOperand = operand
 }
 
-// Source is the source position of a node.
-type Source struct {
-	File string
-	Line uint
-	Col  uint
-}
-
-// SourceTODO fills unimplemented source information for now.
-// TODO: remove.
-var SourceTODO Source
-
 // IntConst is a constant integer value.
 type IntConst struct {
 	Int  *big.Int
 	uses []*ValueUse
-	src  Source
+	pos  token.Pos
 }
 
 // NewIntConst constructs an IntConst.
-func NewIntConst(i *big.Int, src Source) *IntConst {
-	return &IntConst{Int: i, src: src}
+func NewIntConst(i *big.Int, pos token.Pos) *IntConst {
+	return &IntConst{Int: i, pos: pos}
 }
 
 // Uses returns the set of instructions referring this node.
 func (i *IntConst) Uses() *[]*ValueUse { return &i.uses }
 
-// Source returns the source location of this node.
-func (i *IntConst) Source() *Source { return &i.src }
+// Pos returns the source location of this node.
+func (i *IntConst) Pos() token.Pos { return i.pos }
 
 // BinaryOp is the operator kind of a binary expression.
 type BinaryOp uint8
@@ -145,12 +137,12 @@ type BinaryExpr struct {
 	Op       BinaryOp
 	operands [2]*ValueUse // LHS, RHS
 	uses     []*ValueUse
-	src      Source
+	pos      token.Pos
 }
 
 // NewBinaryExpr constructs a BinaryExpr.
-func NewBinaryExpr(op BinaryOp, lhs, rhs Value, src Source) *BinaryExpr {
-	b := &BinaryExpr{Op: op, src: src}
+func NewBinaryExpr(op BinaryOp, lhs, rhs Value, pos token.Pos) *BinaryExpr {
+	b := &BinaryExpr{Op: op, pos: pos}
 	b.operands[0] = NewValueUse(lhs, b, 0)
 	b.operands[1] = NewValueUse(rhs, b, 1)
 	return b
@@ -162,8 +154,8 @@ func (b *BinaryExpr) Operands() []*ValueUse { return b.operands[:] }
 // Uses returns the set of instructions referring this node.
 func (b *BinaryExpr) Uses() *[]*ValueUse { return &b.uses }
 
-// Source returns the source location of this node.
-func (b *BinaryExpr) Source() *Source { return &b.src }
+// Pos returns the source location of this node.
+func (b *BinaryExpr) Pos() token.Pos { return b.pos }
 
 // OpString pretty prints the op kind.
 func (b *BinaryExpr) OpString() string { return b.Op.String() }
@@ -189,12 +181,12 @@ type UnaryExpr struct {
 	Op       UnaryOp
 	operands [1]*ValueUse // unary value
 	uses     []*ValueUse
-	src      Source
+	pos      token.Pos
 }
 
 // NewUnaryExpr constructs a UnaryExpr.
-func NewUnaryExpr(op UnaryOp, val Value, src Source) *UnaryExpr {
-	u := &UnaryExpr{Op: op, src: src}
+func NewUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryExpr {
+	u := &UnaryExpr{Op: op, pos: pos}
 	u.operands[0] = NewValueUse(val, u, 0)
 	return u
 }
@@ -205,8 +197,8 @@ func (u *UnaryExpr) Operands() []*ValueUse { return u.operands[:] }
 // Uses returns the set of instructions referring this node.
 func (u *UnaryExpr) Uses() *[]*ValueUse { return &u.uses }
 
-// Source returns the source location of this node.
-func (u *UnaryExpr) Source() *Source { return &u.src }
+// Pos returns the source location of this node.
+func (u *UnaryExpr) Pos() token.Pos { return u.pos }
 
 // OpString pretty prints the op kind.
 func (u *UnaryExpr) OpString() string { return u.Op.String() }
@@ -214,21 +206,21 @@ func (u *UnaryExpr) OpString() string { return u.Op.String() }
 // LoadStackExpr is an expression that loads a value from under the
 // current stack frame. A position of 1 is the top of the stack.
 type LoadStackExpr struct {
-	Pos  int // stack position
-	uses []*ValueUse
-	src  Source
+	StackPos int
+	uses     []*ValueUse
+	pos      token.Pos
 }
 
 // NewLoadStackExpr constructs a LoadStackExpr.
-func NewLoadStackExpr(pos int, src Source) *LoadStackExpr {
-	return &LoadStackExpr{Pos: pos, src: src}
+func NewLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExpr {
+	return &LoadStackExpr{StackPos: stackPos, pos: pos}
 }
 
 // Uses returns the set of instructions referring this node.
 func (l *LoadStackExpr) Uses() *[]*ValueUse { return &l.uses }
 
-// Source returns the source location of this node.
-func (l *LoadStackExpr) Source() *Source { return &l.src }
+// Pos returns the source location of this node.
+func (l *LoadStackExpr) Pos() token.Pos { return l.pos }
 
 // OpString pretty prints the op kind.
 func (l *LoadStackExpr) OpString() string { return "loadstack" }
@@ -236,14 +228,14 @@ func (l *LoadStackExpr) OpString() string { return "loadstack" }
 // StoreStackStmt is a statement that stores a value at a position in
 // the stack.
 type StoreStackStmt struct {
-	Pos      int          // stack position
+	StackPos int
 	operands [1]*ValueUse // value to store
-	src      Source
+	pos      token.Pos
 }
 
 // NewStoreStackStmt constructs a StoreStackStmt.
-func NewStoreStackStmt(pos int, val Value, src Source) *StoreStackStmt {
-	s := &StoreStackStmt{Pos: pos, src: src}
+func NewStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
+	s := &StoreStackStmt{StackPos: stackPos, pos: pos}
 	s.operands[0] = NewValueUse(val, s, 0)
 	return s
 }
@@ -251,25 +243,25 @@ func NewStoreStackStmt(pos int, val Value, src Source) *StoreStackStmt {
 // Operands returns the value to be stored in the stack.
 func (s *StoreStackStmt) Operands() []*ValueUse { return s.operands[:] }
 
-// Source returns the source location of this node.
-func (s *StoreStackStmt) Source() *Source { return &s.src }
+// Pos returns the source location of this node.
+func (s *StoreStackStmt) Pos() token.Pos { return s.pos }
 
 // OpString pretty prints the op kind.
 func (s *StoreStackStmt) OpString() string { return "storestack" }
 
 // CheckStackStmt is a statement that asserts the stack length.
 type CheckStackStmt struct {
-	Size int
-	src  Source
+	StackSize int
+	pos       token.Pos
 }
 
 // NewCheckStackStmt constructs a CheckStackStmt.
-func NewCheckStackStmt(size int, src Source) *CheckStackStmt {
-	return &CheckStackStmt{Size: size, src: src}
+func NewCheckStackStmt(stackSize int, pos token.Pos) *CheckStackStmt {
+	return &CheckStackStmt{StackSize: stackSize, pos: pos}
 }
 
-// Source returns the source location of this node.
-func (c *CheckStackStmt) Source() *Source { return &c.src }
+// Pos returns the source location of this node.
+func (c *CheckStackStmt) Pos() token.Pos { return c.pos }
 
 // OpString pretty prints the op kind.
 func (c *CheckStackStmt) OpString() string { return "checkstack" }
@@ -279,12 +271,12 @@ func (c *CheckStackStmt) OpString() string { return "checkstack" }
 type LoadHeapExpr struct {
 	operands [1]*ValueUse // heap address
 	uses     []*ValueUse
-	src      Source
+	pos      token.Pos
 }
 
 // NewLoadHeapExpr constructs a LoadHeapExpr.
-func NewLoadHeapExpr(addr Value, src Source) *LoadHeapExpr {
-	l := &LoadHeapExpr{src: src}
+func NewLoadHeapExpr(addr Value, pos token.Pos) *LoadHeapExpr {
+	l := &LoadHeapExpr{pos: pos}
 	l.operands[0] = NewValueUse(addr, l, 0)
 	return l
 }
@@ -295,8 +287,8 @@ func (l *LoadHeapExpr) Operands() []*ValueUse { return l.operands[:] }
 // Uses returns the set of instructions referring this node.
 func (l *LoadHeapExpr) Uses() *[]*ValueUse { return &l.uses }
 
-// Source returns the source location of this node.
-func (l *LoadHeapExpr) Source() *Source { return &l.src }
+// Pos returns the source location of this node.
+func (l *LoadHeapExpr) Pos() token.Pos { return l.pos }
 
 // OpString pretty prints the op kind.
 func (l *LoadHeapExpr) OpString() string { return "loadheap" }
@@ -305,12 +297,12 @@ func (l *LoadHeapExpr) OpString() string { return "loadheap" }
 // in the heap.
 type StoreHeapStmt struct {
 	operands [2]*ValueUse // heap address, value
-	src      Source
+	pos      token.Pos
 }
 
 // NewStoreHeapStmt constructs a StoreHeapStmt.
-func NewStoreHeapStmt(addr, val Value, src Source) *StoreHeapStmt {
-	s := &StoreHeapStmt{src: src}
+func NewStoreHeapStmt(addr, val Value, pos token.Pos) *StoreHeapStmt {
+	s := &StoreHeapStmt{pos: pos}
 	s.operands[0] = NewValueUse(addr, s, 0)
 	s.operands[1] = NewValueUse(val, s, 1)
 	return s
@@ -319,8 +311,8 @@ func NewStoreHeapStmt(addr, val Value, src Source) *StoreHeapStmt {
 // Operands returns the heap address and the value to store there.
 func (s *StoreHeapStmt) Operands() []*ValueUse { return s.operands[:] }
 
-// Source returns the source location of this node.
-func (s *StoreHeapStmt) Source() *Source { return &s.src }
+// Pos returns the source location of this node.
+func (s *StoreHeapStmt) Pos() token.Pos { return s.pos }
 
 // OpString pretty prints the op kind.
 func (s *StoreHeapStmt) OpString() string { return "storeheap" }
@@ -351,12 +343,12 @@ func (op PrintOp) String() string {
 type PrintStmt struct {
 	Op       PrintOp
 	operands [1]*ValueUse // value to print
-	src      Source
+	pos      token.Pos
 }
 
 // NewPrintStmt constructs a PrintStmt.
-func NewPrintStmt(op PrintOp, val Value, src Source) *PrintStmt {
-	p := &PrintStmt{Op: op, src: src}
+func NewPrintStmt(op PrintOp, val Value, pos token.Pos) *PrintStmt {
+	p := &PrintStmt{Op: op, pos: pos}
 	p.operands[0] = NewValueUse(val, p, 0)
 	return p
 }
@@ -364,8 +356,8 @@ func NewPrintStmt(op PrintOp, val Value, src Source) *PrintStmt {
 // Operands returns the value to print.
 func (p *PrintStmt) Operands() []*ValueUse { return p.operands[:] }
 
-// Source returns the source location of this node.
-func (p *PrintStmt) Source() *Source { return &p.src }
+// Pos returns the source location of this node.
+func (p *PrintStmt) Pos() token.Pos { return p.pos }
 
 // OpString pretty prints the op kind.
 func (p *PrintStmt) OpString() string { return p.Op.String() }
@@ -393,35 +385,35 @@ func (op ReadOp) String() string {
 type ReadExpr struct {
 	Op   ReadOp
 	uses []*ValueUse
-	src  Source
+	pos  token.Pos
 }
 
 // NewReadExpr constructs a ReadExpr.
-func NewReadExpr(op ReadOp, src Source) *ReadExpr {
-	return &ReadExpr{Op: op, src: src}
+func NewReadExpr(op ReadOp, pos token.Pos) *ReadExpr {
+	return &ReadExpr{Op: op, pos: pos}
 }
 
 // Uses returns the set of instructions referring this node.
 func (r *ReadExpr) Uses() *[]*ValueUse { return &r.uses }
 
-// Source returns the source location of this node.
-func (r *ReadExpr) Source() *Source { return &r.src }
+// Pos returns the source location of this node.
+func (r *ReadExpr) Pos() token.Pos { return r.pos }
 
 // OpString pretty prints the op kind.
 func (r *ReadExpr) OpString() string { return r.Op.String() }
 
 // FlushStmt is a statement that flushes stdout.
 type FlushStmt struct {
-	src Source
+	pos token.Pos
 }
 
 // NewFlushStmt constructs a FlushStmt.
-func NewFlushStmt(src Source) *FlushStmt {
-	return &FlushStmt{src: src}
+func NewFlushStmt(pos token.Pos) *FlushStmt {
+	return &FlushStmt{pos: pos}
 }
 
-// Source returns the source location of this node.
-func (f *FlushStmt) Source() *Source { return &f.src }
+// Pos returns the source location of this node.
+func (f *FlushStmt) Pos() token.Pos { return f.pos }
 
 // OpString pretty prints the op kind.
 func (f *FlushStmt) OpString() string { return "flush" }
@@ -430,20 +422,20 @@ func (f *FlushStmt) OpString() string { return "flush" }
 // stack, then jumps to the callee.
 type CallTerm struct {
 	succs [2]*BasicBlock // callee, next block
-	src   Source
+	pos   token.Pos
 }
 
 // NewCallTerm constructs a CallTerm.
-func NewCallTerm(callee, next *BasicBlock, src Source) *CallTerm {
-	return &CallTerm{succs: [2]*BasicBlock{callee, next}, src: src}
+func NewCallTerm(callee, next *BasicBlock, pos token.Pos) *CallTerm {
+	return &CallTerm{succs: [2]*BasicBlock{callee, next}, pos: pos}
 }
 
 // Succs returns the call destination block and the block to which ret
 // transfers control.
 func (c *CallTerm) Succs() []*BasicBlock { return c.succs[:] }
 
-// Source returns the source location of this node.
-func (c *CallTerm) Source() *Source { return &c.src }
+// Pos returns the source location of this node.
+func (c *CallTerm) Pos() token.Pos { return c.pos }
 
 // OpString pretty prints the op kind.
 func (c *CallTerm) OpString() string { return "call" }
@@ -471,19 +463,19 @@ func (op JmpOp) String() string {
 type JmpTerm struct {
 	Op    JmpOp
 	succs [1]*BasicBlock // jump destination
-	src   Source
+	pos   token.Pos
 }
 
 // NewJmpTerm constructs a JmpTerm.
-func NewJmpTerm(op JmpOp, jumpee *BasicBlock, src Source) *JmpTerm {
-	return &JmpTerm{Op: op, succs: [1]*BasicBlock{jumpee}, src: src}
+func NewJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *JmpTerm {
+	return &JmpTerm{Op: op, succs: [1]*BasicBlock{jumpee}, pos: pos}
 }
 
 // Succs returns the jump destination.
 func (j *JmpTerm) Succs() []*BasicBlock { return j.succs[:] }
 
-// Source returns the source location of this node.
-func (j *JmpTerm) Source() *Source { return &j.src }
+// Pos returns the source location of this node.
+func (j *JmpTerm) Pos() token.Pos { return j.pos }
 
 // OpString pretty prints the op kind.
 func (j *JmpTerm) OpString() string { return j.Op.String() }
@@ -513,12 +505,12 @@ type JmpCondTerm struct {
 	Op       JmpCondOp
 	operands [1]*ValueUse   // condition value
 	succs    [2]*BasicBlock // true block, false block
-	src      Source
+	pos      token.Pos
 }
 
 // NewJmpCondTerm constructs a JmpCondTerm.
-func NewJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, src Source) *JmpCondTerm {
-	j := &JmpCondTerm{Op: op, succs: [2]*BasicBlock{trueBlock, falseBlock}, src: src}
+func NewJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, pos token.Pos) *JmpCondTerm {
+	j := &JmpCondTerm{Op: op, succs: [2]*BasicBlock{trueBlock, falseBlock}, pos: pos}
 	j.operands[0] = NewValueUse(val, j, 0)
 	return j
 }
@@ -530,46 +522,46 @@ func (j *JmpCondTerm) Operands() []*ValueUse { return j.operands[:] }
 // destination on false.
 func (j *JmpCondTerm) Succs() []*BasicBlock { return j.succs[:] }
 
-// Source returns the source location of this node.
-func (j *JmpCondTerm) Source() *Source { return &j.src }
+// Pos returns the source location of this node.
+func (j *JmpCondTerm) Pos() token.Pos { return j.pos }
 
 // OpString pretty prints the op kind.
 func (j *JmpCondTerm) OpString() string { return j.Op.String() }
 
 // RetTerm is a terminator that returns to the caller.
 type RetTerm struct {
-	src Source
+	pos token.Pos
 }
 
 // NewRetTerm constructs a RetTerm.
-func NewRetTerm(src Source) *RetTerm {
-	return &RetTerm{src: src}
+func NewRetTerm(pos token.Pos) *RetTerm {
+	return &RetTerm{pos: pos}
 }
 
 // Succs returns no successors.
 func (r *RetTerm) Succs() []*BasicBlock { return nil }
 
-// Source returns the source location of this node.
-func (r *RetTerm) Source() *Source { return &r.src }
+// Pos returns the source location of this node.
+func (r *RetTerm) Pos() token.Pos { return r.pos }
 
 // OpString pretty prints the op kind.
 func (r *RetTerm) OpString() string { return "ret" }
 
 // ExitTerm is a terminator that exits the program.
 type ExitTerm struct {
-	src Source
+	pos token.Pos
 }
 
 // NewExitTerm constructs a FlushStmt.
-func NewExitTerm(src Source) *ExitTerm {
-	return &ExitTerm{src: src}
+func NewExitTerm(pos token.Pos) *ExitTerm {
+	return &ExitTerm{pos: pos}
 }
 
 // Succs returns no successors.
 func (e *ExitTerm) Succs() []*BasicBlock { return nil }
 
-// Source returns the source location of this node.
-func (e *ExitTerm) Source() *Source { return &e.src }
+// Pos returns the source location of this node.
+func (e *ExitTerm) Pos() token.Pos { return e.pos }
 
 // OpString pretty prints the op kind.
 func (e *ExitTerm) OpString() string { return "exit" }
@@ -587,7 +579,9 @@ func SetOperand(user User, operand uint, val Value) {
 		if use.Def != nil {
 			RemoveUse(use.Def, use)
 		}
-		AddUse(val, use)
+		if val != nil {
+			AddUse(val, use)
+		}
 		use.Def = val
 	}
 }
@@ -617,9 +611,13 @@ func RemoveUse(def Value, use *ValueUse) bool {
 
 // ReplaceUses replaces all uses of def with newDef.
 func ReplaceUses(def, newDef Value) {
-	uses := *def.Uses()
-	for _, use := range uses {
-		use.Def = newDef
+	if def != newDef {
+		uses := def.Uses()
+		for _, use := range *uses {
+			use.Def = newDef
+			AddUse(newDef, use)
+		}
+		*uses = (*uses)[:0]
 	}
 }
 

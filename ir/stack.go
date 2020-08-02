@@ -119,7 +119,7 @@ func (s *Stack) At(n int) Value {
 		s.Under = append(s.Under, make([]Value, id-len(s.Under))...)
 	}
 	if s.Under[id-1] == nil {
-		load := &LoadStackExpr{Pos: id}
+		load := &LoadStackExpr{StackPos: id} // TODO track source position
 		if s.LoadHandler != nil {
 			s.LoadHandler(load)
 		}

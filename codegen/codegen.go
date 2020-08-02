@@ -190,17 +190,17 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 			panic("codegen: unrecognized unary op")
 		}
 	case *ir.LoadStackExpr:
-		addr := m.stackAddr(inst.Pos, stackLen)
+		addr := m.stackAddr(inst.StackPos, stackLen)
 		m.defs[inst] = m.b.CreateLoad(addr, "loadstack")
 	case *ir.StoreStackStmt:
-		addr := m.stackAddr(inst.Pos, stackLen)
+		addr := m.stackAddr(inst.StackPos, stackLen)
 		val := m.lookupUse(ir.Operand(inst, 0))
 		m.b.CreateStore(val, addr)
 	case *ir.CheckStackStmt:
-		if inst.Size <= 0 {
-			panic(fmt.Sprintf("codegen: invalid access count: %d", inst.Size))
+		if inst.StackSize <= 0 {
+			panic(fmt.Sprintf("codegen: invalid access count: %d", inst.StackSize))
 		}
-		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Size), false)
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.StackSize), false)
 		m.b.CreateCall(m.checkStack, []llvm.Value{n, m.blockName(block)}, "")
 	case *ir.LoadHeapExpr:
 		addr := m.heapAddr(ir.Operand(inst, 0))
@@ -249,7 +249,7 @@ func (m *moduleBuilder) updateStack(block *ir.BasicBlock, stackLen llvm.Value) {
 		stackLen = m.b.CreateSub(stackLen, n, "stack_len_pop")
 	}
 	for i, val := range block.Stack.Vals {
-		v := m.lookupVal(val)
+		v := m.lookupValue(val)
 		name := fmt.Sprintf("s%d", i)
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
 		idx := m.b.CreateAdd(stackLen, n, name+".idx")
@@ -310,10 +310,10 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 }
 
 func (m *moduleBuilder) lookupUse(use *ir.ValueUse) llvm.Value {
-	return m.lookupVal(use.Def)
+	return m.lookupValue(use.Def)
 }
 
-func (m *moduleBuilder) lookupVal(val ir.Value) llvm.Value {
+func (m *moduleBuilder) lookupValue(val ir.Value) llvm.Value {
 	switch v := val.(type) {
 	case *ir.IntConst:
 		if i64, ok := bigint.ToInt64(v.Int); ok {

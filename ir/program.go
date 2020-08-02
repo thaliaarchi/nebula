@@ -2,6 +2,7 @@ package ir
 
 import (
 	"fmt"
+	"go/token"
 	"math/big"
 	"strings"
 
@@ -181,11 +182,11 @@ func (p *Program) Digraph() digraph.Digraph {
 
 // LookupConst creates a val for a constant with matching constants
 // having the same val.
-func (p *Program) LookupConst(c *big.Int) Value {
+func (p *Program) LookupConst(c *big.Int, pos token.Pos) Value {
 	if val, ok := p.ConstVals.Get(c); ok {
 		return val.(Value)
 	}
-	val := NewIntConst(c, SourceTODO)
+	val := NewIntConst(c, pos)
 	p.ConstVals.Put(c, val)
 	return val
 }

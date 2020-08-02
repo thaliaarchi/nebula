@@ -18,7 +18,7 @@ func FoldConstArith(p *ir.Program) {
 			case *ir.BinaryExpr:
 				val, isNeg := foldBinaryExpr(p, inst)
 				if isNeg {
-					neg := ir.NewUnaryExpr(ir.Neg, val, ir.SourceTODO)
+					neg := ir.NewUnaryExpr(ir.Neg, val, inst.Pos())
 					ir.ClearOperands(inst)
 					ir.ReplaceUses(inst, neg)
 					node = neg
@@ -31,7 +31,7 @@ func FoldConstArith(p *ir.Program) {
 				if inst.Op == ir.Neg {
 					val := ir.Operand(inst, 0).Def
 					if lhs, ok := val.(*ir.IntConst); ok {
-						constNeg := p.LookupConst(new(big.Int).Neg(lhs.Int))
+						constNeg := p.LookupConst(new(big.Int).Neg(lhs.Int), inst.Pos())
 						ir.ClearOperands(inst)
 						ir.ReplaceUses(inst, constNeg)
 						continue
@@ -99,7 +99,7 @@ func foldBinaryLR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 	default:
 		return nil, false
 	}
-	return p.LookupConst(result), false
+	return p.LookupConst(result, expr.Pos()), false
 }
 
 var (
@@ -155,19 +155,19 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 			case ir.Mul, ir.Div:
 				return lhs, false
 			case ir.Mod:
-				return p.LookupConst(bigZero), false
+				return p.LookupConst(bigZero, expr.Pos()), false
 			}
 		} else if ntz := rhs.Int.TrailingZeroBits(); uint(rhs.Int.BitLen()) == ntz+1 {
 			switch expr.Op {
 			case ir.Mul:
 				expr.Op = ir.Shl
-				ops[1].SetDef(p.LookupConst(new(big.Int).SetUint64(uint64(ntz))))
+				ops[1].SetDef(p.LookupConst(new(big.Int).SetUint64(uint64(ntz)), expr.Pos()))
 			case ir.Div:
 				expr.Op = ir.AShr
-				ops[1].SetDef(p.LookupConst(new(big.Int).SetUint64(uint64(ntz))))
+				ops[1].SetDef(p.LookupConst(new(big.Int).SetUint64(uint64(ntz)), expr.Pos()))
 			case ir.Mod:
 				expr.Op = ir.And
-				ops[1].SetDef(p.LookupConst(new(big.Int).Sub(rhs.Int, bigOne)))
+				ops[1].SetDef(p.LookupConst(new(big.Int).Sub(rhs.Int, bigOne), expr.Pos()))
 			}
 			return nil, false // overwrite op
 		}
@@ -177,7 +177,7 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 			case ir.Mul, ir.Div:
 				return lhs, true
 			case ir.Mod:
-				return p.LookupConst(bigZero), false
+				return p.LookupConst(bigZero, expr.Pos()), false
 			}
 		}
 	}
@@ -190,13 +190,13 @@ func foldBinary(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 	if lhs.Def == rhs.Def {
 		switch expr.Op {
 		case ir.Sub:
-			return p.LookupConst(bigZero), false
+			return p.LookupConst(bigZero, expr.Pos()), false
 		case ir.Div:
 			// TODO trap if RHS zero
-			return p.LookupConst(bigOne), false
+			return p.LookupConst(bigOne, expr.Pos()), false
 		case ir.Mod:
 			// TODO trap if RHS zero
-			return p.LookupConst(bigZero), false
+			return p.LookupConst(bigZero, expr.Pos()), false
 		}
 	}
 	return nil, false
