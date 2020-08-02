@@ -273,7 +273,7 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		gep := m.b.CreateInBoundsGEP(m.callStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 		callStackLen = m.b.CreateAdd(callStackLen, one, "call_stack_len")
 		m.b.CreateStore(callStackLen, m.callStackLen)
-		addr := llvm.BlockAddress(m.main, m.blocks[ir.Succ(term, 0)])
+		addr := llvm.BlockAddress(m.main, m.blocks[ir.Succ(term, 1)])
 		m.b.CreateStore(addr, gep)
 		m.b.CreateBr(m.blocks[ir.Succ(term, 0)])
 	case *ir.JmpTerm:
