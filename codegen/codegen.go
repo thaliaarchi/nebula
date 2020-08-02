@@ -319,12 +319,12 @@ func (m *moduleBuilder) lookupValue(val ir.Value) llvm.Value {
 		if i64, ok := bigint.ToInt64(v.Int); ok {
 			return llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
 		}
-		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v", v))
+		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v at %v", v, m.program.Position(v.Pos())))
 	default:
 		if ident, ok := m.defs[v]; ok {
 			return ident
 		}
-		panic(fmt.Sprintf("codegen: def not found: %v", v))
+		panic(fmt.Sprintf("codegen: def not found: %v at %v", v, m.program.Position(v.Pos())))
 	}
 }
 

@@ -158,6 +158,7 @@ func TestFoldConstArith(t *testing.T) {
 		Entry:       blockStart,
 		ConstVals:   constVals,
 		NextBlockID: 1,
+		File:        file,
 	}
 	// stack.LoadHandler = blockStart.AppendNode
 
@@ -222,6 +223,7 @@ func TestFoldConstArith(t *testing.T) {
 		Entry:       blockConst,
 		ConstVals:   constVals,
 		NextBlockID: 1,
+		File:        file,
 	}
 	// stack.LoadHandler = blockConst.AppendNode
 

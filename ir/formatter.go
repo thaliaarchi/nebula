@@ -90,7 +90,11 @@ func (f *Formatter) FormatInst(inst Inst) string {
 	if user, ok := inst.(User); ok {
 		for _, op := range user.Operands() {
 			b.WriteByte(' ')
-			b.WriteString(f.FormatValue(op.Def))
+			if op == nil {
+				b.WriteString("<nil>")
+			} else {
+				b.WriteString(f.FormatValue(op.Def))
+			}
 		}
 	}
 	if term, ok := inst.(TermInst); ok {

@@ -106,8 +106,8 @@ func initFlags() {
 		"llvm":   {runLLVM, llvmFlags},
 		"help":   {runHelp, helpFlags},
 	}
-	graphFlags.BoolVar(&ascii, "ascii", false, "print as ASCII grid rather than DOT digraph.")
-	astFlags.StringVar(&format, "format", "wsa", "output format; options: ws, wsa, wsx")
+	graphFlags.BoolVar(&ascii, "ascii", false, "print as ASCII grid rather than DOT digraph")
+	astFlags.StringVar(&format, "format", "wsa", "output format; options: ws, wsa, wsapos, wsx")
 	llvmFlags.UintVar(&maxStackLen, "stack", codegen.DefaultMaxStackLen, "maximum stack length for LLVM codegen")
 	llvmFlags.UintVar(&maxCallStackLen, "calls", codegen.DefaultMaxCallStackLen, "maximum call stack length for LLVM codegen")
 	llvmFlags.UintVar(&maxHeapBound, "heap", codegen.DefaultMaxHeapBound, "maximum heap address bound for LLVM codegen")
@@ -241,6 +241,8 @@ func runAST(args []string) {
 		fmt.Print(program.DumpWS())
 	case "wsa":
 		fmt.Print(program.Dump("    "))
+	case "wsapos":
+		fmt.Print(program.DumpPos())
 	case "wsx":
 		fmt.Print(string(ws.Pack([]byte(program.DumpWS()))))
 	default:

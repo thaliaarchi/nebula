@@ -39,6 +39,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	irp := &ir.Program{
 		Name:      p.File.Name(),
 		ConstVals: bigint.NewMap(),
+		File:      p.File,
 	}
 	var branches []*big.Int
 	labels := bigint.NewMap()           // map[*big.Int]int

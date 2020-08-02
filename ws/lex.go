@@ -70,6 +70,11 @@ func (l *Lexer) LexProgram() (*Program, error) {
 	}
 }
 
+// Position returns the full position information for a given pos.
+func (l *Lexer) Position(pos token.Pos) token.Position {
+	return l.file.PositionFor(pos, false)
+}
+
 func (l *Lexer) next() (byte, bool) {
 	if l.offset < len(l.src) {
 		l.endOffset = l.offset
@@ -102,8 +107,8 @@ func (l *Lexer) emitToken(typ Type, arg *big.Int) (*Token, error) {
 func (l *Lexer) error(msg string) (*Token, error) {
 	return nil, &SyntaxError{
 		Msg:   msg,
-		Start: l.file.PositionFor(l.file.Pos(l.startOffset), false),
-		End:   l.file.PositionFor(l.file.Pos(l.endOffset), false),
+		Start: l.Position(l.file.Pos(l.startOffset)),
+		End:   l.Position(l.file.Pos(l.endOffset)),
 	}
 }
 

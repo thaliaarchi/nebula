@@ -17,6 +17,7 @@ type Program struct {
 	Entry       *BasicBlock
 	ConstVals   *bigint.Map // map[*big.Int]*Val
 	NextBlockID int
+	File        *token.File
 }
 
 // BasicBlock is a list of consecutive non-branching instructions in a
@@ -293,6 +294,11 @@ func (l *Label) String() string {
 		return l.Name
 	}
 	return fmt.Sprintf("label_%v", l.ID)
+}
+
+// Position returns the full position information for a given pos.
+func (p *Program) Position(pos token.Pos) token.Position {
+	return p.File.PositionFor(pos, false)
 }
 
 func (err *ErrorRetUnderflow) addTrace(err2 *ErrorRetUnderflow, trace *BasicBlock) *ErrorRetUnderflow {
