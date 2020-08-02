@@ -1,4 +1,4 @@
-package ir // import "github.com/andrewarchi/nebula/ir"
+package ir
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ type Stack struct {
 
 // LoadHandler is a handler registered to watch loads of values under
 // the current stack frame.
-type LoadHandler func(load Node)
+type LoadHandler func(load Inst)
 
 // Push pushes a value to the stack.
 func (s *Stack) Push(val Value) {
@@ -203,23 +203,21 @@ func (s *Stack) Len() int {
 
 func (s *Stack) String() string {
 	var b strings.Builder
-	f := newFormatter()
+	f := NewFormatter()
 	b.WriteString("push [")
 	for i, val := range s.Vals {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString(f.FormatDef(val.ValueDef()))
+		b.WriteString(f.FormatValue(val))
 	}
 	fmt.Fprintf(&b, "], pop %d, access %d [", s.Pops, s.Access)
-	first := true
-	for _, val := range s.Under {
+	for i, val := range s.Under {
 		if val != nil {
-			if !first {
+			if i != 0 {
 				b.WriteByte(' ')
 			}
-			b.WriteString(f.FormatDef(val.ValueDef()))
-			first = false
+			b.WriteString(f.FormatValue(val))
 		}
 	}
 	b.WriteByte(']')

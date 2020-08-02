@@ -1,23 +1,26 @@
-package ir // import "github.com/andrewarchi/nebula/ir"
+package ir
 
 import (
 	"fmt"
 	"strings"
 )
 
-type formatter struct {
-	ids    map[*ValueDef]int
+// Formatter pretty prints Nebula IR.
+type Formatter struct {
+	ids    map[Value]int
 	nextID int
 }
 
-func newFormatter() *formatter {
-	return &formatter{
-		ids:    make(map[*ValueDef]int),
+// NewFormatter constructs a Formatter.
+func NewFormatter() *Formatter {
+	return &Formatter{
+		ids:    make(map[Value]int),
 		nextID: 0,
 	}
 }
 
-func (f *formatter) FormatProgram(p *Program) string {
+// FormatProgram pretty prints a Program.
+func (f *Formatter) FormatProgram(p *Program) string {
 	var b strings.Builder
 	for i, block := range p.Blocks {
 		if i != 0 {
@@ -28,7 +31,8 @@ func (f *formatter) FormatProgram(p *Program) string {
 	return b.String()
 }
 
-func (f *formatter) FormatBlock(block *BasicBlock) string {
+// FormatBlock pretty prints a BasicBlock.
+func (f *Formatter) FormatBlock(block *BasicBlock) string {
 	var b strings.Builder
 	if len(block.Labels) == 0 {
 		fmt.Fprintf(&b, "block_%d:\n", block.ID)
@@ -38,15 +42,19 @@ func (f *formatter) FormatBlock(block *BasicBlock) string {
 		b.WriteString(":\n")
 	}
 
-	fmt.Fprintf(&b, "    ; entries: %s\n", formatBlockSlice(block.Entries))
-	fmt.Fprintf(&b, "    ; callers: %s\n", formatBlockSlice(block.Callers))
+	b.WriteString("    ; entries: ")
+	writeBlockSlice(&b, block.Entries)
+	b.WriteString("\n    ; callers: ")
+	writeBlockSlice(&b, block.Callers)
 	if len(block.Returns) != 0 {
-		fmt.Fprintf(&b, "    ; returns: %s\n", formatBlockSlice(block.Returns))
+		b.WriteString("\n    ; returns: ")
+		writeBlockSlice(&b, block.Returns)
 	}
+	b.WriteByte('\n')
 
-	for _, node := range block.Nodes {
+	for _, inst := range block.Nodes {
 		b.WriteString("    ")
-		b.WriteString(f.FormatNode(node))
+		b.WriteString(f.FormatInst(inst))
 		b.WriteByte('\n')
 	}
 
@@ -59,104 +67,63 @@ func (f *formatter) FormatBlock(block *BasicBlock) string {
 			if i != 0 {
 				b.WriteByte(' ')
 			}
-			b.WriteString(f.FormatVal(val))
+			b.WriteString(f.FormatValue(val))
 		}
 		b.WriteString("]\n")
 	}
 
 	b.WriteString("    ")
-	b.WriteString(f.FormatTerminator(block.Terminator))
+	b.WriteString(f.FormatInst(block.Terminator))
 	b.WriteByte('\n')
 	return b.String()
 }
 
-func (f *formatter) FormatNode(node Node) string {
-	switch n := node.(type) {
-	case *PhiExpr:
-		var b strings.Builder
-		b.WriteString("phi [")
-		for i, edge := range n.Edges {
-			if i != 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(f.FormatUse(edge.Val))
+// FormatInst pretty prints an Inst.
+func (f *Formatter) FormatInst(inst Inst) string {
+	var b strings.Builder
+	if val, ok := inst.(Value); ok {
+		b.WriteString(f.FormatValue(val))
+		b.WriteString(" = ")
+	}
+	b.WriteString(inst.OpString())
+	writeStackPos(&b, inst)
+	if user, ok := inst.(User); ok {
+		for _, op := range user.Operands() {
 			b.WriteByte(' ')
-			b.WriteString(edge.Block.Name())
+			b.WriteString(f.FormatValue(op.Def))
 		}
-		b.WriteByte(']')
-		return b.String()
-	case *BinaryExpr:
-		return fmt.Sprintf("%s = %v %s %s", f.FormatDef(&n.Def), n.Op, f.FormatUse(n.LHS), f.FormatUse(n.RHS))
-	case *UnaryExpr:
-		return fmt.Sprintf("%s = %v %s", f.FormatDef(&n.Def), n.Op, f.FormatUse(n.Val))
-	case *LoadStackExpr:
-		return fmt.Sprintf("%s = loadstack %d", f.FormatDef(&n.Def), n.Pos)
-	case *StoreStackStmt:
-		return fmt.Sprintf("storestack %d %s", n.Pos, f.FormatUse(n.Val))
-	case *CheckStackStmt:
-		return fmt.Sprintf("checkstack %d", n.Access)
-	case *LoadHeapExpr:
-		return fmt.Sprintf("%s = loadheap *%s", f.FormatDef(&n.Def), f.FormatUse(n.Addr))
-	case *StoreHeapStmt:
-		return fmt.Sprintf("storeheap *%s %s", f.FormatUse(n.Addr), f.FormatUse(n.Val))
-	case *PrintStmt:
-		return fmt.Sprintf("%v %s", n.Op, f.FormatUse(n.Val))
-	case *ReadExpr:
-		return fmt.Sprintf("%s = %v", f.FormatDef(&n.Def), n.Op)
-	case *FlushStmt:
-		return "flush"
-	default:
-		panic("ir: unknown node type")
 	}
+	if term, ok := inst.(TermInst); ok {
+		for _, succ := range term.Succs() {
+			b.WriteByte(' ')
+			b.WriteString(succ.Name())
+		}
+	}
+	return b.String()
 }
 
-func (f *formatter) FormatTerminator(term Terminator) string {
-	switch t := term.(type) {
-	case *CallTerm:
-		return fmt.Sprintf("call %s", t.Dest.Name())
-	case *JmpTerm:
-		return fmt.Sprintf("%v %s", t.Op, t.Dest.Name())
-	case *JmpCondTerm:
-		return fmt.Sprintf("%v %s %s %s", t.Op, f.FormatUse(t.Cond), t.Then.Name(), t.Else.Name())
-	case *RetTerm:
-		return "ret"
-	case *ExitTerm:
-		return "exit"
-	default:
-		panic("ir: unknown terminator type")
-	}
-}
-
-func (f *formatter) FormatVal(val Value) string {
+// FormatValue pretty prints a value.
+func (f *Formatter) FormatValue(val Value) string {
 	switch v := val.(type) {
-	case *ConstVal:
+	case *IntConst:
 		return v.Int.String()
-	default:
-		return f.FormatDef(v.ValueDef())
 	}
-}
-
-func (f *formatter) FormatDef(def *ValueDef) string {
 	var id int
-	if vid, ok := f.ids[def]; ok {
+	if vid, ok := f.ids[val]; ok {
 		id = vid
 	} else {
 		id = f.nextID
-		f.ids[def] = f.nextID
+		f.ids[val] = f.nextID
 		f.nextID++
 	}
 	return fmt.Sprintf("%%%d", id)
 }
 
-func (f *formatter) FormatUse(use *ValueUse) string {
-	return f.FormatVal(use.Val)
-}
-
-func formatBlockSlice(blocks []*BasicBlock) string {
+func writeBlockSlice(b *strings.Builder, blocks []*BasicBlock) {
 	if len(blocks) == 0 {
-		return "-"
+		b.WriteString("-")
+		return
 	}
-	var b strings.Builder
 	for i, block := range blocks {
 		if i != 0 {
 			b.WriteByte(' ')
@@ -167,5 +134,20 @@ func formatBlockSlice(blocks []*BasicBlock) string {
 			b.WriteString(block.Name())
 		}
 	}
-	return b.String()
+}
+
+func writeStackPos(b *strings.Builder, inst Inst) {
+	var pos int
+	switch s := inst.(type) {
+	case *LoadStackExpr:
+		pos = s.Pos
+	case *StoreStackStmt:
+		pos = s.Pos
+	case *CheckStackStmt:
+		pos = s.Size
+	default:
+		return
+	}
+	b.WriteByte(' ')
+	fmt.Fprintf(b, "%d", pos)
 }

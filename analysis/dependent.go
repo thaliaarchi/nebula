@@ -40,14 +40,14 @@ func DependenceGraph(block *ir.BasicBlock) graph.Graph {
 // when both are I/O instructions, one is I/O and the other can throw,
 // both assign to the same value, or one reads the value assigned to by
 // the other. Dependent is reflexive.
-func Dependent(a, b ir.Node) bool {
+func Dependent(a, b ir.Inst) bool {
 	aIO, bIO := isIO(a), isIO(b)
 	return aIO && bIO ||
 		aIO && canThrow(b) || bIO && canThrow(a) ||
 		references(a, b) || references(b, a)
 }
 
-func isIO(node ir.Node) bool {
+func isIO(node ir.Inst) bool {
 	switch node.(type) {
 	case *ir.PrintStmt, *ir.ReadExpr:
 		return true
@@ -57,9 +57,10 @@ func isIO(node ir.Node) bool {
 
 // canThrow returns whether the node is a division with a non-constant
 // RHS.
-func canThrow(node ir.Node) bool {
+// TODO: create div trap to replace this.
+func canThrow(node ir.Inst) bool {
 	if n, ok := node.(*ir.BinaryExpr); ok && n.Op == ir.Div {
-		_, ok := n.RHS.Val.(*ir.ConstVal)
+		_, ok := ir.Operand(n, 0).Def.(*ir.IntConst)
 		return !ok
 	}
 	return false
@@ -67,12 +68,11 @@ func canThrow(node ir.Node) bool {
 
 // references returns whether node B references the assignment of
 // node A.
-func references(a, b ir.Node) bool {
-	if expr, ok := a.(ir.Expr); ok {
+func references(a, b ir.Inst) bool {
+	if expr, ok := a.(ir.Value); ok {
 		if user, ok := b.(ir.User); ok {
-			n := user.NumOperand()
-			for i := 0; i < n; i++ {
-				if user.Operand(i).Val == expr {
+			for _, operand := range user.Operands() {
+				if operand.Def == expr {
 					return true
 				}
 			}

@@ -1,4 +1,4 @@
-package ir // import "github.com/andrewarchi/nebula/ir"
+package ir
 
 import (
 	"fmt"
@@ -24,8 +24,8 @@ type BasicBlock struct {
 	ID         int           // Unique block ID for printing
 	Labels     []Label       // Labels for this block in source
 	Stack      Stack         // Stack frame of this block
-	Nodes      []Node        // Non-branching non-stack instructions
-	Terminator Terminator    // Terminator control flow instruction
+	Nodes      []Inst        // Non-branching non-stack instructions
+	Terminator TermInst      // Terminator control flow instruction
 	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
 	Callers    []*BasicBlock // Calling blocks; blocks calling this block or its parents
 	Returns    []*BasicBlock // Returning blocks; blocks returning to this block
@@ -60,13 +60,13 @@ func (p *Program) ConnectEdges(branches []*big.Int, labels *bigint.Map /* map[*b
 
 			switch term := block.Terminator.(type) {
 			case *CallTerm:
-				term.Dest = callee
-				term.Next = p.Blocks[i+1]
+				term.succs[0] = callee
+				term.succs[1] = p.Blocks[i+1]
 			case *JmpTerm:
-				term.Dest = callee
+				term.succs[0] = callee
 			case *JmpCondTerm:
-				term.Then = callee
-				term.Else = block.Next
+				term.succs[0] = callee
+				term.succs[1] = block.Next
 				block.Next.Entries = append(block.Next.Entries, block)
 			case *RetTerm, *ExitTerm:
 			default:
@@ -91,14 +91,14 @@ func (block *BasicBlock) connectCaller(caller *BasicBlock) *ErrorRetUnderflow {
 	var errs *ErrorRetUnderflow
 	switch term := block.Terminator.(type) {
 	case *CallTerm:
-		errs = errs.addTrace(term.Dest.connectCaller(block), block)
-		errs = errs.addTrace(term.Next.connectCaller(caller), block)
-		term.Next.Entries = appendUnique(term.Next.Entries, block.Returns...)
+		errs = errs.addTrace(term.succs[0].connectCaller(block), block)
+		errs = errs.addTrace(term.succs[1].connectCaller(caller), block)
+		term.succs[1].Entries = appendUnique(term.succs[1].Entries, block.Returns...)
 	case *JmpTerm:
-		errs = errs.addTrace(term.Dest.connectCaller(caller), block)
+		errs = errs.addTrace(term.succs[0].connectCaller(caller), block)
 	case *JmpCondTerm:
-		errs = errs.addTrace(term.Then.connectCaller(caller), block)
-		errs = errs.addTrace(term.Else.connectCaller(caller), block)
+		errs = errs.addTrace(term.succs[0].connectCaller(caller), block)
+		errs = errs.addTrace(term.succs[1].connectCaller(caller), block)
 	case *RetTerm:
 		if caller == nil {
 			errs = errs.addTrace(&ErrorRetUnderflow{[][]*BasicBlock{{}}}, block)
@@ -185,35 +185,30 @@ func (p *Program) LookupConst(c *big.Int) Value {
 	if val, ok := p.ConstVals.Get(c); ok {
 		return val.(Value)
 	}
-	val := &ConstVal{Int: c}
+	val := NewIntConst(c, SourceTODO)
 	p.ConstVals.Put(c, val)
 	return val
 }
 
 // AppendNode appends a node to the block.
-func (block *BasicBlock) AppendNode(node Node) {
-	block.Nodes = append(block.Nodes, node)
+func (block *BasicBlock) AppendNode(inst Inst) {
+	if _, ok := inst.(TermInst); ok {
+		panic("AppendNode: terminator not allowed")
+	}
+	block.Nodes = append(block.Nodes, inst)
 }
 
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {
-	case *CallTerm:
-		return []*BasicBlock{term.Dest}
-	case *JmpTerm:
-		return []*BasicBlock{term.Dest}
-	case *JmpCondTerm:
-		return []*BasicBlock{term.Then, term.Else}
 	case *RetTerm:
 		exits := make([]*BasicBlock, len(block.Callers))
 		for i, caller := range block.Callers {
 			exits[i] = caller.Next
 		}
 		return exits
-	case *ExitTerm:
-		return nil
 	default:
-		panic("ir: unrecognized terminator type")
+		return term.Succs()
 	}
 }
 
@@ -265,12 +260,12 @@ func (p *Program) DotDigraph() string {
 	for _, block := range p.Blocks {
 		switch term := block.Terminator.(type) {
 		case *CallTerm:
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, term.Dest.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"call\"];\n", block.ID, term.succs[0].ID)
 		case *JmpTerm:
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"jmp\"];\n", block.ID, term.Dest.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"jmp\"];\n", block.ID, term.succs[0].ID)
 		case *JmpCondTerm:
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, term.Then.ID)
-			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, term.Else.ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"true\"];\n", block.ID, term.succs[0].ID)
+			fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"false\"];\n", block.ID, term.succs[1].ID)
 		case *RetTerm:
 			for _, caller := range block.Callers {
 				fmt.Fprintf(&b, "  block_%d -> block_%d[label=\"ret\\n%s\"];\n", block.ID, caller.Next.ID, caller.Name())
@@ -285,11 +280,11 @@ func (p *Program) DotDigraph() string {
 }
 
 func (p *Program) String() string {
-	return newFormatter().FormatProgram(p)
+	return NewFormatter().FormatProgram(p)
 }
 
 func (block *BasicBlock) String() string {
-	return newFormatter().FormatBlock(block)
+	return NewFormatter().FormatBlock(block)
 }
 
 func (l *Label) String() string {

@@ -76,7 +76,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 			i++
 		}
 
-		checkStack := &ir.CheckStackStmt{}
+		checkStack := ir.NewCheckStackStmt(-1, ir.SourceTODO)
 		block.AppendNode(checkStack)
 
 		var branch *big.Int
@@ -91,7 +91,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 		}
 
 		if block.Stack.Access > 0 {
-			checkStack.Access = block.Stack.Access
+			checkStack.Size = block.Stack.Access
 		} else {
 			block.Nodes = block.Nodes[1:]
 		}
@@ -156,14 +156,10 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 
 	case Store:
 		val, addr := stack.Pop(), stack.Pop()
-		store := &ir.StoreHeapStmt{}
-		ir.AddUse(addr, store, 0)
-		ir.AddUse(val, store, 1)
-		block.AppendNode(store)
+		block.AppendNode(ir.NewStoreHeapStmt(addr, val, ir.SourceTODO))
 	case Retrieve:
 		addr := stack.Pop()
-		load := &ir.LoadHeapExpr{}
-		ir.AddUse(addr, load, 0)
+		load := ir.NewLoadHeapExpr(addr, ir.SourceTODO)
 		stack.Push(load)
 		block.AppendNode(load)
 
@@ -179,20 +175,22 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		block.Terminator = &ir.JmpTerm{Op: ir.Jmp}
 		return tok.Arg
 	case Jz:
-		appendJmpCond(block, stack, ir.Jz)
+		block.Terminator = ir.NewJmpCondTerm(ir.Jz, stack.Pop(), nil, nil, ir.SourceTODO)
 		return tok.Arg
 	case Jn:
-		appendJmpCond(block, stack, ir.Jn)
+		block.Terminator = ir.NewJmpCondTerm(ir.Jn, stack.Pop(), nil, nil, ir.SourceTODO)
 		return tok.Arg
 	case Ret:
-		block.Terminator = &ir.RetTerm{}
+		block.Terminator = ir.NewRetTerm(ir.SourceTODO)
 	case End:
-		block.Terminator = &ir.ExitTerm{}
+		block.Terminator = ir.NewExitTerm(ir.SourceTODO)
 
 	case Printc:
-		appendPrint(block, stack, ir.Printc)
+		block.AppendNode(ir.NewPrintStmt(ir.Printc, stack.Pop(), ir.SourceTODO))
+		block.AppendNode(ir.NewFlushStmt(ir.SourceTODO))
 	case Printi:
-		appendPrint(block, stack, ir.Printi)
+		block.AppendNode(ir.NewPrintStmt(ir.Printi, stack.Pop(), ir.SourceTODO))
+		block.AppendNode(ir.NewFlushStmt(ir.SourceTODO))
 	case Readc:
 		appendRead(block, stack, ir.Readc)
 	case Readi:
@@ -206,34 +204,15 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 
 func appendBinary(block *ir.BasicBlock, stack *ir.Stack, op ir.BinaryOp) {
 	rhs, lhs := stack.Pop(), stack.Pop()
-	bin := &ir.BinaryExpr{Op: op}
-	ir.AddUse(lhs, bin, 0)
-	ir.AddUse(rhs, bin, 1)
+	bin := ir.NewBinaryExpr(op, lhs, rhs, ir.SourceTODO)
 	stack.Push(bin)
 	block.AppendNode(bin)
 }
 
-func appendJmpCond(block *ir.BasicBlock, stack *ir.Stack, op ir.JmpCondOp) {
-	cond := stack.Pop()
-	jmp := &ir.JmpCondTerm{Op: op}
-	ir.AddUse(cond, jmp, 0)
-	block.Terminator = jmp
-}
-
-func appendPrint(block *ir.BasicBlock, stack *ir.Stack, op ir.PrintOp) {
-	val := stack.Pop()
-	print := &ir.PrintStmt{Op: op}
-	ir.AddUse(val, print, 0)
-	block.AppendNode(print)
-	// block.AppendNode(&ir.FlushStmt{})
-}
-
 func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.ReadOp) {
 	addr := stack.Pop()
-	read := &ir.ReadExpr{Op: op}
-	store := &ir.StoreHeapStmt{}
-	ir.AddUse(addr, store, 0)
-	ir.AddUse(read, store, 1)
+	read := ir.NewReadExpr(op, ir.SourceTODO)
+	store := ir.NewStoreHeapStmt(addr, read, ir.SourceTODO)
 	block.AppendNode(read)
 	block.AppendNode(store)
 }
