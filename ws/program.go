@@ -10,7 +10,7 @@ import (
 // Program is a sequence of tokens with source map information.
 type Program struct {
 	File       *token.File
-	Tokens     []Token
+	Tokens     []*Token
 	LabelNames *bigint.Map // map[*big.Int]string
 }
 
@@ -23,10 +23,13 @@ func (p *Program) Position(pos token.Pos) token.Position {
 func (p *Program) Dump(indent string) string {
 	var b strings.Builder
 	for _, tok := range p.Tokens {
-		if tok.Type != Label {
+		if tok.Type == Label {
+			b.WriteString(tok.Format(p.LabelNames))
+			b.WriteByte(':')
+		} else {
 			b.WriteString(indent)
+			b.WriteString(tok.Format(p.LabelNames))
 		}
-		b.WriteString(tok.Format(p.LabelNames))
 		b.WriteByte('\n')
 	}
 	return b.String()
@@ -36,20 +39,24 @@ func (p *Program) Dump(indent string) string {
 // information.
 func (p *Program) DumpPos() string {
 	const indent = "    "
-	const width = 39
-	padding := strings.Repeat(" ", width)
+	const padWidth = 39
+	padding := strings.Repeat(" ", padWidth)
 
 	var b strings.Builder
 	for _, tok := range p.Tokens {
-		indentLen := 0
-		if tok.Type != Label {
-			b.WriteString(indent)
-			indentLen = len(indent)
-		}
 		t := tok.Format(p.LabelNames)
-		b.WriteString(t)
-		if indentLen+len(t) < width {
-			b.WriteString(padding[:width-len(t)-indentLen])
+		l := len(t)
+		if tok.Type == Label {
+			b.WriteString(t)
+			b.WriteByte(':')
+			l++
+		} else {
+			b.WriteString(indent)
+			b.WriteString(t)
+			l += len(indent)
+		}
+		if l < padWidth {
+			b.WriteString(padding[:padWidth-l])
 		}
 		b.WriteString(" ; ")
 		pos := p.Position(tok.Start)

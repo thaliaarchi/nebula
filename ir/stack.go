@@ -92,6 +92,9 @@ func (s *Stack) Swap() {
 
 // Slide slides n items off the stack, leaving the top item.
 func (s *Stack) Slide(n int) {
+	if n < 0 {
+		panic(fmt.Sprintf("stack: slide count must be positive: %d", n))
+	}
 	if n == 0 {
 		return
 	}

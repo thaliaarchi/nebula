@@ -34,17 +34,23 @@ func (m *Map) Get(k *big.Int) (interface{}, bool) {
 	return nil, false
 }
 
+// Has returns whether the key exists.
+func (m *Map) Has(k *big.Int) bool {
+	_, ok := m.Get(k)
+	return ok
+}
+
 // Put a value at the key.
 func (m *Map) Put(k *big.Int, v interface{}) bool {
 	hash := k.Int64()
-	pairs := m.m[hash]
-	for _, e := range pairs {
+	bucket := m.m[hash]
+	for _, e := range bucket {
 		if e.K.Cmp(k) == 0 {
 			e.V = v
 			return true
 		}
 	}
-	m.m[hash] = append(pairs, MapPair{new(big.Int).Set(k), v})
+	m.m[hash] = append(bucket, MapPair{new(big.Int).Set(k), v})
 	m.len++
 	return false
 }

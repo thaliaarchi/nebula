@@ -21,7 +21,7 @@ type Token struct {
 func (tok *Token) Format(labelNames *bigint.Map /* map[*big.Int]string */) string {
 	switch {
 	case tok.Type == Label:
-		return fmt.Sprintf("%s:", tok.formatArg(labelNames))
+		return tok.formatArg(labelNames)
 	case tok.Type.HasArg():
 		return fmt.Sprintf("%s %s", tok.Type, tok.formatArg(labelNames))
 	default:

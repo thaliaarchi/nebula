@@ -62,12 +62,10 @@ compare      rosetta/while         rosetta/while.ws
 compare      rosetta/langstons_ant rosetta/langstons_ant.ws
 compare_file rosetta/freq          rosetta/freq.ws          programs/rosetta/freq.ws
 
-cp programs/interpret.out.ws tmp.ws
-printf '\0' >> tmp.ws
-cat programs/hello_world.ws >> tmp.ws
-printf '\0' >> tmp.ws
+printf '\0' > nul
+cat programs/interpret.out.ws nul programs/hello_world.ws nul > tmp.ws
 
 echo "hello_world:"
 time build/interpret < tmp.ws &&
 time "$wspace" programs/interpret.out.ws < tmp.ws
-rm tmp.ws
+rm tmp.ws nul

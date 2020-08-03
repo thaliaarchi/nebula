@@ -10,21 +10,25 @@ import (
 )
 
 // ConvertSSA converts tokens into Nebula IR in SSA form.
-func (p *Program) ConvertSSA() (*ir.Program, error) {
+func (p *Program) ConvertSSA() (*ir.Program, []error) {
 	if needsImplicitEnd(p.Tokens) {
-		p.Tokens = append(p.Tokens, Token{Type: End})
+		p.Tokens = append(p.Tokens, &Token{Type: End})
 	}
-	irp, branches, labels, err := p.createBlocks()
+	labels, labelUses, errs := collectLabels(p)
+	if len(errs) != 0 {
+		return nil, errs
+	}
+	irp, branches, blockLabels, err := p.createBlocks(labels, labelUses)
 	if err != nil {
-		return nil, err
+		return nil, []error{err}
 	}
-	if err := irp.ConnectEdges(branches, labels); err != nil {
-		return irp, err
+	if err := irp.ConnectEdges(branches, blockLabels); err != nil {
+		return irp, []error{err}
 	}
 	return irp, nil
 }
 
-func needsImplicitEnd(tokens []Token) bool {
+func needsImplicitEnd(tokens []*Token) bool {
 	if len(tokens) == 0 {
 		return true
 	}
@@ -35,15 +39,44 @@ func needsImplicitEnd(tokens []Token) bool {
 	return true
 }
 
-func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
+func collectLabels(p *Program) (*bigint.Map, *bigint.Map, []error) {
+	labels := bigint.NewMap()    // map[*big.Int]int
+	labelUses := bigint.NewMap() // map[*big.Int][]int
+	var errs []error
+
+	for i, tok := range p.Tokens {
+		switch tok.Type {
+		case Label:
+			if labels.Put(tok.Arg, i) {
+				errs = append(errs, p.tokenError("Label is not unique", tok))
+			}
+		case Call, Jmp, Jz, Jn:
+			if l, ok := labelUses.Get(tok.Arg); ok {
+				labelUses.Put(tok.Arg, append(l.([]int), i))
+			} else {
+				labelUses.Put(tok.Arg, []int{i})
+			}
+		}
+	}
+
+	for _, use := range labelUses.Pairs() {
+		if _, ok := labels.Get(use.K); !ok {
+			for _, branch := range use.V.([]int) {
+				errs = append(errs, p.tokenError("Label does not exist", p.Tokens[branch]))
+			}
+		}
+	}
+	return labels, labelUses, errs
+}
+
+func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*big.Int, *bigint.Map, error) {
 	irp := &ir.Program{
 		Name:      p.File.Name(),
 		ConstVals: bigint.NewMap(),
 		File:      p.File,
 	}
 	var branches []*big.Int
-	labels := bigint.NewMap()           // map[*big.Int]int
-	labelUses := getLabelUses(p.Tokens) // map[*big.Int]struct{}
+	blockLabels := bigint.NewMap() // map[*big.Int]int
 	prevLabel := ""
 	labelIndex := 0
 
@@ -63,9 +96,7 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 		}
 		for p.Tokens[i].Type == Label {
 			label := p.Tokens[i].Arg
-			if labels.Put(label, len(irp.Blocks)) {
-				return nil, nil, nil, fmt.Errorf("ir: label is not unique: %s", label)
-			}
+			blockLabels.Put(label, len(irp.Blocks)) // TODO remove need for this
 			var name string
 			if p.LabelNames != nil {
 				if n, ok := p.LabelNames.Get(label); ok {
@@ -83,8 +114,12 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 
 		var branch *big.Int
 		for ; i < len(p.Tokens); i++ {
-			branch = appendInstruction(irp, &block, p.Tokens[i], labelUses)
+			err := appendInstruction(p, irp, &block, p.Tokens[i], labelUses)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 			if block.Terminator != nil {
+				branch = p.Tokens[i].Arg
 				if p.Tokens[i].Type == Label {
 					i--
 				}
@@ -103,33 +138,22 @@ func (p *Program) createBlocks() (*ir.Program, []*big.Int, *bigint.Map, error) {
 	}
 	irp.Entry = irp.Blocks[0]
 	irp.NextBlockID = len(irp.Blocks)
-	return irp, branches, labels, nil
+	return irp, branches, blockLabels, nil
 }
 
-func getLabelUses(tokens []Token) *bigint.Map {
-	labelUses := bigint.NewMap() // map[*big.Int]struct{}
-	for _, token := range tokens {
-		switch token.Type {
-		case Call, Jmp, Jz, Jn:
-			labelUses.Put(token.Arg, nil)
-		}
-	}
-	return labelUses
-}
-
-func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses *bigint.Map) *big.Int {
+func appendInstruction(p *Program, irp *ir.Program, block *ir.BasicBlock, tok *Token, labelUses *bigint.Map) error {
 	stack := &block.Stack
 	switch tok.Type {
 	case Push:
-		stack.Push(p.LookupConst(tok.Arg, tok.Start))
+		stack.Push(irp.LookupConst(tok.Arg, tok.Start))
 	case Dup:
 		stack.Dup()
 	case Copy:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ws: copy argument overflow: %v", tok.Arg))
+			return p.tokenError("Argument overflows int", tok)
 		} else if n < 0 {
-			panic(fmt.Sprintf("ws: copy argument negative: %v", tok.Arg))
+			return p.tokenError("Argument is negative", tok)
 		}
 		stack.Copy(n)
 	case Swap:
@@ -139,9 +163,9 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 	case Slide:
 		n, ok := bigint.ToInt(tok.Arg)
 		if !ok {
-			panic(fmt.Sprintf("ws: slide argument overflow: %v", tok.Arg))
+			return p.tokenError("Argument overflows int", tok)
 		} else if n < 0 {
-			panic(fmt.Sprintf("ws: slide argument negative: %v", tok.Arg))
+			return p.tokenError("Argument is negative", tok)
 		}
 		stack.Slide(n)
 
@@ -166,22 +190,17 @@ func appendInstruction(p *ir.Program, block *ir.BasicBlock, tok Token, labelUses
 		block.AppendNode(load)
 
 	case Label:
-		if _, ok := labelUses.Get(tok.Arg); ok { // split blocks at used labels
+		if labelUses.Has(tok.Arg) { // split blocks at used labels
 			block.Terminator = ir.NewJmpTerm(ir.Fallthrough, nil, tok.Start)
-			return tok.Arg
 		}
 	case Call:
 		block.Terminator = ir.NewCallTerm(nil, nil, tok.Start)
-		return tok.Arg
 	case Jmp:
 		block.Terminator = ir.NewJmpTerm(ir.Jmp, nil, tok.Start)
-		return tok.Arg
 	case Jz:
 		block.Terminator = ir.NewJmpCondTerm(ir.Jz, stack.Pop(), nil, nil, tok.Start)
-		return tok.Arg
 	case Jn:
 		block.Terminator = ir.NewJmpCondTerm(ir.Jn, stack.Pop(), nil, nil, tok.Start)
-		return tok.Arg
 	case Ret:
 		block.Terminator = ir.NewRetTerm(tok.Start)
 	case End:
@@ -217,4 +236,9 @@ func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.ReadOp, pos token.P
 	store := ir.NewStoreHeapStmt(addr, read, pos)
 	block.AppendNode(read)
 	block.AppendNode(store)
+}
+
+// TODO maybe change into type
+func (p *Program) tokenError(err string, tok *Token) error {
+	return fmt.Errorf("%s: %s at %v", err, tok.Format(p.LabelNames), p.Position(tok.Start))
 }

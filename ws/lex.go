@@ -57,7 +57,7 @@ func (l *Lexer) Lex() (*Token, error) {
 
 // LexProgram scans a Whitespace source file into a Program.
 func (l *Lexer) LexProgram() (*Program, error) {
-	var tokens []Token
+	var tokens []*Token
 	for {
 		tok, err := l.Lex()
 		if err != nil {
@@ -66,7 +66,7 @@ func (l *Lexer) LexProgram() (*Program, error) {
 			}
 			return &Program{l.file, tokens, nil}, nil
 		}
-		tokens = append(tokens, *tok)
+		tokens = append(tokens, tok)
 	}
 }
 
