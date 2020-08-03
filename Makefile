@@ -5,7 +5,8 @@ all: build/99_bottles build/ascii build/ascii4 build/caesar \
 	build/rosetta/fibrec build/rosetta/fizz_buzz build/rosetta/freq \
 	build/rosetta/harshad build/rosetta/langstons_ant \
 	build/rosetta/octal build/rosetta/shell_sort \
-	build/rosetta/term_cursor build/rosetta/while
+	build/rosetta/term_cursor build/rosetta/while \
+	build/test_ret_underflow
 
 build/rosetta/%: programs/rosetta/%.ws nebula compile codegen/ext/ext.c
 	@mkdir -p build/rosetta

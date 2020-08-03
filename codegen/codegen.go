@@ -82,8 +82,9 @@ func (m *moduleBuilder) declareFuncs() {
 	readcTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	readiTyp := llvm.FunctionType(llvm.Int64Type(), []llvm.Type{}, false)
 	flushTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{}, false)
-	checkStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type(), llvm.PointerType(llvm.Int8Type(), 0)}, false)
-	checkCallStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.PointerType(llvm.Int8Type(), 0)}, false)
+	cStrTyp := llvm.PointerType(llvm.Int8Type(), 0)
+	checkStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type(), cStrTyp, cStrTyp}, false)
+	checkCallStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{cStrTyp, cStrTyp}, false)
 
 	m.printc = llvm.AddFunction(m.module, "printc", printcTyp)
 	m.printi = llvm.AddFunction(m.module, "printi", printiTyp)
@@ -120,11 +121,7 @@ func (m *moduleBuilder) declareGlobals() {
 	m.heap.SetInitializer(llvm.ConstNull(heapTyp))
 
 	for _, block := range m.program.Blocks {
-		name := block.Name()
-		nameGlobal := llvm.AddGlobal(m.module, llvm.ArrayType(llvm.Int8Type(), len(name)+1), "name_"+name)
-		nameGlobal.SetInitializer(m.ctx.ConstString(name, true))
-		nameGlobal.SetLinkage(llvm.PrivateLinkage)
-		m.blockNames[block] = nameGlobal
+		m.blockNames[block] = m.constString(block.Name())
 	}
 }
 
@@ -201,7 +198,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 			panic(fmt.Sprintf("codegen: invalid access count: %d", inst.StackSize))
 		}
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.StackSize), false)
-		m.b.CreateCall(m.checkStack, []llvm.Value{n, m.blockName(block)}, "")
+		m.b.CreateCall(m.checkStack, []llvm.Value{n, m.blockName(block), m.instPos(inst)}, "")
 	case *ir.LoadHeapExpr:
 		addr := m.heapAddr(ir.Operand(inst, 0))
 		m.defs[inst] = m.b.CreateLoad(addr, "loadheap")
@@ -291,7 +288,7 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		}
 		m.b.CreateCondBr(cond, m.blocks[ir.Succ(term, 0)], m.blocks[ir.Succ(term, 1)])
 	case *ir.RetTerm:
-		m.b.CreateCall(m.checkCallStack, []llvm.Value{m.blockName(block)}, "")
+		m.b.CreateCall(m.checkCallStack, []llvm.Value{m.blockName(block), m.instPos(term)}, "")
 		callStackLen := m.b.CreateLoad(m.callStackLen, "call_stack_len")
 		callStackLen = m.b.CreateSub(callStackLen, one, "call_stack_len")
 		m.b.CreateStore(callStackLen, m.callStackLen)
@@ -300,7 +297,9 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		dests := block.Exits()
 		br := m.b.CreateIndirectBr(addr, len(dests))
 		for _, dest := range dests {
-			br.AddDest(m.blocks[dest])
+			if dest != nil {
+				br.AddDest(m.blocks[dest])
+			}
 		}
 	case *ir.ExitTerm:
 		m.b.CreateRet(llvm.ConstInt(llvm.Int32Type(), 0, false))
@@ -340,6 +339,18 @@ func (m *moduleBuilder) heapAddr(val *ir.ValueUse) llvm.Value {
 	return m.b.CreateInBoundsGEP(m.heap, []llvm.Value{zero, addr}, "gep")
 }
 
+func (m *moduleBuilder) constString(str string) llvm.Value {
+	global := llvm.AddGlobal(m.module, llvm.ArrayType(llvm.Int8Type(), len(str)+1), "str_"+str)
+	global.SetInitializer(m.ctx.ConstString(str, true))
+	global.SetLinkage(llvm.PrivateLinkage)
+	return global
+}
+
 func (m *moduleBuilder) blockName(block *ir.BasicBlock) llvm.Value {
 	return m.b.CreateInBoundsGEP(m.blockNames[block], []llvm.Value{zero, zero}, "name")
+}
+
+func (m *moduleBuilder) instPos(inst ir.Inst) llvm.Value {
+	pos := m.program.Position(inst.Pos()).String()
+	return m.b.CreateInBoundsGEP(m.constString(pos), []llvm.Value{zero, zero}, "op")
 }

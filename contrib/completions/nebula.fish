@@ -24,9 +24,9 @@ __fish_nebula_command ir 'Emit Nebula IR'
 __fish_nebula_command llvm 'Emit LLVM IR'
 __fish_nebula_command help 'Print usage'
 
-__fish_nebula_command_flag graph ascii 'Print as ASCII grid rather than DOT digraph.'
+__fish_nebula_command_flag graph ascii 'Print as ASCII grid rather than DOT digraph'
 __fish_nebula_command_flag graph nofold 'Disable constant folding'
-__fish_nebula_command_flag_option ast format 'Output format' ws wsa wsx
+__fish_nebula_command_flag_option ast format 'Output format' ws wsa wsapos wsx
 __fish_nebula_command_flag ir nofold 'Disable constant folding'
 __fish_nebula_command_flag_uint llvm calls 'Maximum call stack length for LLVM codegen'
 __fish_nebula_command_flag_uint llvm heap 'Maximum heap address bound for LLVM codegen'

@@ -194,10 +194,16 @@ func lexFile(args []string) *ws.Program {
 func convertSSA(p *ws.Program, noFold bool) *ir.Program {
 	program, errs := p.ConvertSSA()
 	if len(errs) != 0 {
+		fatal := false
 		for _, err := range errs {
+			if _, ok := err.(*ir.ErrorRetUnderflow); !ok {
+				fatal = true
+			}
 			fmt.Fprintln(os.Stderr, err)
 		}
-		os.Exit(1)
+		if fatal {
+			os.Exit(1)
+		}
 	}
 	if !noFold {
 		analysis.FoldConstArith(program)

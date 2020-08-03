@@ -2,6 +2,7 @@ package ir
 
 import (
 	"fmt"
+	"go/token"
 	"strings"
 )
 
@@ -122,7 +123,7 @@ func (s *Stack) At(n int) Value {
 		s.Under = append(s.Under, make([]Value, id-len(s.Under))...)
 	}
 	if s.Under[id-1] == nil {
-		load := &LoadStackExpr{StackPos: id} // TODO track source position
+		load := NewLoadStackExpr(id, token.NoPos) // TODO track source position
 		if s.LoadHandler != nil {
 			s.LoadHandler(load)
 		}

@@ -206,7 +206,9 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 	case *RetTerm:
 		exits := make([]*BasicBlock, len(block.Callers))
 		for i, caller := range block.Callers {
-			exits[i] = caller.Next
+			if caller != nil {
+				exits[i] = caller.Next
+			}
 		}
 		return exits
 	default:

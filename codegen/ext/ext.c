@@ -28,18 +28,18 @@ void flush() {
 }
 
 // TODO change to procedure generated in IR to enable transformations.
-void check_stack(uint64_t n, char *location) {
+void check_stack(uint64_t n, char *block, char *pos) {
   if (stack_len < n) {
-    fprintf(stderr, "data stack underflow at %s\n", location);
+    fprintf(stderr, "Data stack underflow in %s at %s\n", block, pos);
     fflush(stderr);
     exit(1);
   }
 }
 
 // TODO change to procedure generated in IR to enable transformations.
-void check_call_stack(char *location) {
+void check_call_stack(char *block, char *pos) {
   if (call_stack_len < 1) {
-    fprintf(stderr, "call stack underflow at %s\n", location);
+    fprintf(stderr, "Call stack underflow in %s at %s\n", block, pos);
     fflush(stderr);
     exit(1);
   }

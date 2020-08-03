@@ -109,7 +109,7 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 			i++
 		}
 
-		checkStack := ir.NewCheckStackStmt(-1, -1) // TODO source position
+		checkStack := ir.NewCheckStackStmt(-1, token.NoPos) // TODO source position
 		block.AppendNode(checkStack)
 
 		var branch *big.Int
