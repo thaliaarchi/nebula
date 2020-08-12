@@ -81,13 +81,11 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 	labelIndex := 0
 
 	for i := 0; i < len(p.Tokens); i++ {
-		var block ir.BasicBlock
-		block.ID = len(irp.Blocks)
-		stack := &block.Stack
-		stack.LoadHandler = block.AppendNode
+		block := &ir.BasicBlock{ID: len(irp.Blocks)}
+		stack := &ir.Stack{LoadHandler: block.AppendNode}
 		if len(irp.Blocks) > 0 {
 			prev := irp.Blocks[len(irp.Blocks)-1]
-			prev.Next = &block
+			prev.Next = block
 			block.Prev = prev
 		}
 
@@ -115,7 +113,7 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 
 		var branch *big.Int
 		for ; i < len(p.Tokens); i++ {
-			err := appendInstruction(p, irp, &block, p.Tokens[i], labelUses)
+			err := appendInstruction(p, irp, block, stack, p.Tokens[i], labelUses)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -141,7 +139,7 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 			block.AppendNode(ir.NewStoreStackStmt(len(stack.Values)-i, val, token.NoPos)) // TODO source position
 		}
 
-		irp.Blocks = append(irp.Blocks, &block)
+		irp.Blocks = append(irp.Blocks, block)
 		branches = append(branches, branch)
 	}
 	irp.Entry = irp.Blocks[0]
@@ -149,8 +147,7 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 	return irp, branches, blockLabels, nil
 }
 
-func appendInstruction(p *Program, irp *ir.Program, block *ir.BasicBlock, tok *Token, labelUses *bigint.Map) error {
-	stack := &block.Stack
+func appendInstruction(p *Program, irp *ir.Program, block *ir.BasicBlock, stack *ir.Stack, tok *Token, labelUses *bigint.Map) error {
 	switch tok.Type {
 	case Push:
 		stack.Push(irp.LookupConst(tok.Arg, tok.Start))

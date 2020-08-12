@@ -25,7 +25,6 @@ type Program struct {
 type BasicBlock struct {
 	ID         int           // Unique block ID for printing
 	Labels     []Label       // Labels for this block in source
-	Stack      Stack         // Stack frame of this block
 	Nodes      []Inst        // Non-branching non-stack instructions
 	Terminator TermInst      // Terminator control flow instruction
 	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
@@ -238,20 +237,7 @@ func (p *Program) DotDigraph() string {
 		fmt.Fprintf(&b, "  subgraph cluster_%d {\n", i)
 		for _, node := range scc {
 			block := p.Blocks[node]
-			fmt.Fprintf(&b, "    block_%d[label=\"%s\\n", block.ID, block.Name())
-			if block.Stack.Len() != 0 {
-				fmt.Fprintf(&b, " +%d", block.Stack.Len())
-			}
-			if block.Stack.Pops != 0 {
-				fmt.Fprintf(&b, " -%d", block.Stack.Pops)
-			}
-			if block.Stack.Access != 0 {
-				fmt.Fprintf(&b, " a%d", block.Stack.Access)
-			}
-			if len(block.Stack.Under) != 0 {
-				fmt.Fprintf(&b, " r%d", len(block.Stack.Under))
-			}
-			b.WriteByte('"')
+			fmt.Fprintf(&b, "    block_%d[label=\"%s\"", block.ID, block.Name())
 			if _, ok := block.Terminator.(*ExitTerm); ok {
 				b.WriteString(" peripheries=2")
 			}

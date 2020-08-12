@@ -131,7 +131,6 @@ func TestFoldConstArith(t *testing.T) {
 	}
 
 	blockStart := &ir.BasicBlock{
-		Stack: stack,
 		Nodes: []ir.Inst{
 			mul,
 			add1,
@@ -160,15 +159,11 @@ func TestFoldConstArith(t *testing.T) {
 		NextBlockID: 1,
 		File:        file,
 	}
-	// stack.LoadHandler = blockStart.AppendNode
 
 	program, err := p.ConvertSSA()
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
-	loadHandler := program.Entry.Stack.LoadHandler
-	program.Entry.Stack.LoadHandler = nil // for equality
-
 	if !reflect.DeepEqual(program, programStart) {
 		t.Errorf("SSA conversion not equal\ngot:\n%v\nwant:\n%v", program, programStart)
 	}
@@ -200,7 +195,6 @@ func TestFoldConstArith(t *testing.T) {
 	ir.ClearOperands(add2)
 
 	blockConst := &ir.BasicBlock{
-		Stack: stack,
 		Nodes: []ir.Inst{
 			printAdd2,
 			flushAdd2,
@@ -225,12 +219,8 @@ func TestFoldConstArith(t *testing.T) {
 		NextBlockID: 1,
 		File:        file,
 	}
-	// stack.LoadHandler = blockConst.AppendNode
 
-	program.Entry.Stack.LoadHandler = loadHandler
 	FoldConstArith(program)
-	program.Entry.Stack.LoadHandler = nil // for equality
-
 	if !reflect.DeepEqual(program, programConst) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
