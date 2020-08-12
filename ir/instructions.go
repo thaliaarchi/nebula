@@ -266,6 +266,24 @@ func (c *CheckStackStmt) Pos() token.Pos { return c.pos }
 // OpString pretty prints the op kind.
 func (c *CheckStackStmt) OpString() string { return "checkstack" }
 
+// OffsetStackStmt is a statement that changes the stack length
+// relatively.
+type OffsetStackStmt struct {
+	Offset int
+	pos    token.Pos
+}
+
+// NewOffsetStackStmt constructs a OffsetStackStmt.
+func NewOffsetStackStmt(offset int, pos token.Pos) *OffsetStackStmt {
+	return &OffsetStackStmt{Offset: offset, pos: pos}
+}
+
+// Pos returns the source location of this node.
+func (o *OffsetStackStmt) Pos() token.Pos { return o.pos }
+
+// OpString pretty prints the op kind.
+func (o *OffsetStackStmt) OpString() string { return "offsetstack" }
+
 // LoadHeapExpr is an expression that loads a value at an address
 // from the heap.
 type LoadHeapExpr struct {

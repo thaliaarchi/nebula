@@ -83,7 +83,8 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 	for i := 0; i < len(p.Tokens); i++ {
 		var block ir.BasicBlock
 		block.ID = len(irp.Blocks)
-		block.Stack.LoadHandler = block.AppendNode
+		stack := &block.Stack
+		stack.LoadHandler = block.AppendNode
 		if len(irp.Blocks) > 0 {
 			prev := irp.Blocks[len(irp.Blocks)-1]
 			prev.Next = &block
@@ -127,10 +128,17 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 			}
 		}
 
-		if block.Stack.Access > 0 {
-			checkStack.StackSize = block.Stack.Access
+		if stack.Access > 0 {
+			checkStack.StackSize = stack.Access
 		} else {
 			block.Nodes = block.Nodes[1:]
+		}
+
+		if offset := len(stack.Values) - stack.Pops; offset != 0 {
+			block.AppendNode(ir.NewOffsetStackStmt(offset, token.NoPos)) // TODO source position
+		}
+		for i, val := range stack.Values {
+			block.AppendNode(ir.NewStoreStackStmt(len(stack.Values)-i, val, token.NoPos)) // TODO source position
 		}
 
 		irp.Blocks = append(irp.Blocks, &block)

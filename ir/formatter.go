@@ -57,21 +57,6 @@ func (f *Formatter) FormatBlock(block *BasicBlock) string {
 		b.WriteString(f.FormatInst(inst))
 		b.WriteByte('\n')
 	}
-
-	if block.Stack.Pops > 0 {
-		fmt.Fprintf(&b, "    pop %d\n", block.Stack.Pops)
-	}
-	if len(block.Stack.Values) != 0 {
-		b.WriteString("    push [")
-		for i, val := range block.Stack.Values {
-			if i != 0 {
-				b.WriteByte(' ')
-			}
-			b.WriteString(f.FormatValue(val))
-		}
-		b.WriteString("]\n")
-	}
-
 	b.WriteString("    ")
 	b.WriteString(f.FormatInst(block.Terminator))
 	b.WriteByte('\n')
@@ -149,6 +134,8 @@ func writeStackPos(b *strings.Builder, inst Inst) {
 		pos = s.StackPos
 	case *CheckStackStmt:
 		pos = s.StackSize
+	case *OffsetStackStmt:
+		pos = s.Offset
 	default:
 		return
 	}

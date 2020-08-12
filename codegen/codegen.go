@@ -138,14 +138,13 @@ func (m *moduleBuilder) emitBlocks() {
 		m.b.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
 		stackLen := m.b.CreateLoad(m.stackLen, "stack_len")
 		for _, node := range block.Nodes {
-			m.emitNode(node, block, stackLen)
+			stackLen = m.emitNode(node, block, stackLen)
 		}
-		m.updateStack(block, stackLen)
 		m.emitTerminator(block)
 	}
 }
 
-func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen llvm.Value) {
+func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen llvm.Value) llvm.Value {
 	switch inst := node.(type) {
 	case *ir.BinaryExpr:
 		lhs := m.lookupUse(ir.Operand(inst, 0))
@@ -199,6 +198,10 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		}
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.StackSize), false)
 		m.b.CreateCall(m.checkStack, []llvm.Value{n, m.blockName(block), m.instPos(inst)}, "")
+	case *ir.OffsetStackStmt:
+		n := llvm.ConstInt(llvm.Int64Type(), uint64(inst.Offset), false)
+		stackLen = m.b.CreateAdd(stackLen, n, "offsetstack")
+		m.b.CreateStore(stackLen, m.stackLen)
 	case *ir.LoadHeapExpr:
 		addr := m.heapAddr(ir.Operand(inst, 0))
 		m.defs[inst] = m.b.CreateLoad(addr, "loadheap")
@@ -234,33 +237,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 	default:
 		panic("codegen: unrecognized node type")
 	}
-}
-
-func (m *moduleBuilder) updateStack(block *ir.BasicBlock, stackLen llvm.Value) {
-	pop := block.Stack.Pops
-	if pop < 0 {
-		panic("codegen: negative pop")
-	}
-	if pop > 0 {
-		n := llvm.ConstInt(llvm.Int64Type(), uint64(pop), false)
-		stackLen = m.b.CreateSub(stackLen, n, "stack_len_pop")
-	}
-	for i, val := range block.Stack.Values {
-		v := m.lookupValue(val)
-		name := fmt.Sprintf("s%d", i)
-		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
-		idx := m.b.CreateAdd(stackLen, n, name+".idx")
-		gep := m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
-		m.b.CreateStore(v, gep)
-	}
-	push := len(block.Stack.Values)
-	if pop != push {
-		if push > 0 {
-			n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
-			stackLen = m.b.CreateAdd(stackLen, n, "stack_len_push")
-		}
-		m.b.CreateStore(stackLen, m.stackLen)
-	}
+	return stackLen
 }
 
 func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {

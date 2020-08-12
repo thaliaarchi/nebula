@@ -18,16 +18,12 @@ build/%: programs/%.ws nebula compile codegen/ext/ext.c
 build/%: programs/%.out.ws nebula compile codegen/ext/ext.c
 	./compile $< $@
 
-# TODO nofold is needed for now because reducing `mul %0 -1` to `neg %0`
-# does not replace mul in the stack push list with neg. Once stack
-# updates are first class NIR instructions, -nofold can be removed.
-
 build/interpret: programs/interpret.out.ws nebula compile codegen/ext/ext.c
-	./compile $< $@ -O3 "-heap=1000000 -nofold"
+	./compile $< $@ -O3 -heap=1000000
 
 build/rosetta/langstons_ant: programs/rosetta/langstons_ant.ws nebula compile codegen/ext/ext.c
 	@mkdir -p build/rosetta
-	./compile $< $@ -O3 "-heap=10004 -nofold"
+	./compile $< $@ -O3 -heap=10004
 
 clean:
 	rm -rf build
