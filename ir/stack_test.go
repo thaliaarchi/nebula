@@ -110,29 +110,31 @@ func TestSwap(t *testing.T) {
 			Want:  &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, nil},
 		},
 		{
-			Stack: &Stack{nil, nil, 2, 7, nil},
-			Want:  &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, nil},
-		},
-		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, nil},
-			Want:  &Stack{[]Value{v1, v0}, nil, 0, 0, nil},
-		},
-		{
-			Stack: &Stack{[]Value{v2}, nil, 1, 1, nil},
-			Want:  &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, nil},
+			Stack: &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, nil},
+			Want:  &Stack{[]Value{}, []Value{load1, load2}, 0, 2, nil},
 		},
 
 		{
-			Stack: &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, nil},
-			Want:  &Stack{[]Value{}, []Value{load1, load2}, 0, 2, nil},
+			Stack: &Stack{nil, nil, 2, 7, nil},
+			Want:  &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, nil},
 		},
 		{
 			Stack: &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, nil},
 			Want:  &Stack{[]Value{}, []Value{nil, nil, load3, load4}, 2, 7, nil},
 		},
+
+		{
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, nil},
+			Want:  &Stack{[]Value{v1, v0}, nil, 0, 0, nil},
+		},
 		{
 			Stack: &Stack{[]Value{v1, v0}, nil, 0, 0, nil},
 			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, nil},
+		},
+
+		{
+			Stack: &Stack{[]Value{v2}, nil, 1, 1, nil},
+			Want:  &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, nil},
 		},
 		{
 			Stack: &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, nil},

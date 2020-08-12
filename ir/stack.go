@@ -186,8 +186,9 @@ func (s *Stack) Concat(next *Stack) {
 
 // simplify cleans up low elements.
 func (s *Stack) simplify() {
-	var i int
-	for i < len(s.Values) && i < s.Pops && s.Values[i] == s.Under[s.Pops-i-1] {
+	i := 0
+	for i < len(s.Values) && i < s.Pops &&
+		s.Pops-i-1 < len(s.Under) && s.Values[i] == s.Under[s.Pops-i-1] {
 		i++
 	}
 	s.Values = s.Values[i:]
