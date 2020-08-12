@@ -108,6 +108,31 @@ func (f *Formatter) FormatValue(val Value) string {
 	return fmt.Sprintf("%%%d", id)
 }
 
+// FormatStack pretty prints a stack.
+func (f *Formatter) FormatStack(s *Stack) string {
+	var b strings.Builder
+	b.WriteString("{values:[")
+	for i, val := range s.Values {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(f.FormatValue(val))
+	}
+	b.WriteString("] under:[")
+	for i, val := range s.Under {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
+		if val != nil {
+			b.WriteString(f.FormatValue(val))
+		} else {
+			b.WriteString("-")
+		}
+	}
+	fmt.Fprintf(&b, "] pops:%d access:%d}", s.Pops, s.Access)
+	return b.String()
+}
+
 func writeBlockSlice(b *strings.Builder, blocks []*BasicBlock) {
 	if len(blocks) == 0 {
 		b.WriteString("-")

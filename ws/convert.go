@@ -82,7 +82,7 @@ func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*b
 
 	for i := 0; i < len(p.Tokens); i++ {
 		block := &ir.BasicBlock{ID: len(irp.Blocks)}
-		stack := &ir.Stack{LoadHandler: block.AppendNode}
+		stack := &ir.Stack{HandleLoad: block.AppendStackLoad}
 		if len(irp.Blocks) > 0 {
 			prev := irp.Blocks[len(irp.Blocks)-1]
 			prev.Next = block

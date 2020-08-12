@@ -199,6 +199,13 @@ func (block *BasicBlock) AppendNode(inst Inst) {
 	block.Nodes = append(block.Nodes, inst)
 }
 
+// AppendStackLoad is a LoadHandler for a stack.
+func (block *BasicBlock) AppendStackLoad(pos int) Value {
+	load := NewLoadStackExpr(pos, token.NoPos) // TODO source position
+	block.AppendNode(load)
+	return load
+}
+
 // Exits returns all outgoing edges of the block.
 func (block *BasicBlock) Exits() []*BasicBlock {
 	switch term := block.Terminator.(type) {
