@@ -1,4 +1,4 @@
-package ir // import "github.com/andrewarchi/nebula/ir"
+package ir
 
 import (
 	"fmt"
@@ -16,7 +16,18 @@ var (
 	load2 = NewLoadStackExpr(2, token.NoPos)
 	load3 = NewLoadStackExpr(3, token.NoPos)
 	load4 = NewLoadStackExpr(4, token.NoPos)
+
+	f = NewFormatter()
 )
+
+func init() {
+	// Register loads with formatter so they are printed consistently
+	// across tests.
+	f.FormatValue(load1)
+	f.FormatValue(load2)
+	f.FormatValue(load3)
+	f.FormatValue(load4)
+}
 
 type stackTest struct {
 	Stack *Stack
@@ -201,7 +212,6 @@ func equals(a, b *Stack) bool {
 func checkStack(t *testing.T, testIndex int, got, want *Stack) {
 	t.Helper()
 	if !equals(got, want) {
-		f := NewFormatter()
 		t.Errorf("test %d: got stack %s, want %s", testIndex, f.FormatStack(got), f.FormatStack(want))
 	}
 }
@@ -209,7 +219,6 @@ func checkStack(t *testing.T, testIndex int, got, want *Stack) {
 func checkValue(t *testing.T, testIndex int, got, want Value) {
 	t.Helper()
 	if got != want {
-		f := NewFormatter()
 		t.Errorf("test %d: got value %s, want %s", testIndex, f.FormatValue(got), f.FormatValue(want))
 	}
 }
