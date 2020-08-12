@@ -1,10 +1,10 @@
-package ws // import "github.com/andrewarchi/nebula/ws"
+package ws
 
 import (
 	"go/token"
 	"strings"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
 // Program is a sequence of tokens with source map information.

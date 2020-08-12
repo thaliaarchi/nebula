@@ -1,4 +1,4 @@
-package ws // import "github.com/andrewarchi/nebula/ws"
+package ws
 
 import (
 	"bufio"
@@ -6,7 +6,7 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
 // ParseSourceMap reads a source map and parses it into mappings from

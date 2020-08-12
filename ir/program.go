@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/andrewarchi/nebula/bigint"
-	"github.com/andrewarchi/nebula/digraph"
+	"github.com/andrewarchi/nebula/internal/bigint"
+	"github.com/andrewarchi/nebula/internal/digraph"
 )
 
 // Program is a set of interconnected basic blocks.

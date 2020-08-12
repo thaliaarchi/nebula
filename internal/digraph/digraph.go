@@ -1,4 +1,6 @@
-package digraph // import "github.com/andrewarchi/nebula/digraph"
+// Package digraph implements a directed graph.
+//
+package digraph // import "github.com/andrewarchi/nebula/internal/digraph"
 
 // Digraph is a directed graph.
 type Digraph []graphNode

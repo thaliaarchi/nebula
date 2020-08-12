@@ -1,4 +1,4 @@
-package ws // import "github.com/andrewarchi/nebula/ws"
+package ws
 
 import (
 	"fmt"

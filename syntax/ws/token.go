@@ -1,4 +1,6 @@
-package ws // import "github.com/andrewarchi/nebula/ws"
+// Package ws parses Whitespace source files.
+//
+package ws // import "github.com/andrewarchi/nebula/syntax/ws"
 
 import (
 	"fmt"
@@ -6,7 +8,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
 // Token is a lexical token in the Whitespace language.

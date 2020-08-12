@@ -1,4 +1,4 @@
-package analysis // import "github.com/andrewarchi/nebula/analysis"
+package optimize
 
 import (
 	"go/token"
@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/ws"
+	"github.com/andrewarchi/nebula/syntax/ws"
 )
 
 func TestFoldConstArith(t *testing.T) {

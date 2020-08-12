@@ -1,11 +1,11 @@
-package ws // import "github.com/andrewarchi/nebula/ws"
+package ws
 
 import (
 	"fmt"
 	"go/token"
 	"math/big"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
 )
 

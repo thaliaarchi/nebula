@@ -8,20 +8,20 @@ all: build/99_bottles build/ascii build/ascii4 build/caesar \
 	build/rosetta/term_cursor build/rosetta/while \
 	build/test_ret_underflow
 
-build/rosetta/%: programs/rosetta/%.ws nebula compile codegen/ext/ext.c
+build/rosetta/%: programs/rosetta/%.ws nebula compile ir/codegen/ext/ext.c
 	@mkdir -p build/rosetta
 	./compile $< $@
 
-build/%: programs/%.ws nebula compile codegen/ext/ext.c
+build/%: programs/%.ws nebula compile ir/codegen/ext/ext.c
 	./compile $< $@
 
-build/%: programs/%.out.ws nebula compile codegen/ext/ext.c
+build/%: programs/%.out.ws nebula compile ir/codegen/ext/ext.c
 	./compile $< $@
 
-build/interpret: programs/interpret.out.ws nebula compile codegen/ext/ext.c
+build/interpret: programs/interpret.out.ws nebula compile ir/codegen/ext/ext.c
 	./compile $< $@ -O3 -heap=1000000
 
-build/rosetta/langstons_ant: programs/rosetta/langstons_ant.ws nebula compile codegen/ext/ext.c
+build/rosetta/langstons_ant: programs/rosetta/langstons_ant.ws nebula compile ir/codegen/ext/ext.c
 	@mkdir -p build/rosetta
 	./compile $< $@ -O3 -heap=10004
 

@@ -1,4 +1,4 @@
-package analysis // import "github.com/andrewarchi/nebula/analysis"
+package optimize
 
 import (
 	"github.com/andrewarchi/graph"

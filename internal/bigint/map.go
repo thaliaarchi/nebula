@@ -1,4 +1,7 @@
-package bigint // import "github.com/andrewarchi/nebula/bigint"
+// Package bigint implements utilities for dealing with arbitrary
+// precision integers.
+//
+package bigint // import "github.com/andrewarchi/nebula/internal/bigint"
 
 import (
 	"fmt"

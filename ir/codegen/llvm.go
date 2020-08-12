@@ -1,9 +1,11 @@
-package codegen // import "github.com/andrewarchi/nebula/codegen"
+// Package codegen lowers Nebula IR to LLVM IR.
+//
+package codegen // import "github.com/andrewarchi/nebula/ir/codegen"
 
 import (
 	"fmt"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
 	"llvm.org/llvm/bindings/go/llvm"
 )

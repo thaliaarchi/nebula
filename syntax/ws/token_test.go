@@ -1,4 +1,4 @@
-package ws // import "github.com/andrewarchi/nebula/ws"
+package ws
 
 import (
 	"math/big"
@@ -15,8 +15,8 @@ func TestTokenString(t *testing.T) {
 		{&Token{Type: Push, Arg: nil}, "push <nil>"},
 		{&Token{Type: Add, Arg: arg}, "add"},
 		{&Token{Type: Add, Arg: nil}, "add"},
-		{&Token{Type: Label, Arg: arg}, "label_123:"},
-		{&Token{Type: Label, Arg: nil}, "label_<nil>:"},
+		{&Token{Type: Label, Arg: arg}, "label_123"},
+		{&Token{Type: Label, Arg: nil}, "label_<nil>"},
 	}
 
 	for i, test := range tests {

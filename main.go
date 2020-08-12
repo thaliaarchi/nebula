@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/andrewarchi/graph"
-	"github.com/andrewarchi/nebula/analysis"
-	"github.com/andrewarchi/nebula/codegen"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/ws"
+	"github.com/andrewarchi/nebula/ir/codegen"
+	"github.com/andrewarchi/nebula/ir/optimize"
+	"github.com/andrewarchi/nebula/syntax/ws"
 	"llvm.org/llvm/bindings/go/llvm"
 )
 
@@ -206,7 +206,7 @@ func convertSSA(p *ws.Program, noFold bool) *ir.Program {
 		}
 	}
 	if !noFold {
-		analysis.FoldConstArith(program)
+		optimize.FoldConstArith(program)
 	}
 	return program
 }
@@ -236,7 +236,7 @@ func runGraph(args []string) {
 		for i, block := range program.Blocks {
 			labels[i] = block.Name()
 		}
-		fmt.Print(graph.FormatGridLabeled(analysis.ControlFlowGraph(program), labels))
+		fmt.Print(graph.FormatGridLabeled(optimize.ControlFlowGraph(program), labels))
 	}
 }
 

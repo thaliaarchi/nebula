@@ -1,10 +1,12 @@
-package analysis // import "github.com/andrewarchi/nebula/analysis"
+// Package optimize analyzes and optimizes Nebula IR.
+//
+package optimize // import "github.com/andrewarchi/nebula/ir/optimize"
 
 import (
 	"fmt"
 	"math/big"
 
-	"github.com/andrewarchi/nebula/bigint"
+	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
 )
 
@@ -79,7 +81,7 @@ func foldBinaryLR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 	case ir.Shl:
 		s, ok := bigint.ToUint(rhs.Int)
 		if !ok {
-			panic(fmt.Sprintf("analysis: shl rhs overflow: %v", rhs.Int))
+			panic(fmt.Sprintf("optimize: shl rhs overflow: %v", rhs.Int))
 		}
 		result.Lsh(lhs.Int, s)
 	case ir.LShr:
@@ -87,7 +89,7 @@ func foldBinaryLR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 	case ir.AShr:
 		s, ok := bigint.ToUint(rhs.Int)
 		if !ok {
-			panic(fmt.Sprintf("analysis: ashr rhs overflow: %v", rhs.Int))
+			panic(fmt.Sprintf("optimize: ashr rhs overflow: %v", rhs.Int))
 		}
 		result.Rsh(lhs.Int, s)
 	case ir.And:
@@ -147,7 +149,7 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 		case ir.Mul:
 			return rhs, false
 		case ir.Div, ir.Mod:
-			panic("analysis: divide by zero")
+			panic("optimize: divide by zero")
 		}
 	case 1:
 		if rhs.Int.Cmp(bigOne) == 0 {
