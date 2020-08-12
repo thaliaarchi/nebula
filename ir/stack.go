@@ -11,7 +11,7 @@ import (
 // block are represented as negative numbers. Operations are expressed
 // in terms of push and pop.
 type Stack struct {
-	Vals        []Value // Values in the current stack frame
+	Values      []Value // Values in the current stack frame
 	Under       []Value // Values under the current stack frame
 	Pops        int     // Number of items popped below current stack frame
 	Access      int     // Number of items accessed below current stack frame
@@ -24,7 +24,7 @@ type LoadHandler func(load Inst)
 
 // Push pushes a value to the stack.
 func (s *Stack) Push(val Value) {
-	s.Vals = append(s.Vals, val)
+	s.Values = append(s.Values, val)
 }
 
 // Pop pops an item from the stack and returns the val of the removed
@@ -37,7 +37,7 @@ func (s *Stack) Pop() Value {
 
 // PopN pops n items from the stack.
 func (s *Stack) PopN(n int) {
-	l := len(s.Vals)
+	l := len(s.Values)
 	switch {
 	case n < 0:
 		panic(fmt.Sprintf("stack: pop count must be positive: %d", n))
@@ -46,10 +46,10 @@ func (s *Stack) PopN(n int) {
 	case l == 0:
 		s.Pops += n
 	case n >= l:
-		s.Vals = s.Vals[:0]
+		s.Values = s.Values[:0]
 		s.Pops += n - l
 	default:
-		s.Vals = s.Vals[:l-n]
+		s.Values = s.Values[:l-n]
 	}
 	if s.Pops > s.Access {
 		s.Access = s.Pops
@@ -58,20 +58,20 @@ func (s *Stack) PopN(n int) {
 
 // Drop pops the top item from the stack without returning a val.
 func (s *Stack) Drop() {
-	if len(s.Vals) == 0 {
+	if len(s.Values) == 0 {
 		s.Pops++
 		if s.Pops > s.Access {
 			s.Access = s.Pops
 		}
 	} else {
-		s.Vals = s.Vals[:len(s.Vals)-1]
+		s.Values = s.Values[:len(s.Values)-1]
 	}
 }
 
 // Dup pushes a copy of the top item to the stack.
 func (s *Stack) Dup() Value {
 	top := s.Top()
-	s.Vals = append(s.Vals, top)
+	s.Values = append(s.Values, top)
 	return top
 }
 
@@ -81,13 +81,13 @@ func (s *Stack) Copy(n int) Value {
 		panic(fmt.Sprintf("stack: copy index must be positive: %d", n))
 	}
 	val := s.At(n)
-	s.Vals = append(s.Vals, val)
+	s.Values = append(s.Values, val)
 	return val
 }
 
 // Swap swaps the top two items on the stack.
 func (s *Stack) Swap() {
-	s.Vals = append(s.Vals, s.Pop(), s.Pop())
+	s.Values = append(s.Values, s.Pop(), s.Pop())
 	s.simplify()
 }
 
@@ -101,7 +101,7 @@ func (s *Stack) Slide(n int) {
 	}
 	top := s.Top()
 	s.PopN(n + 1)
-	s.Vals = append(s.Vals, top)
+	s.Values = append(s.Values, top)
 	s.simplify()
 }
 
@@ -112,10 +112,10 @@ func (s *Stack) Top() Value {
 
 // At returns the val of the nth item on the stack.
 func (s *Stack) At(n int) Value {
-	if n < len(s.Vals) {
-		return s.Vals[len(s.Vals)-n-1]
+	if n < len(s.Values) {
+		return s.Values[len(s.Values)-n-1]
 	}
-	id := s.Pops + n + 1 - len(s.Vals)
+	id := s.Pops + n + 1 - len(s.Values)
 	if id > s.Access {
 		s.Access = id
 	}
@@ -136,10 +136,10 @@ func (s *Stack) At(n int) Value {
 // the lookup would cause an underflow access.
 func (s *Stack) AtExists(n int) (Value, bool) {
 	var val Value
-	if n < len(s.Vals) {
-		val = s.Vals[len(s.Vals)-n-1]
-	} else if n < len(s.Under)-len(s.Vals) {
-		val = s.Under[len(s.Under)-len(s.Vals)-n-1]
+	if n < len(s.Values) {
+		val = s.Values[len(s.Values)-n-1]
+	} else if n < len(s.Under)-len(s.Values) {
+		val = s.Under[len(s.Under)-len(s.Values)-n-1]
 	}
 	if val != nil {
 		return val, true
@@ -174,56 +174,52 @@ func (s *Stack) Concat(next *Stack) {
 		}
 	}
 	if next.Access > 0 {
-		id := s.Pops + next.Access - len(s.Vals)
+		id := s.Pops + next.Access - len(s.Values)
 		if id > s.Access {
 			s.Access = id
 		}
 	}
 	s.PopN(next.Pops)
-	s.Vals = append(s.Vals, next.Vals...)
+	s.Values = append(s.Values, next.Values...)
 }
 */
 
 // simplify cleans up low elements.
-// TODO update to new IR structure
 func (s *Stack) simplify() {
-	// var i int
-	// for i = range s.Vals {
-	// 	if s.Pops <= 0 {
-	// 		break
-	// 	}
-	// 	if val, ok := (*s.Vals[i]).(*StackVal); !ok || val.Pos != -s.Pops {
-	// 		break
-	// 	}
-	// 	s.Pops--
-	// }
-	// s.Vals = s.Vals[i:]
+	var i int
+	for i < len(s.Values) && i < s.Pops && s.Values[i] == s.Under[s.Pops-i-1] {
+		i++
+	}
+	s.Values = s.Values[i:]
+	s.Pops -= i
 }
 
 // Len returns the number of items on the stack.
 func (s *Stack) Len() int {
-	return len(s.Vals)
+	return len(s.Values)
 }
 
 func (s *Stack) String() string {
 	var b strings.Builder
 	f := NewFormatter()
-	b.WriteString("push [")
-	for i, val := range s.Vals {
+	b.WriteString("{values:[")
+	for i, val := range s.Values {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
 		b.WriteString(f.FormatValue(val))
 	}
-	fmt.Fprintf(&b, "], pop %d, access %d [", s.Pops, s.Access)
+	b.WriteString("] under:[")
 	for i, val := range s.Under {
+		if i != 0 {
+			b.WriteByte(' ')
+		}
 		if val != nil {
-			if i != 0 {
-				b.WriteByte(' ')
-			}
 			b.WriteString(f.FormatValue(val))
+		} else {
+			b.WriteString("-")
 		}
 	}
-	b.WriteByte(']')
+	fmt.Fprintf(&b, "] pops:%d access:%d}", s.Pops, s.Access)
 	return b.String()
 }

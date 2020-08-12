@@ -61,9 +61,9 @@ func (f *Formatter) FormatBlock(block *BasicBlock) string {
 	if block.Stack.Pops > 0 {
 		fmt.Fprintf(&b, "    pop %d\n", block.Stack.Pops)
 	}
-	if len(block.Stack.Vals) != 0 {
+	if len(block.Stack.Values) != 0 {
 		b.WriteString("    push [")
-		for i, val := range block.Stack.Vals {
+		for i, val := range block.Stack.Values {
 			if i != 0 {
 				b.WriteByte(' ')
 			}

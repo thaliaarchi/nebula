@@ -32,7 +32,7 @@ func TestFoldConstArith(t *testing.T) {
 	// printi    ; 18
 	// printi    ; 19
 
-	tokens := []ws.Token{
+	tokens := []*ws.Token{
 		{Type: ws.Push, Arg: big.NewInt(1), Start: 1, End: 1},     // 1
 		{Type: ws.Push, Arg: big.NewInt(3), Start: 2, End: 2},     // 2
 		{Type: ws.Push, Arg: big.NewInt(10), Start: 3, End: 3},    // 3
@@ -126,7 +126,7 @@ func TestFoldConstArith(t *testing.T) {
 	stack.Pop()         // 17
 	stack.Pop()         // 18
 
-	if len(stack.Vals) != 0 || stack.Pops != 0 || stack.Access != 0 {
+	if len(stack.Values) != 0 || stack.Pops != 0 || stack.Access != 0 {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 

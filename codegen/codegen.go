@@ -245,7 +245,7 @@ func (m *moduleBuilder) updateStack(block *ir.BasicBlock, stackLen llvm.Value) {
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(pop), false)
 		stackLen = m.b.CreateSub(stackLen, n, "stack_len_pop")
 	}
-	for i, val := range block.Stack.Vals {
+	for i, val := range block.Stack.Values {
 		v := m.lookupValue(val)
 		name := fmt.Sprintf("s%d", i)
 		n := llvm.ConstInt(llvm.Int64Type(), uint64(i), false)
@@ -253,7 +253,7 @@ func (m *moduleBuilder) updateStack(block *ir.BasicBlock, stackLen llvm.Value) {
 		gep := m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
 		m.b.CreateStore(v, gep)
 	}
-	push := len(block.Stack.Vals)
+	push := len(block.Stack.Values)
 	if pop != push {
 		if push > 0 {
 			n := llvm.ConstInt(llvm.Int64Type(), uint64(push), false)
