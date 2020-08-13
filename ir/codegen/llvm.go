@@ -4,6 +4,7 @@ package codegen // import "github.com/andrewarchi/nebula/ir/codegen"
 
 import (
 	"fmt"
+	"go/token"
 
 	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
@@ -16,10 +17,10 @@ type moduleBuilder struct {
 	module llvm.Module
 	config Config
 
-	program    *ir.Program
-	blocks     map[*ir.BasicBlock]llvm.BasicBlock
-	blockNames map[*ir.BasicBlock]llvm.Value
-	defs       map[ir.Value]llvm.Value
+	program *ir.Program
+	blocks  map[*ir.BasicBlock]llvm.BasicBlock
+	defs    map[ir.Value]llvm.Value
+	strings map[string]llvm.Value
 
 	stack        llvm.Value
 	stackLen     llvm.Value
@@ -60,14 +61,14 @@ var (
 func EmitLLVMModule(program *ir.Program, config Config) llvm.Module {
 	ctx := llvm.GlobalContext()
 	m := moduleBuilder{
-		ctx:        ctx,
-		b:          ctx.NewBuilder(),
-		module:     ctx.NewModule(program.Name),
-		config:     config,
-		program:    program,
-		blocks:     make(map[*ir.BasicBlock]llvm.BasicBlock),
-		blockNames: make(map[*ir.BasicBlock]llvm.Value),
-		defs:       make(map[ir.Value]llvm.Value),
+		ctx:     ctx,
+		b:       ctx.NewBuilder(),
+		module:  ctx.NewModule(program.Name),
+		config:  config,
+		program: program,
+		blocks:  make(map[*ir.BasicBlock]llvm.BasicBlock),
+		defs:    make(map[ir.Value]llvm.Value),
+		strings: make(map[string]llvm.Value),
 	}
 	m.declareFuncs()
 	m.declareGlobals()
@@ -121,10 +122,6 @@ func (m *moduleBuilder) declareGlobals() {
 	m.callStack.SetInitializer(llvm.ConstNull(callStackTyp))
 	m.callStackLen.SetInitializer(zero)
 	m.heap.SetInitializer(llvm.ConstNull(heapTyp))
-
-	for _, block := range m.program.Blocks {
-		m.blockNames[block] = m.constString(block.Name())
-	}
 }
 
 func (m *moduleBuilder) emitBlocks() {
@@ -319,17 +316,24 @@ func (m *moduleBuilder) heapAddr(val *ir.ValueUse) llvm.Value {
 }
 
 func (m *moduleBuilder) constString(str string) llvm.Value {
-	global := llvm.AddGlobal(m.module, llvm.ArrayType(llvm.Int8Type(), len(str)+1), "str_"+str)
-	global.SetInitializer(m.ctx.ConstString(str, true))
-	global.SetLinkage(llvm.PrivateLinkage)
-	return global
+	if val, ok := m.strings[str]; ok {
+		return val
+	}
+	val := llvm.AddGlobal(m.module, llvm.ArrayType(llvm.Int8Type(), len(str)+1), "str_"+str)
+	val.SetInitializer(m.ctx.ConstString(str, true))
+	val.SetLinkage(llvm.PrivateLinkage)
+	m.strings[str] = val
+	return val
 }
 
 func (m *moduleBuilder) blockName(block *ir.BasicBlock) llvm.Value {
-	return m.b.CreateInBoundsGEP(m.blockNames[block], []llvm.Value{zero, zero}, "name")
+	return m.b.CreateInBoundsGEP(m.constString(block.Name()), []llvm.Value{zero, zero}, "name")
 }
 
 func (m *moduleBuilder) instPos(inst ir.Inst) llvm.Value {
-	pos := m.program.Position(inst.Pos()).String()
-	return m.b.CreateInBoundsGEP(m.constString(pos), []llvm.Value{zero, zero}, "op")
+	str := "<unknown>"
+	if pos := inst.Pos(); pos != token.NoPos {
+		str = m.program.Position(inst.Pos()).String()
+	}
+	return m.b.CreateInBoundsGEP(m.constString(str), []llvm.Value{zero, zero}, "op")
 }
