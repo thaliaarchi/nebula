@@ -1,13 +1,17 @@
-// tetrisrun is a runner for Peter De Wachter's Whitespace Tetris game.
+// tetrisrun is a driver for Peter De Wachter's Whitespace Tetris game.
 // It introduces gravity and provides several key mappings.
 //
 // Download tetris.ws from the Whitespace mailing list archives:
 // https://web.archive.org/web/20141011193149/http://compsoc.dur.ac.uk/archives/whitespace/2008-January/000067.html
 //
-// Running:
+// For better results, disable input processing and turn off echo back
+// with stty, then run tetris.ws with tetrisrun piped into it.
+//
+// For example:
 //
 //     ./compile tetris.ws build/tetris
-//     stty raw -echo && go run programs/tetrisrun.go | build/tetris
+//     go build -o build/tetrisrun programs/tetrisrun.go
+//     stty raw -echo && build/tetrisrun | build/tetris
 //
 // Controls:
 //
