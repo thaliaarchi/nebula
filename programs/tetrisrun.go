@@ -1,7 +1,5 @@
 // tetrisrun is a runner for Peter De Wachter's Whitespace Tetris game.
-//
-// It moves blocks downwards automatically on the interval specified
-// with the -speed flag and maps arrow keys to i/j/k/ls.
+// It introduces gravity and provides several key mappings.
 //
 // Download tetris.ws from the Whitespace mailing list archives:
 // https://web.archive.org/web/20141011193149/http://compsoc.dur.ac.uk/archives/whitespace/2008-January/000067.html
@@ -9,20 +7,20 @@
 // Running:
 //
 //     ./compile tetris.ws build/tetris
-//     stty raw -echo && go run programs/tetrisrun.go -speed 750ms | build/tetris
+//     stty raw -echo && go run programs/tetrisrun.go | build/tetris
 //
 // Controls:
 //
-//     j, left arrow - move left
-//     k, down arrow - drop
-//     l, right arrow - move right
-//     i, up arrow - rotate
+//     i / w / up arrow - rotate
+//     j / a / left arrow - move left
+//     k / s / down arrow - drop
+//     l / d / right arrow - move right
+//     ESC / q - quit
 //
 package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -32,90 +30,127 @@ import (
 )
 
 var stdin = bufio.NewReader(os.Stdin)
+var done chan bool
+
+const (
+	escTimeout      = 100 * time.Millisecond
+	initialDropRate = 1000 * time.Millisecond
+	finalDropRate   = 300 * time.Microsecond
+	dropRateDelta   = 1 * time.Millisecond
+)
 
 func main() {
-	speed := flag.Duration("speed", 750*time.Millisecond, "drop rate")
-	flag.Parse()
-
-	ticker := time.NewTicker(*speed)
 	signal.Ignore(syscall.SIGPIPE)
-	done := make(chan bool)
+	done = make(chan bool)
+	dropRate := initialDropRate
 
+	// Forward key presses to stdout
 	go func() {
 		for {
 			select {
 			default:
 				key, err := readKey()
-				try(err)
-				_, err = os.Stdout.Write([]byte{key})
-				if isSIGPIPE(err) || err == io.EOF {
+				if err != nil {
+					if err != io.EOF {
+						fmt.Fprintln(os.Stderr, err)
+					}
+					writeByte('\x1b') // ESC quits the game
 					done <- true
 					return
 				}
-				try(err)
+				if !writeByte(key) {
+					return
+				}
 			case <-done:
 				return
 			}
 		}
 	}()
 
-Loop:
+	// Move block downwards
+Drop:
 	for {
 		select {
-		case <-ticker.C:
-			_, err := os.Stdout.WriteString("k")
-			if isSIGPIPE(err) {
-				done <- true
-				break Loop
+		case <-time.After(dropRate):
+			if !writeByte('k') {
+				break Drop
 			}
-			try(err)
+			if dropRate > finalDropRate {
+				dropRate -= dropRateDelta
+			}
 		case <-done:
-			break Loop
+			break Drop
 		}
 	}
-
-	ticker.Stop()
 }
 
-// readKey translates arrow keys to i, j, j, and l and filters out
-// other keys.
+func writeByte(b byte) bool {
+	_, err := os.Stdout.Write([]byte{b})
+	if err != nil {
+		// Suppress SIGPIPE
+		if pe, ok := err.(*os.PathError); !ok || pe.Err != syscall.EPIPE {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		done <- true
+		return false
+	}
+	return true
+}
+
+// readKey reads a key press and handles key aliases. Arrow keys and
+// wasd are translated to ijjl; q and various control keys are
+// translated to quit.
 func readKey() (byte, error) {
-	var prev byte
-	escape := false
 	for {
 		b, err := stdin.ReadByte()
 		if err != nil {
 			return 0, err
 		}
-		switch {
-		case 'i' <= b && b <= 'l':
-			return b, nil
-		case prev == '\x1b' && b == '[': // ESC [
-			escape = true
-			prev = b
-		case b == 'A' && escape: // up arrow
+		switch b {
+		case 'i', 'w': // up
 			return 'i', nil
-		case b == 'B' && escape: // down arrow
-			return 'k', nil
-		case b == 'C' && escape: // right arrow
-			return 'l', nil
-		case b == 'D' && escape: // left arrow
+		case 'j', 'a': // left
 			return 'j', nil
-		default:
-			escape = false
-			prev = b
+		case 'k', 's': // down
+			return 'k', nil
+		case 'l', 'd': // right
+			return 'l', nil
+		case 'q', '\x00', '\x03', '\x04', '\x1a': // q, ^@, ^C, ^D, ^Z
+			return 0, io.EOF
+		case '\x1b': // ESC
+			// Translate the ANSI escape sequences for arrow keys into ijkl
+			// and quit on ESC key press. If a bracket is not read within
+			// escTimeout, it is treated as plain ESC.
+			readBracket := make(chan bool, 1)
+			go func() {
+				// Try to read the next character
+				b, err := stdin.ReadByte()
+				readBracket <- err == nil && b == '['
+			}()
+			select {
+			// Handle ANSI arrow key escape sequences
+			case isBracket := <-readBracket:
+				if !isBracket {
+					return 0, io.EOF
+				}
+				b, err := stdin.ReadByte()
+				if err != nil {
+					return 0, err
+				}
+				switch b {
+				case 'A': // up
+					return 'i', nil
+				case 'B': // down
+					return 'k', nil
+				case 'C': // right
+					return 'l', nil
+				case 'D': // left
+					return 'j', nil
+				}
+			// Timeout for lone ESC
+			case <-time.After(escTimeout):
+				return 0, io.EOF
+			}
 		}
-	}
-}
-
-func isSIGPIPE(err error) bool {
-	patherr, ok := err.(*os.PathError)
-	return ok && patherr.Err == syscall.EPIPE
-}
-
-func try(err error) {
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
 	}
 }
