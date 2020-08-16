@@ -4,8 +4,8 @@
 // Download tetris.ws from the Whitespace mailing list archives:
 // https://web.archive.org/web/20141011193149/http://compsoc.dur.ac.uk/archives/whitespace/2008-January/000067.html
 //
-// For better results, disable input processing and turn off echo back
-// with stty, then run tetris.ws with tetrisrun piped into it.
+// For better results, disable input processing and echo back using
+// stty, then run tetris.ws with tetrisrun piped into it.
 //
 // For example:
 //

@@ -39,13 +39,13 @@ type stackTest struct {
 func TestPush(t *testing.T) {
 	for i, test := range []stackTest{
 		{
-			Stack: &Stack{nil, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0}, nil, 0, 0, handleLoad},
+			Stack: &Stack{nil, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0}, nil, 0, 0, handleAccess, handleLoad},
 			Value: v0,
 		},
 		{
-			Stack: &Stack{[]Value{v0, v1}, []Value{load1}, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0, v1, v3}, []Value{load1}, 0, 0, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, []Value{load1}, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0, v1, v3}, []Value{load1}, 0, 0, handleAccess, handleLoad},
 			Value: v3,
 		},
 	} {
@@ -57,22 +57,22 @@ func TestPush(t *testing.T) {
 func TestPop(t *testing.T) {
 	for i, test := range []stackTest{
 		{
-			Stack: &Stack{nil, nil, 0, 0, handleLoad},
-			Want:  &Stack{nil, []Value{load1}, 1, 1, handleLoad},
+			Stack: &Stack{nil, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{nil, []Value{load1}, 1, 1, handleAccess, handleLoad},
 			Value: load1,
 		},
 		{
-			Stack: &Stack{nil, []Value{nil, nil, load3}, 3, 7, handleLoad},
-			Want:  &Stack{nil, []Value{nil, nil, load3, load4}, 4, 7, handleLoad},
+			Stack: &Stack{nil, []Value{nil, nil, load3}, 3, 7, handleAccess, handleLoad},
+			Want:  &Stack{nil, []Value{nil, nil, load3, load4}, 4, 7, handleAccess, handleLoad},
 			Value: load4,
 		},
 		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0}, nil, 0, 0, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0}, nil, 0, 0, handleAccess, handleLoad},
 			Value: v1,
 		},
 	} {
-		checkValue(t, i, test.Stack.Pop(), test.Value)
+		checkValue(t, i, test.Stack.Pop(token.NoPos), test.Value)
 		checkStack(t, i, test.Stack, test.Want)
 	}
 }
@@ -80,79 +80,79 @@ func TestPop(t *testing.T) {
 func TestDropN(t *testing.T) {
 	for i, test := range []stackTest{
 		{
-			Stack: &Stack{nil, nil, 0, 0, handleLoad},
-			Want:  &Stack{nil, nil, 1, 1, handleLoad},
+			Stack: &Stack{nil, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{nil, nil, 1, 1, handleAccess, handleLoad},
 			N:     1,
 		},
 		{
-			Stack: &Stack{nil, nil, 3, 7, handleLoad},
-			Want:  &Stack{nil, nil, 5, 7, handleLoad},
+			Stack: &Stack{nil, nil, 3, 7, handleAccess, handleLoad},
+			Want:  &Stack{nil, nil, 5, 7, handleAccess, handleLoad},
 			N:     2,
 		},
 		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0}, nil, 0, 0, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0}, nil, 0, 0, handleAccess, handleLoad},
 			N:     1,
 		},
 		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{}, nil, 2, 2, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{}, nil, 2, 2, handleAccess, handleLoad},
 			N:     4,
 		},
 		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
 			N:     0,
 		},
 	} {
-		test.Stack.DropN(test.N)
+		test.Stack.DropN(test.N, token.NoPos)
 		checkStack(t, i, test.Stack, test.Want)
 	}
 
 	checkPanic(t, "stack: drop count must be positive: -1", func() {
-		new(Stack).DropN(-1)
+		new(Stack).DropN(-1, token.NoPos)
 	})
 }
 
 func TestSwap(t *testing.T) {
 	for i, test := range []stackTest{
 		{
-			Stack: &Stack{nil, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, handleLoad},
+			Stack: &Stack{nil, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, handleAccess, handleLoad},
 		},
 		{
-			Stack: &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, handleLoad},
-			Want:  &Stack{[]Value{}, []Value{load1, load2}, 0, 2, handleLoad},
-		},
-
-		{
-			Stack: &Stack{nil, nil, 2, 7, handleLoad},
-			Want:  &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, handleLoad},
-		},
-		{
-			Stack: &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, handleLoad},
-			Want:  &Stack{[]Value{}, []Value{nil, nil, load3, load4}, 2, 7, handleLoad},
+			Stack: &Stack{[]Value{load1, load2}, []Value{load1, load2}, 2, 2, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{}, []Value{load1, load2}, 0, 2, handleAccess, handleLoad},
 		},
 
 		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v1, v0}, nil, 0, 0, handleLoad},
+			Stack: &Stack{nil, nil, 2, 7, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, handleAccess, handleLoad},
 		},
 		{
-			Stack: &Stack{[]Value{v1, v0}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
+			Stack: &Stack{[]Value{load3, load4}, []Value{nil, nil, load3, load4}, 4, 7, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{}, []Value{nil, nil, load3, load4}, 2, 7, handleAccess, handleLoad},
 		},
 
 		{
-			Stack: &Stack{[]Value{v2}, nil, 1, 1, handleLoad},
-			Want:  &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v1, v0}, nil, 0, 0, handleAccess, handleLoad},
 		},
 		{
-			Stack: &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, handleLoad},
-			Want:  &Stack{[]Value{v2}, []Value{nil, load2}, 1, 2, handleLoad},
+			Stack: &Stack{[]Value{v1, v0}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+		},
+
+		{
+			Stack: &Stack{[]Value{v2}, nil, 1, 1, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, handleAccess, handleLoad},
+		},
+		{
+			Stack: &Stack{[]Value{v2, load2}, []Value{nil, load2}, 2, 2, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v2}, []Value{nil, load2}, 1, 2, handleAccess, handleLoad},
 		},
 	} {
-		test.Stack.Swap()
+		test.Stack.Swap(token.NoPos)
 		checkStack(t, i, test.Stack, test.Want)
 	}
 }
@@ -160,20 +160,20 @@ func TestSwap(t *testing.T) {
 func TestSimplify(t *testing.T) {
 	for i, test := range []stackTest{
 		{
-			Stack: &Stack{nil, nil, 0, 0, handleLoad},
-			Want:  &Stack{nil, nil, 0, 0, handleLoad},
+			Stack: &Stack{nil, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{nil, nil, 0, 0, handleAccess, handleLoad},
 		},
 		{
-			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
-			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, handleLoad},
+			Stack: &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0, v1}, nil, 0, 0, handleAccess, handleLoad},
 		},
 		{
-			Stack: &Stack{[]Value{load1, load2}, []Value{load1, load2}, 1, 2, handleLoad},
-			Want:  &Stack{[]Value{load2}, []Value{load1, load2}, 0, 2, handleLoad},
+			Stack: &Stack{[]Value{load1, load2}, []Value{load1, load2}, 1, 2, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{load2}, []Value{load1, load2}, 0, 2, handleAccess, handleLoad},
 		},
 		{
-			Stack: &Stack{[]Value{load3, load2, v0}, []Value{nil, load2, load3}, 3, 3, handleLoad},
-			Want:  &Stack{[]Value{v0}, []Value{nil, load2, load3}, 1, 3, handleLoad},
+			Stack: &Stack{[]Value{load3, load2, v0}, []Value{nil, load2, load3}, 3, 3, handleAccess, handleLoad},
+			Want:  &Stack{[]Value{v0}, []Value{nil, load2, load3}, 1, 3, handleAccess, handleLoad},
 		},
 	} {
 		test.Stack.simplify()
@@ -181,28 +181,32 @@ func TestSimplify(t *testing.T) {
 	}
 }
 
-func handleLoad(pos int) Value {
-	if pos < 1 || pos > 4 {
-		panic(fmt.Sprintf("handleLoad: pos out of range: %d", pos))
+func handleAccess(n int, pos token.Pos) {
+	panic("TODO")
+}
+
+func handleLoad(n int, pos token.Pos) Value {
+	if n < 1 || n > 4 {
+		panic(fmt.Sprintf("handleLoad: n out of range: %d", n))
 	}
-	return []Value{load1, load2, load3, load4}[pos-1]
+	return []Value{load1, load2, load3, load4}[n-1]
 }
 
 func equals(a, b *Stack) bool {
-	if a.Pops != b.Pops || a.Access != b.Access ||
-		len(a.Values) != len(b.Values) || len(a.Under) != len(b.Under) ||
-		(a.Values == nil) != (b.Values == nil) ||
-		(a.Under == nil) != (b.Under == nil) ||
+	if a.pops != b.pops || a.accesses != b.accesses ||
+		len(a.values) != len(b.values) || len(a.under) != len(b.under) ||
+		(a.values == nil) != (b.values == nil) ||
+		(a.under == nil) != (b.under == nil) ||
 		(a.HandleLoad == nil) != (b.HandleLoad == nil) {
 		return false
 	}
-	for i := range a.Values {
-		if a.Values[i] != b.Values[i] {
+	for i := range a.values {
+		if a.values[i] != b.values[i] {
 			return false
 		}
 	}
-	for i := range a.Under {
-		if a.Under[i] != b.Under[i] {
+	for i := range a.under {
+		if a.under[i] != b.under[i] {
 			return false
 		}
 	}

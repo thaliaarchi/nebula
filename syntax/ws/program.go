@@ -1,7 +1,9 @@
 package ws
 
 import (
+	"bytes"
 	"go/token"
+	"regexp"
 	"strings"
 
 	"github.com/andrewarchi/nebula/internal/bigint"
@@ -24,11 +26,11 @@ func (p *Program) Dump(indent string) string {
 	var b strings.Builder
 	for _, tok := range p.Tokens {
 		if tok.Type == Label {
-			b.WriteString(tok.Format(p.LabelNames))
+			b.WriteString(tok.String())
 			b.WriteByte(':')
 		} else {
 			b.WriteString(indent)
-			b.WriteString(tok.Format(p.LabelNames))
+			b.WriteString(tok.String())
 		}
 		b.WriteByte('\n')
 	}
@@ -44,7 +46,7 @@ func (p *Program) DumpPos() string {
 
 	var b strings.Builder
 	for _, tok := range p.Tokens {
-		t := tok.Format(p.LabelNames)
+		t := tok.String()
 		l := len(t)
 		if tok.Type == Label {
 			b.WriteString(t)
@@ -63,6 +65,38 @@ func (p *Program) DumpPos() string {
 		pos.Filename = ""
 		b.WriteString(pos.String())
 		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+var spacePattern = regexp.MustCompile("[ \t\n]+")
+
+func (p *Program) DumpCommented(src []byte, indent string) string {
+	var b strings.Builder
+	start := 0
+	for i, tok := range p.Tokens {
+		end := p.File.Offset(tok.End)
+		if i == len(p.Tokens)-1 {
+			end = p.File.Size()
+		}
+		comment := bytes.TrimSpace(spacePattern.ReplaceAll(src[start:end], []byte{' '}))
+		if len(comment) != 0 {
+			if tok.Type != Label {
+				b.WriteString(indent)
+			}
+			b.WriteString("; ")
+			b.Write(comment)
+			b.WriteByte('\n')
+		}
+		if tok.Type == Label {
+			b.WriteString(tok.String())
+			b.WriteByte(':')
+		} else {
+			b.WriteString(indent)
+			b.WriteString(tok.String())
+		}
+		b.WriteByte('\n')
+		start = end
 	}
 	return b.String()
 }

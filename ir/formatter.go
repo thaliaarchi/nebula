@@ -112,14 +112,14 @@ func (f *Formatter) FormatValue(val Value) string {
 func (f *Formatter) FormatStack(s *Stack) string {
 	var b strings.Builder
 	b.WriteString("{values:[")
-	for i, val := range s.Values {
+	for i, val := range s.values {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
 		b.WriteString(f.FormatValue(val))
 	}
 	b.WriteString("] under:[")
-	for i, val := range s.Under {
+	for i, val := range s.under {
 		if i != 0 {
 			b.WriteByte(' ')
 		}
@@ -129,7 +129,7 @@ func (f *Formatter) FormatStack(s *Stack) string {
 			b.WriteString("-")
 		}
 	}
-	fmt.Fprintf(&b, "] pops:%d access:%d}", s.Pops, s.Access)
+	fmt.Fprintf(&b, "] pops:%d access:%d}", s.Pops(), s.Accesses())
 	return b.String()
 }
 
@@ -157,7 +157,7 @@ func writeStackPos(b *strings.Builder, inst Inst) {
 		pos = s.StackPos
 	case *StoreStackStmt:
 		pos = s.StackPos
-	case *CheckStackStmt:
+	case *AccessStackStmt:
 		pos = s.StackSize
 	case *OffsetStackStmt:
 		pos = s.Offset

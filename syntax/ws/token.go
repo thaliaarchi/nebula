@@ -7,44 +7,36 @@ import (
 	"go/token"
 	"math/big"
 	"strings"
-
-	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
 // Token is a lexical token in the Whitespace language.
 type Token struct {
-	Type  Type
-	Arg   *big.Int
-	Start token.Pos
-	End   token.Pos
+	Type      Type
+	Arg       *big.Int
+	ArgString string    // Label string, if exists
+	Start     token.Pos // Start position in source
+	End       token.Pos // End position in source (exclusive)
 }
 
-// Format formats a token as Whitespace assembly.
-func (tok *Token) Format(labelNames *bigint.Map /* map[*big.Int]string */) string {
+func (tok *Token) String() string {
 	switch {
 	case tok.Type == Label:
-		return tok.formatArg(labelNames)
+		return tok.formatArg()
 	case tok.Type.HasArg():
-		return fmt.Sprintf("%s %s", tok.Type, tok.formatArg(labelNames))
+		return fmt.Sprintf("%s %s", tok.Type, tok.formatArg())
 	default:
 		return tok.Type.String()
 	}
 }
 
-func (tok *Token) formatArg(labelNames *bigint.Map) string {
+func (tok *Token) formatArg() string {
 	if !tok.Type.IsFlow() {
 		return tok.Arg.String()
 	}
-	if labelNames != nil {
-		if name, ok := labelNames.Get(tok.Arg); ok {
-			return name.(string)
-		}
+	if tok.ArgString != "" {
+		return tok.ArgString
 	}
 	return fmt.Sprintf("label_%s", tok.Arg)
-}
-
-func (tok *Token) String() string {
-	return tok.Format(nil)
 }
 
 // StringWS formats a token as Whitespace.

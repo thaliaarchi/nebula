@@ -88,45 +88,45 @@ func TestFoldConstArith(t *testing.T) {
 		flushAdd1 = ir.NewFlushStmt(19)
 	)
 
-	constVals := bigint.NewMap()
-	constVals.Put(big1, push1)
-	constVals.Put(big3, push3)
-	constVals.Put(big10, push10)
-	constVals.Put(big2, push2)
-	constVals.Put(bigC, pushC)
-	constVals.Put(bign32, pushn32)
-	constVals.Put(biga, pusha)
+	constValues := bigint.NewMap()
+	constValues.Put(big1, push1)
+	constValues.Put(big3, push3)
+	constValues.Put(big10, push10)
+	constValues.Put(big2, push2)
+	constValues.Put(bigC, pushC)
+	constValues.Put(bign32, pushn32)
+	constValues.Put(biga, pusha)
 
 	var stack ir.Stack
 	stack.Push(push1)   // 0
 	stack.Push(push3)   // 1
 	stack.Push(push10)  // 2
 	stack.Push(push2)   // 3
-	stack.Pop()         // 4
-	stack.Pop()         // 4
+	stack.Pop(4)        // 4
+	stack.Pop(4)        // 4
 	stack.Push(mul)     // 4
-	stack.Pop()         // 5
-	stack.Pop()         // 5
+	stack.Pop(5)        // 5
+	stack.Pop(5)        // 5
 	stack.Push(add1)    // 5
-	stack.Swap()        // 6
+	stack.Swap(6)       // 6
 	stack.Push(pushC)   // 7
-	stack.Dup()         // 8
-	stack.Copy(2)       // 9
-	stack.Pop()         // 10
-	stack.Pop()         // 10
+	stack.Dup(8)        // 8
+	stack.Copy(2, 9)    // 9
+	stack.Pop(10)       // 10
+	stack.Pop(10)       // 10
 	stack.Push(sub)     // 10
 	stack.Push(pushn32) // 11
 	stack.Push(pusha)   // 12
-	stack.Pop()         // 13
-	stack.Pop()         // 13
+	stack.Pop(13)       // 13
+	stack.Pop(13)       // 13
 	stack.Push(add2)    // 13
-	stack.Pop()         // 14
-	stack.Pop()         // 15
-	stack.Pop()         // 16
-	stack.Pop()         // 17
-	stack.Pop()         // 18
+	stack.Pop(14)       // 14
+	stack.Pop(15)       // 15
+	stack.Pop(16)       // 16
+	stack.Pop(17)       // 17
+	stack.Pop(18)       // 18
 
-	if len(stack.Values) != 0 || stack.Pops != 0 || stack.Access != 0 {
+	if stack.Len() != 0 || stack.Pops() != 0 || stack.Accesses() != 0 {
 		t.Errorf("stack should be empty and not underflow, got %v", stack)
 	}
 
@@ -155,12 +155,12 @@ func TestFoldConstArith(t *testing.T) {
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockStart},
 		Entry:       blockStart,
-		ConstVals:   constVals,
+		ConstValues: constValues,
 		NextBlockID: 1,
 		File:        file,
 	}
 
-	program, err := p.ConvertSSA()
+	program, err := p.LowerIR()
 	if err != nil {
 		t.Errorf("unexpected parse error: %v", err)
 	}
@@ -180,10 +180,10 @@ func TestFoldConstArith(t *testing.T) {
 		foldA  = ir.NewIntConst(bigA, 14)
 	)
 
-	constVals.Put(big.NewInt(20), fold20)
-	constVals.Put(big.NewInt(23), fold23)
-	constVals.Put(big.NewInt('A'), foldA)
-	constVals.Put(big.NewInt('B'), foldB)
+	constValues.Put(big.NewInt(20), fold20)
+	constValues.Put(big.NewInt(23), fold23)
+	constValues.Put(big.NewInt('A'), foldA)
+	constValues.Put(big.NewInt('B'), foldB)
 
 	ir.ReplaceUses(mul, fold20)
 	ir.ClearOperands(mul)
@@ -215,7 +215,7 @@ func TestFoldConstArith(t *testing.T) {
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockConst},
 		Entry:       blockConst,
-		ConstVals:   constVals,
+		ConstValues: constValues,
 		NextBlockID: 1,
 		File:        file,
 	}
@@ -244,7 +244,7 @@ func TestFoldConstArith(t *testing.T) {
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockStr},
 		Entry:       blockStr,
-		ConstVals:   constVals,
+		ConstVals:   constValues,
 		NextBlockID: 1,
 	}
 

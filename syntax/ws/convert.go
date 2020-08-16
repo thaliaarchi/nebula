@@ -3,29 +3,75 @@ package ws
 import (
 	"fmt"
 	"go/token"
-	"math/big"
 
 	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
 )
 
-// ConvertSSA converts tokens into Nebula IR in SSA form.
-func (p *Program) ConvertSSA() (*ir.Program, []error) {
-	if needsImplicitEnd(p.Tokens) {
-		p.Tokens = append(p.Tokens, &Token{Type: End})
+// irBuilder converts a Whitespace AST to SSA form.
+type irBuilder struct {
+	*ir.Program
+	tokens      []*Token
+	tokenBlocks [][]*Token
+	block       *ir.BasicBlock
+	stack       *ir.Stack
+	labels      *bigint.Map // map[*big.Int]int
+	labelUses   *bigint.Map // map[*big.Int][]int
+	labelBlocks *bigint.Map // map[*big.Int]*ir.BasicBlock
+	errs        []error
+}
+
+// TokenError is an error emitted while lowering to SSA form.
+type TokenError struct {
+	Token *Token
+	Pos   token.Position
+	Err   string
+}
+
+func (err *TokenError) Error() string {
+	return fmt.Sprintf("%s: %v at %v", err.Err, err.Token, err.Pos)
+}
+
+func (ib *irBuilder) err(err string, tok *Token) {
+	ib.errs = append(ib.errs, &TokenError{tok, ib.position(tok.Start), err})
+}
+
+// LowerIR lowers a Whitespace AST to Nebula IR in SSA form.
+func (p *Program) LowerIR() (*ir.Program, []error) {
+	tokens := p.Tokens
+	if needsImplicitEnd(tokens) {
+		tokens = append(tokens, &Token{Type: End})
 	}
-	labels, labelUses, errs := collectLabels(p)
+	ib := &irBuilder{
+		Program: &ir.Program{
+			Name:        p.File.Name(),
+			ConstValues: bigint.NewMap(),
+			File:        p.File,
+		},
+		tokens:      tokens,
+		labels:      bigint.NewMap(),
+		labelUses:   bigint.NewMap(),
+		labelBlocks: bigint.NewMap(),
+	}
+	ib.stack = &ir.Stack{
+		HandleAccess: ib.handleAccess,
+		HandleLoad:   ib.handleLoad,
+	}
+	errs := ib.collectLabels()
 	if len(errs) != 0 {
 		return nil, errs
 	}
-	irp, branches, blockLabels, err := p.createBlocks(labels, labelUses)
+	ib.splitTokens()
+	for i, tokens := range ib.tokenBlocks {
+		ib.block = ib.Blocks[i]
+		ib.convertBlock(tokens)
+	}
+	ib.nameBlocks()
+	err := ib.Program.ConnectEntries()
 	if err != nil {
-		return nil, []error{err}
+		errs = append(errs, err)
 	}
-	if err := irp.ConnectEdges(branches, blockLabels); err != nil {
-		return irp, []error{err}
-	}
-	return irp, nil
+	return ib.Program, errs
 }
 
 func needsImplicitEnd(tokens []*Token) bool {
@@ -39,211 +85,237 @@ func needsImplicitEnd(tokens []*Token) bool {
 	return true
 }
 
-func collectLabels(p *Program) (*bigint.Map, *bigint.Map, []error) {
-	labels := bigint.NewMap()    // map[*big.Int]int
-	labelUses := bigint.NewMap() // map[*big.Int][]int
+// collectLabels collects all labels from the tokens into maps and
+// enforces that all labels are unique and callees exist.
+func (ib *irBuilder) collectLabels() []error {
 	var errs []error
-
-	for i, tok := range p.Tokens {
+	for i, tok := range ib.tokens {
 		switch tok.Type {
 		case Label:
-			if labels.Put(tok.Arg, i) {
-				errs = append(errs, p.tokenError("Label is not unique", tok))
+			if ib.labels.Put(tok.Arg, i) {
+				ib.err("Label is not unique", tok)
 			}
 		case Call, Jmp, Jz, Jn:
-			if l, ok := labelUses.Get(tok.Arg); ok {
-				labelUses.Put(tok.Arg, append(l.([]int), i))
+			if l, ok := ib.labelUses.Get(tok.Arg); ok {
+				ib.labelUses.Put(tok.Arg, append(l.([]int), i))
 			} else {
-				labelUses.Put(tok.Arg, []int{i})
+				ib.labelUses.Put(tok.Arg, []int{i})
 			}
 		}
 	}
 
-	for _, use := range labelUses.Pairs() {
-		if _, ok := labels.Get(use.K); !ok {
+	for _, use := range ib.labelUses.Pairs() {
+		if _, ok := ib.labels.Get(use.K); !ok {
 			for _, branch := range use.V.([]int) {
-				errs = append(errs, p.tokenError("Label does not exist", p.Tokens[branch]))
+				ib.err("Label does not exist", ib.tokens[branch])
 			}
 		}
 	}
-	return labels, labelUses, errs
+	return errs
 }
 
-func (p *Program) createBlocks(labels, labelUses *bigint.Map) (*ir.Program, []*big.Int, *bigint.Map, error) {
-	irp := &ir.Program{
-		Name:      p.File.Name(),
-		ConstVals: bigint.NewMap(),
-		File:      p.File,
+// splitTokens splits the tokens into sequences of non-branching tokens.
+func (ib *irBuilder) splitTokens() {
+	start := true
+	lo := 0
+	for i := 0; i < len(ib.tokens); i++ {
+		tok := ib.tokens[i]
+		if !tok.Type.IsFlow() {
+			start = false
+			continue
+		}
+		if tok.Type == Label {
+			if start || !ib.labelUses.Has(tok.Arg) {
+				continue
+			}
+			i--
+		}
+		ib.tokenBlocks = append(ib.tokenBlocks, ib.tokens[lo:i+1])
+		lo = i + 1
+		start = true
 	}
-	var branches []*big.Int
-	blockLabels := bigint.NewMap() // map[*big.Int]int
-	prevLabel := ""
-	labelIndex := 0
+	if lo < len(ib.tokens) {
+		ib.tokenBlocks = append(ib.tokenBlocks, ib.tokens[lo:])
+	}
 
-	for i := 0; i < len(p.Tokens); i++ {
-		block := &ir.BasicBlock{ID: len(irp.Blocks)}
-		stack := &ir.Stack{HandleLoad: block.AppendStackLoad}
-		if len(irp.Blocks) > 0 {
-			prev := irp.Blocks[len(irp.Blocks)-1]
-			prev.Next = block
-			block.Prev = prev
+	ib.Blocks = make([]*ir.BasicBlock, len(ib.tokenBlocks))
+	for i := range ib.Blocks {
+		block := &ir.BasicBlock{ID: i}
+		ib.Blocks[i] = block
+		if i > 0 {
+			block.Prev = ib.Blocks[i-1]
+			ib.Blocks[i-1].Next = block
 		}
-
-		if p.Tokens[i].Type != Label && i != 0 && prevLabel != "" {
-			labelIndex++
-			block.Labels = append(block.Labels, ir.Label{ID: nil, Name: fmt.Sprintf("%s%d", prevLabel, labelIndex)})
-		}
-		for p.Tokens[i].Type == Label {
-			label := p.Tokens[i].Arg
-			blockLabels.Put(label, len(irp.Blocks)) // TODO remove need for this
-			var name string
-			if p.LabelNames != nil {
-				if n, ok := p.LabelNames.Get(label); ok {
-					name = n.(string)
-				}
-			}
-			prevLabel = name
-			labelIndex = 0
-			block.Labels = append(block.Labels, ir.Label{ID: label, Name: name})
-			i++
-		}
-
-		checkStack := ir.NewCheckStackStmt(-1, token.NoPos) // TODO source position
-		block.AppendNode(checkStack)
-
-		var branch *big.Int
-		for ; i < len(p.Tokens); i++ {
-			err := appendInstruction(p, irp, block, stack, p.Tokens[i], labelUses)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			if block.Terminator != nil {
-				branch = p.Tokens[i].Arg
-				if p.Tokens[i].Type == Label {
-					i--
-				}
+		for _, tok := range ib.tokenBlocks[i] {
+			if tok.Type == Label {
+				ib.labelBlocks.Put(tok.Arg, block)
+			} else {
 				break
 			}
 		}
-
-		if stack.Access > 0 {
-			checkStack.StackSize = stack.Access
-		} else {
-			block.Nodes = block.Nodes[1:]
-		}
-
-		if offset := len(stack.Values) - stack.Pops; offset != 0 {
-			block.AppendNode(ir.NewOffsetStackStmt(offset, token.NoPos)) // TODO source position
-		}
-		for i, val := range stack.Values {
-			block.AppendNode(ir.NewStoreStackStmt(len(stack.Values)-i, val, token.NoPos)) // TODO source position
-		}
-
-		irp.Blocks = append(irp.Blocks, block)
-		branches = append(branches, branch)
 	}
-	irp.Entry = irp.Blocks[0]
-	irp.NextBlockID = len(irp.Blocks)
-	return irp, branches, blockLabels, nil
+	ib.Entry = ib.Blocks[0]
+	ib.NextBlockID = len(ib.Blocks)
 }
 
-func appendInstruction(p *Program, irp *ir.Program, block *ir.BasicBlock, stack *ir.Stack, tok *Token, labelUses *bigint.Map) error {
-	switch tok.Type {
-	case Push:
-		stack.Push(irp.LookupConst(tok.Arg, tok.Start))
-	case Dup:
-		stack.Dup()
-	case Copy:
-		n, ok := bigint.ToInt(tok.Arg)
-		if !ok {
-			return p.tokenError("Argument overflows int", tok)
-		} else if n < 0 {
-			return p.tokenError("Argument is negative", tok)
+func (ib *irBuilder) convertBlock(tokens []*Token) {
+	ib.stack.Clear()
+	start := true
+	for _, tok := range tokens {
+		pos := tok.Start
+		switch tok.Type {
+		case Push:
+			ib.stack.Push(ib.LookupConst(tok.Arg, pos))
+		case Dup:
+			ib.stack.Dup(pos)
+		case Copy:
+			if n, ok := ib.intArg(tok); ok {
+				ib.stack.Copy(n, pos)
+			}
+		case Swap:
+			ib.stack.Swap(pos)
+		case Drop:
+			ib.stack.Drop(pos)
+		case Slide:
+			if n, ok := ib.intArg(tok); ok {
+				ib.stack.Slide(n, pos)
+			}
+
+		case Add:
+			ib.appendBinary(ir.Add, pos)
+		case Sub:
+			ib.appendBinary(ir.Sub, pos)
+		case Mul:
+			ib.appendBinary(ir.Mul, pos)
+		case Div:
+			ib.appendBinary(ir.Div, pos)
+		case Mod:
+			ib.appendBinary(ir.Mod, pos)
+
+		case Store:
+			addr, val := ib.stack.Pop2(pos)
+			ib.block.AppendInst(ir.NewStoreHeapStmt(addr, val, pos))
+		case Retrieve:
+			addr := ib.stack.Pop(pos)
+			load := ir.NewLoadHeapExpr(addr, pos)
+			ib.stack.Push(load)
+			ib.block.AppendInst(load)
+
+		case Label:
+			if start {
+				ib.block.Labels = append(ib.block.Labels, ir.Label{ID: tok.Arg, Name: tok.ArgString})
+			}
+		case Call:
+			ib.block.SetTerminator(ir.NewCallTerm(ib.callee(tok), ib.block.Next, pos))
+		case Jmp:
+			ib.block.SetTerminator(ir.NewJmpTerm(ir.Jmp, ib.callee(tok), pos))
+		case Jz:
+			ib.block.SetTerminator(ir.NewJmpCondTerm(ir.Jz, ib.stack.Pop(pos), ib.callee(tok), ib.block.Next, pos))
+		case Jn:
+			ib.block.SetTerminator(ir.NewJmpCondTerm(ir.Jn, ib.stack.Pop(pos), ib.callee(tok), ib.block.Next, pos))
+		case Ret:
+			ib.block.SetTerminator(ir.NewRetTerm(pos))
+		case End:
+			ib.block.SetTerminator(ir.NewExitTerm(pos))
+
+		case Printc:
+			ib.appendPrint(ir.Printc, pos)
+		case Printi:
+			ib.appendPrint(ir.Printi, pos)
+		case Readc:
+			ib.appendRead(ir.Readc, pos)
+		case Readi:
+			ib.appendRead(ir.Readi, pos)
+
+		default:
+			panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
 		}
-		stack.Copy(n)
-	case Swap:
-		stack.Swap()
-	case Drop:
-		stack.Drop()
-	case Slide:
-		n, ok := bigint.ToInt(tok.Arg)
-		if !ok {
-			return p.tokenError("Argument overflows int", tok)
-		} else if n < 0 {
-			return p.tokenError("Argument is negative", tok)
+		if tok.Type != Label {
+			start = false
 		}
-		stack.Slide(n)
-
-	case Add:
-		appendBinary(block, stack, ir.Add, tok.Start)
-	case Sub:
-		appendBinary(block, stack, ir.Sub, tok.Start)
-	case Mul:
-		appendBinary(block, stack, ir.Mul, tok.Start)
-	case Div:
-		appendBinary(block, stack, ir.Div, tok.Start)
-	case Mod:
-		appendBinary(block, stack, ir.Mod, tok.Start)
-
-	case Store:
-		val, addr := stack.Pop(), stack.Pop()
-		block.AppendNode(ir.NewStoreHeapStmt(addr, val, tok.Start))
-	case Retrieve:
-		addr := stack.Pop()
-		load := ir.NewLoadHeapExpr(addr, tok.Start)
-		stack.Push(load)
-		block.AppendNode(load)
-
-	case Label:
-		if labelUses.Has(tok.Arg) { // split blocks at used labels
-			block.Terminator = ir.NewJmpTerm(ir.Fallthrough, nil, tok.Start)
-		}
-	case Call:
-		block.Terminator = ir.NewCallTerm(nil, nil, tok.Start)
-	case Jmp:
-		block.Terminator = ir.NewJmpTerm(ir.Jmp, nil, tok.Start)
-	case Jz:
-		block.Terminator = ir.NewJmpCondTerm(ir.Jz, stack.Pop(), nil, nil, tok.Start)
-	case Jn:
-		block.Terminator = ir.NewJmpCondTerm(ir.Jn, stack.Pop(), nil, nil, tok.Start)
-	case Ret:
-		block.Terminator = ir.NewRetTerm(tok.Start)
-	case End:
-		block.Terminator = ir.NewExitTerm(tok.Start)
-
-	case Printc:
-		block.AppendNode(ir.NewPrintStmt(ir.Printc, stack.Pop(), tok.Start))
-		block.AppendNode(ir.NewFlushStmt(tok.Start))
-	case Printi:
-		block.AppendNode(ir.NewPrintStmt(ir.Printi, stack.Pop(), tok.Start))
-		block.AppendNode(ir.NewFlushStmt(tok.Start))
-	case Readc:
-		appendRead(block, stack, ir.Readc, tok.Start)
-	case Readi:
-		appendRead(block, stack, ir.Readi, tok.Start)
-
-	default:
-		panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
 	}
-	return nil
+	if offset := ib.stack.Len() - ib.stack.Pops(); offset != 0 {
+		ib.block.AppendInst(ir.NewOffsetStackStmt(offset, token.NoPos)) // TODO source position
+	}
+	for i, val := range ib.stack.Values() {
+		ib.block.AppendInst(ir.NewStoreStackStmt(ib.stack.Len()-i, val, val.Pos()))
+	}
+	if ib.block.Terminator == nil {
+		ib.block.SetTerminator(ir.NewJmpTerm(ir.Fallthrough, ib.block.Next, token.NoPos)) // TODO source position
+	}
 }
 
-func appendBinary(block *ir.BasicBlock, stack *ir.Stack, op ir.BinaryOp, pos token.Pos) {
-	rhs, lhs := stack.Pop(), stack.Pop()
+func (ib *irBuilder) intArg(tok *Token) (int, bool) {
+	n, ok := bigint.ToInt(tok.Arg)
+	if !ok {
+		ib.err("Argument overflows int", tok)
+	} else if n < 0 {
+		ib.err("Argument is negative", tok)
+	}
+	return n, ok
+}
+
+func (ib *irBuilder) callee(tok *Token) *ir.BasicBlock {
+	callee, ok := ib.labelBlocks.Get(tok.Arg)
+	if !ok {
+		panic(fmt.Sprintf("ws: block %s jumps to non-existent label: label_%v", ib.block.Name(), tok.Arg))
+	}
+	return callee.(*ir.BasicBlock)
+}
+
+func (ib *irBuilder) appendBinary(op ir.BinaryOp, pos token.Pos) {
+	lhs, rhs := ib.stack.Pop2(pos)
 	bin := ir.NewBinaryExpr(op, lhs, rhs, pos)
-	stack.Push(bin)
-	block.AppendNode(bin)
+	ib.stack.Push(bin)
+	ib.block.AppendInst(bin)
 }
 
-func appendRead(block *ir.BasicBlock, stack *ir.Stack, op ir.ReadOp, pos token.Pos) {
-	addr := stack.Pop()
+func (ib *irBuilder) appendPrint(op ir.PrintOp, pos token.Pos) {
+	val := ib.stack.Pop(pos)
+	ib.block.AppendInst(ir.NewPrintStmt(op, val, pos))
+	ib.block.AppendInst(ir.NewFlushStmt(pos))
+}
+
+func (ib *irBuilder) appendRead(op ir.ReadOp, pos token.Pos) {
+	addr := ib.stack.Pop(pos)
 	read := ir.NewReadExpr(op, pos)
 	store := ir.NewStoreHeapStmt(addr, read, pos)
-	block.AppendNode(read)
-	block.AppendNode(store)
+	ib.block.AppendInst(read)
+	ib.block.AppendInst(store)
 }
 
-// TODO maybe change into type
-func (p *Program) tokenError(err string, tok *Token) error {
-	return fmt.Errorf("%s: %s at %v", err, tok.Format(p.LabelNames), p.Position(tok.Start))
+func (ib *irBuilder) handleAccess(n int, pos token.Pos) {
+	ib.block.AppendInst(ir.NewAccessStackStmt(n, pos))
+}
+
+func (ib *irBuilder) handleLoad(n int, pos token.Pos) ir.Value {
+	load := ir.NewLoadStackExpr(n, pos)
+	ib.block.AppendInst(load)
+	return load
+}
+
+func (ib *irBuilder) nameBlocks() {
+	prevLabel := ""
+	labelIndex := 0
+	for _, block := range ib.Blocks {
+		if len(block.Labels) > 0 {
+			prevLabel = ""
+			labelIndex = 0
+			for _, label := range block.Labels {
+				if label.Name != "" && block.LabelName == "" {
+					block.LabelName = label.Name
+					prevLabel = label.Name
+					labelIndex = 1
+				}
+			}
+		}
+		if block.LabelName == "" && prevLabel != "" {
+			block.LabelName = fmt.Sprintf("%s%d", prevLabel, labelIndex)
+			labelIndex++
+		}
+	}
+}
+
+func (ib *irBuilder) position(pos token.Pos) token.Position {
+	return ib.File.PositionFor(pos, false)
 }

@@ -60,11 +60,11 @@ func (l *Lexer) LexProgram() (*Program, error) {
 	var tokens []*Token
 	for {
 		tok, err := l.Lex()
-		if err != nil {
-			if err != io.EOF {
-				return nil, err
-			}
+		if err == io.EOF {
 			return &Program{l.file, tokens, nil}, nil
+		}
+		if err != nil {
+			return nil, err
 		}
 		tokens = append(tokens, tok)
 	}
@@ -199,7 +199,11 @@ func emitInst(typ Type) stateFn {
 }
 
 func (err *SyntaxError) Error() string {
-	return fmt.Sprintf("syntax error: %s at %v - %v", err.Msg, err.Start, err.End)
+	end := err.End
+	if err.Start.Filename == end.Filename {
+		end.Filename = ""
+	}
+	return fmt.Sprintf("syntax error: %s at %v-%v", err.Msg, err.Start, end)
 }
 
 var lexInst = transition(states{

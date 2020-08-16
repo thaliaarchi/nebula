@@ -191,7 +191,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		addr := m.stackAddr(inst.StackPos, stackLen)
 		val := m.lookupUse(ir.Operand(inst, 0))
 		m.b.CreateStore(val, addr)
-	case *ir.CheckStackStmt:
+	case *ir.AccessStackStmt:
 		if inst.StackSize <= 0 {
 			panic(fmt.Sprintf("codegen: invalid access count: %d", inst.StackSize))
 		}
@@ -270,7 +270,7 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		m.b.CreateStore(callStackLen, m.callStackLen)
 		gep := m.b.CreateInBoundsGEP(m.callStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 		addr := m.b.CreateLoad(gep, "ret_addr")
-		dests := block.Exits()
+		dests := block.Succs()
 		br := m.b.CreateIndirectBr(addr, len(dests))
 		for _, dest := range dests {
 			if dest != nil {

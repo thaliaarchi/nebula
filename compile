@@ -7,6 +7,7 @@ llvm_flags="${3:-$LLVM_DEFAULT_FLAGS}"
 nebula_flags="$4"
 
 mkdir -p build
+./nebula ir "$program" > "$out.nir"
 ./nebula llvm $nebula_flags "$program" > "$out.ll"
 clang $llvm_flags -S -emit-llvm -o build/ext.ll ir/codegen/ext/ext.c
 llvm-link -o "$out.o" "$out.ll" build/ext.ll

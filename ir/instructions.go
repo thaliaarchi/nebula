@@ -249,22 +249,22 @@ func (s *StoreStackStmt) Pos() token.Pos { return s.pos }
 // OpString pretty prints the op kind.
 func (s *StoreStackStmt) OpString() string { return "storestack" }
 
-// CheckStackStmt is a statement that asserts the stack length.
-type CheckStackStmt struct {
+// AccessStackStmt is a statement that asserts the stack length.
+type AccessStackStmt struct {
 	StackSize int
 	pos       token.Pos
 }
 
-// NewCheckStackStmt constructs a CheckStackStmt.
-func NewCheckStackStmt(stackSize int, pos token.Pos) *CheckStackStmt {
-	return &CheckStackStmt{StackSize: stackSize, pos: pos}
+// NewAccessStackStmt constructs a AccessStackStmt.
+func NewAccessStackStmt(stackSize int, pos token.Pos) *AccessStackStmt {
+	return &AccessStackStmt{StackSize: stackSize, pos: pos}
 }
 
 // Pos returns the source location of this node.
-func (c *CheckStackStmt) Pos() token.Pos { return c.pos }
+func (c *AccessStackStmt) Pos() token.Pos { return c.pos }
 
 // OpString pretty prints the op kind.
-func (c *CheckStackStmt) OpString() string { return "checkstack" }
+func (c *AccessStackStmt) OpString() string { return "checkstack" }
 
 // OffsetStackStmt is a statement that changes the stack length
 // relatively.

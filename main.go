@@ -107,7 +107,7 @@ func initFlags() {
 		"help":   {runHelp, helpFlags},
 	}
 	graphFlags.BoolVar(&ascii, "ascii", false, "print as ASCII grid rather than DOT digraph")
-	astFlags.StringVar(&format, "format", "wsa", "output format; options: ws, wsa, wsapos, wsx")
+	astFlags.StringVar(&format, "format", "wsa", "output format; options: ws, wsa, wsx, wsapos, wsacomment")
 	llvmFlags.UintVar(&maxStackLen, "stack", codegen.DefaultMaxStackLen, "maximum stack length for LLVM codegen")
 	llvmFlags.UintVar(&maxCallStackLen, "calls", codegen.DefaultMaxCallStackLen, "maximum call stack length for LLVM codegen")
 	llvmFlags.UintVar(&maxHeapBound, "heap", codegen.DefaultMaxHeapBound, "maximum heap address bound for LLVM codegen")
@@ -180,7 +180,7 @@ func lex(src []byte, filename string) *ws.Program {
 	return program
 }
 
-func lexFile(args []string) *ws.Program {
+func lexFile(args []string) (*ws.Program, []byte) {
 	filename, src := readFile(args)
 	switch {
 	case strings.HasSuffix(filename, ".wsa"):
@@ -188,11 +188,12 @@ func lexFile(args []string) *ws.Program {
 	case strings.HasSuffix(filename, ".wsx"):
 		src = ws.Unpack(src)
 	}
-	return lex(src, filename)
+	return lex(src, filename), src
 }
 
-func convertSSA(p *ws.Program, noFold bool) *ir.Program {
-	program, errs := p.ConvertSSA()
+func convertSSA(args []string) *ir.Program {
+	program, _ := lexFile(args)
+	ssa, errs := program.LowerIR()
 	if len(errs) != 0 {
 		fatal := false
 		for _, err := range errs {
@@ -206,9 +207,9 @@ func convertSSA(p *ws.Program, noFold bool) *ir.Program {
 		}
 	}
 	if !noFold {
-		optimize.FoldConstArith(program)
+		optimize.FoldConstArith(ssa)
 	}
-	return program
+	return ssa
 }
 
 func runPack(args []string) {
@@ -228,41 +229,43 @@ func runUnpack(args []string) {
 }
 
 func runGraph(args []string) {
-	program := convertSSA(lexFile(args), noFold)
+	ssa := convertSSA(args)
 	if !ascii {
-		fmt.Print(program.DotDigraph())
+		fmt.Print(ssa.DotDigraph())
 	} else {
-		labels := make([]string, len(program.Blocks))
-		for i, block := range program.Blocks {
+		labels := make([]string, len(ssa.Blocks))
+		for i, block := range ssa.Blocks {
 			labels[i] = block.Name()
 		}
-		fmt.Print(graph.FormatGridLabeled(optimize.ControlFlowGraph(program), labels))
+		fmt.Print(graph.FormatGridLabeled(optimize.ControlFlowGraph(ssa), labels))
 	}
 }
 
 func runAST(args []string) {
-	program := lexFile(args)
+	program, src := lexFile(args)
 	switch format {
 	case "ws":
 		fmt.Print(program.DumpWS())
 	case "wsa":
 		fmt.Print(program.Dump("    "))
-	case "wsapos":
-		fmt.Print(program.DumpPos())
 	case "wsx":
 		fmt.Print(string(ws.Pack([]byte(program.DumpWS()))))
+	case "wsapos":
+		fmt.Print(program.DumpPos())
+	case "wsacomment":
+		fmt.Print(program.DumpCommented(src, "    "))
 	default:
 		exitErrorf("Unknown format: %s.", format)
 	}
 }
 
 func runIR(args []string) {
-	program := convertSSA(lexFile(args), noFold)
+	program := convertSSA(args)
 	fmt.Print(program.String())
 }
 
 func runLLVM(args []string) {
-	program := convertSSA(lexFile(args), noFold)
+	program := convertSSA(args)
 	mod := codegen.EmitLLVMModule(program, codegen.Config{
 		MaxStackLen:     maxStackLen,
 		MaxCallStackLen: maxCallStackLen,

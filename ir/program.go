@@ -15,7 +15,7 @@ type Program struct {
 	Name        string
 	Blocks      []*BasicBlock
 	Entry       *BasicBlock
-	ConstVals   *bigint.Map // map[*big.Int]*Val
+	ConstValues *bigint.Map // map[*big.Int]*IntConst
 	NextBlockID int
 	File        *token.File
 }
@@ -24,6 +24,7 @@ type Program struct {
 // program followed by a branch.
 type BasicBlock struct {
 	ID         int           // Unique block ID for printing
+	LabelName  string        // Name derived from label
 	Labels     []Label       // Labels for this block in source
 	Nodes      []Inst        // Non-branching non-stack instructions
 	Terminator TermInst      // Terminator control flow instruction
@@ -46,32 +47,16 @@ type ErrorRetUnderflow struct {
 	Traces [][]*BasicBlock
 }
 
-// ConnectEdges connects the CFG edges of a program based on the labels in the source.
-func (p *Program) ConnectEdges(branches []*big.Int, labels *bigint.Map /* map[*big.Int]int */) error {
+// ConnectEntries connects the block entries.
+func (p *Program) ConnectEntries() error {
 	p.Entry.Entries = append(p.Entry.Entries, nil)
-	for i, block := range p.Blocks {
-		branch := branches[i]
-		if branch != nil {
-			label, ok := labels.Get(branch)
-			if !ok {
-				return fmt.Errorf("ir: block %s jumps to non-existant label: %v", block.Name(), branch)
-			}
-			callee := p.Blocks[label.(int)]
-			callee.Entries = append(callee.Entries, block)
-
-			switch term := block.Terminator.(type) {
-			case *CallTerm:
-				term.succs[0] = callee
-				term.succs[1] = p.Blocks[i+1]
-			case *JmpTerm:
-				term.succs[0] = callee
-			case *JmpCondTerm:
-				term.succs[0] = callee
-				term.succs[1] = block.Next
-				block.Next.Entries = append(block.Next.Entries, block)
-			case *RetTerm, *ExitTerm:
-			default:
-				panic("ir: unrecognized terminator type")
+	for _, block := range p.Blocks {
+		if call, ok := block.Terminator.(*CallTerm); ok {
+			// Only connect the callee. Next is connected to ret below.
+			call.succs[0].Entries = append(call.succs[0].Entries, block)
+		} else {
+			for _, succ := range block.Terminator.Succs() {
+				succ.Entries = append(succ.Entries, block)
 			}
 		}
 	}
@@ -136,7 +121,7 @@ func (block *BasicBlock) Disconnect() {
 	if block.Next != nil {
 		block.Next.Prev = block.Prev
 	}
-	for _, exit := range block.Exits() {
+	for _, exit := range block.Succs() {
 		i := 0
 		for _, entry := range exit.Entries {
 			if entry != block {
@@ -173,7 +158,7 @@ func (p *Program) RenumberBlockIDs() {
 func (p *Program) Digraph() digraph.Digraph {
 	g := make(digraph.Digraph, p.NextBlockID)
 	for _, block := range p.Blocks {
-		for _, edge := range block.Exits() {
+		for _, edge := range block.Succs() {
 			g.AddEdge(block.ID, edge.ID)
 		}
 	}
@@ -183,31 +168,32 @@ func (p *Program) Digraph() digraph.Digraph {
 // LookupConst creates a val for a constant with matching constants
 // having the same val.
 func (p *Program) LookupConst(c *big.Int, pos token.Pos) Value {
-	if val, ok := p.ConstVals.Get(c); ok {
+	if val, ok := p.ConstValues.Get(c); ok {
 		return val.(Value)
 	}
 	val := NewIntConst(c, pos)
-	p.ConstVals.Put(c, val)
+	p.ConstValues.Put(c, val)
 	return val
 }
 
-// AppendNode appends a node to the block.
-func (block *BasicBlock) AppendNode(inst Inst) {
+// AppendInst appends an instruction to the block.
+func (block *BasicBlock) AppendInst(inst Inst) {
 	if _, ok := inst.(TermInst); ok {
-		panic("AppendNode: terminator not allowed")
+		panic("AppendInst: terminator not allowed")
 	}
 	block.Nodes = append(block.Nodes, inst)
 }
 
-// AppendStackLoad is a LoadHandler for a stack.
-func (block *BasicBlock) AppendStackLoad(pos int) Value {
-	load := NewLoadStackExpr(pos, token.NoPos) // TODO source position
-	block.AppendNode(load)
-	return load
+// SetTerminator sets the block's terminator instruction.
+func (block *BasicBlock) SetTerminator(term TermInst) {
+	if block.Terminator != nil {
+		panic("SetTerminator: terminator already set")
+	}
+	block.Terminator = term
 }
 
-// Exits returns all outgoing edges of the block.
-func (block *BasicBlock) Exits() []*BasicBlock {
+// Succs returns all outgoing edges of the block.
+func (block *BasicBlock) Succs() []*BasicBlock {
 	switch term := block.Terminator.(type) {
 	case *RetTerm:
 		exits := make([]*BasicBlock, len(block.Callers))
@@ -227,6 +213,9 @@ func (block *BasicBlock) Exits() []*BasicBlock {
 func (block *BasicBlock) Name() string {
 	if block == nil {
 		return "<nil>"
+	}
+	if block.LabelName != "" {
+		return block.LabelName
 	}
 	if len(block.Labels) != 0 {
 		return block.Labels[0].String()

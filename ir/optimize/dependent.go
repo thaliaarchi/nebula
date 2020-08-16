@@ -14,7 +14,7 @@ func ControlFlowGraph(p *ir.Program) graph.Graph {
 	}
 	g := graph.NewGraph(uint(len(p.Blocks)))
 	for i, block := range p.Blocks {
-		for _, exit := range block.Exits() {
+		for _, exit := range block.Succs() {
 			g.Add(uint(i), uint(ids[exit]))
 		}
 	}
