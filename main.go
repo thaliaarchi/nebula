@@ -13,7 +13,7 @@ import (
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/ir/codegen"
 	"github.com/andrewarchi/nebula/ir/optimize"
-	"github.com/andrewarchi/nebula/syntax/ws"
+	"github.com/andrewarchi/nebula/ws"
 	"llvm.org/llvm/bindings/go/llvm"
 )
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
-	"github.com/andrewarchi/nebula/syntax/ws"
+	"github.com/andrewarchi/nebula/ws"
 )
 
 func TestFoldConstArith(t *testing.T) {

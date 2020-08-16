@@ -1,6 +1,6 @@
 // Package ws parses Whitespace source files.
 //
-package ws // import "github.com/andrewarchi/nebula/syntax/ws"
+package ws // import "github.com/andrewarchi/nebula/ws"
 
 import (
 	"fmt"
