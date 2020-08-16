@@ -40,9 +40,8 @@ func (ib *irBuilder) err(err string, tok *Token) {
 func (p *Program) LowerIR() (*ir.Program, []error) {
 	ib := &irBuilder{
 		Program: &ir.Program{
-			Name:        p.File.Name(),
-			ConstValues: bigint.NewMap(),
-			File:        p.File,
+			Name: p.File.Name(),
+			File: p.File,
 		},
 		tokens:      p.Tokens,
 		labels:      bigint.NewMap(),
@@ -58,9 +57,6 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 		return nil, errs
 	}
 	ib.splitTokens()
-	if needsImplicitEnd(ib.tokens) {
-		ib.tokenBlocks = append(ib.tokenBlocks, []*Token{})
-	}
 	for i, tokens := range ib.tokenBlocks {
 		ib.block = ib.Blocks[i]
 		ib.convertBlock(tokens)
@@ -71,17 +67,6 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 		errs = append(errs, err)
 	}
 	return ib.Program, errs
-}
-
-func needsImplicitEnd(tokens []*Token) bool {
-	if len(tokens) == 0 {
-		return true
-	}
-	switch tokens[len(tokens)-1].Type {
-	case Jmp, Ret, End:
-		return false
-	}
-	return true
 }
 
 // collectLabels collects all labels from the tokens into maps and
@@ -136,6 +121,9 @@ func (ib *irBuilder) splitTokens() {
 	if lo < len(ib.tokens) {
 		ib.tokenBlocks = append(ib.tokenBlocks, ib.tokens[lo:])
 	}
+	if needsImplicitEnd(ib.tokens) {
+		ib.tokenBlocks = append(ib.tokenBlocks, []*Token{})
+	}
 
 	ib.Blocks = make([]*ir.BasicBlock, len(ib.tokenBlocks))
 	for i := range ib.Blocks {
@@ -157,6 +145,17 @@ func (ib *irBuilder) splitTokens() {
 	ib.NextBlockID = len(ib.Blocks)
 }
 
+func needsImplicitEnd(tokens []*Token) bool {
+	if len(tokens) == 0 {
+		return true
+	}
+	switch tokens[len(tokens)-1].Type {
+	case Jmp, Ret, End:
+		return false
+	}
+	return true
+}
+
 func (ib *irBuilder) convertBlock(tokens []*Token) {
 	ib.stack.Clear()
 	start := true
@@ -164,7 +163,7 @@ func (ib *irBuilder) convertBlock(tokens []*Token) {
 		pos := tok.Start
 		switch tok.Type {
 		case Push:
-			ib.stack.Push(ib.LookupConst(tok.Arg, pos))
+			ib.stack.Push(ir.NewIntConst(tok.Arg, pos))
 		case Dup:
 			ib.stack.Dup(pos)
 		case Copy:

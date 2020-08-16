@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-// Map is a hash table for big int keys.
+// Map is a hash table for big int keys. Keys are not copied and must
+// not be changed after insertion.
 type Map struct {
 	m   map[int64][]MapPair
 	len uint
@@ -28,34 +29,55 @@ func NewMap() *Map {
 }
 
 // Get the value at the key.
-func (m *Map) Get(k *big.Int) (interface{}, bool) {
-	for _, e := range m.m[k.Int64()] {
-		if e.K.Cmp(k) == 0 {
-			return e.V, true
+func (m *Map) Get(key *big.Int) (interface{}, bool) {
+	pair, ok := m.GetPair(key)
+	return pair.V, ok
+}
+
+// GetPair gets the key-value pair at the key.
+func (m *Map) GetPair(key *big.Int) (MapPair, bool) {
+	for _, pair := range m.m[key.Int64()] {
+		if pair.K.Cmp(key) == 0 {
+			return pair, true
 		}
 	}
-	return nil, false
+	return MapPair{}, false
 }
 
 // Has returns whether the key exists.
-func (m *Map) Has(k *big.Int) bool {
-	_, ok := m.Get(k)
+func (m *Map) Has(key *big.Int) bool {
+	_, ok := m.GetPair(key)
 	return ok
 }
 
 // Put a value at the key.
-func (m *Map) Put(k *big.Int, v interface{}) bool {
-	hash := k.Int64()
+func (m *Map) Put(key *big.Int, v interface{}) bool {
+	hash := key.Int64()
 	bucket := m.m[hash]
-	for _, e := range bucket {
-		if e.K.Cmp(k) == 0 {
-			e.V = v
+	for _, pair := range bucket {
+		if pair.K.Cmp(key) == 0 {
+			pair.V = v
 			return true
 		}
 	}
-	m.m[hash] = append(bucket, MapPair{new(big.Int).Set(k), v})
+	m.m[hash] = append(bucket, MapPair{key, v}) // key not copied
 	m.len++
 	return false
+}
+
+// GetOrPut gets the value at the key, if it exists, and puts a value
+// at the key otherwise.
+func (m *Map) GetOrPut(key *big.Int, v interface{}) (interface{}, bool) {
+	hash := key.Int64()
+	bucket := m.m[hash]
+	for _, pair := range bucket {
+		if pair.K.Cmp(key) == 0 {
+			return pair.V, true
+		}
+	}
+	m.m[hash] = append(bucket, MapPair{key, v}) // key not copied
+	m.len++
+	return v, false
 }
 
 // Pairs returns a sorted slice of key-value pairs in the map.

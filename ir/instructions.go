@@ -7,6 +7,8 @@ package ir // import "github.com/andrewarchi/nebula/ir"
 import (
 	"go/token"
 	"math/big"
+
+	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
 // Inst is an instruction with a source location.
@@ -70,15 +72,21 @@ func (use *ValueUse) SetUser(user User, operand uint) {
 
 // IntConst is a constant integer value.
 type IntConst struct {
-	Int  *big.Int
+	val  *big.Int
 	uses []*ValueUse
 	pos  token.Pos
 }
 
+var intLookup = bigint.NewMap()
+
 // NewIntConst constructs an IntConst.
-func NewIntConst(i *big.Int, pos token.Pos) *IntConst {
-	return &IntConst{Int: i, pos: pos}
+func NewIntConst(val *big.Int, pos token.Pos) *IntConst {
+	v, _ := intLookup.GetOrPut(val, val) // keep only one equivalent *big.Int
+	return &IntConst{val: v.(*big.Int), pos: pos}
 }
+
+// Int returns the constant integer.
+func (i *IntConst) Int() *big.Int { return i.val }
 
 // Uses returns the set of instructions referring this node.
 func (i *IntConst) Uses() *[]*ValueUse { return &i.uses }

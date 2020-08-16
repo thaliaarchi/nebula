@@ -3,10 +3,8 @@ package ir
 import (
 	"fmt"
 	"go/token"
-	"math/big"
 	"strings"
 
-	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/internal/digraph"
 )
 
@@ -15,30 +13,8 @@ type Program struct {
 	Name        string
 	Blocks      []*BasicBlock
 	Entry       *BasicBlock
-	ConstValues *bigint.Map // map[*big.Int]*IntConst
 	NextBlockID int
 	File        *token.File
-}
-
-// BasicBlock is a list of consecutive non-branching instructions in a
-// program followed by a branch.
-type BasicBlock struct {
-	ID         int           // Unique block ID for printing
-	LabelName  string        // Name derived from label
-	Labels     []Label       // Labels for this block in source
-	Nodes      []Inst        // Non-branching non-stack instructions
-	Terminator TermInst      // Terminator control flow instruction
-	Entries    []*BasicBlock // Entry blocks; blocks immediately preceding this block in flow
-	Callers    []*BasicBlock // Calling blocks; blocks calling this block or its parents
-	Returns    []*BasicBlock // Returning blocks; blocks returning to this block
-	Prev       *BasicBlock   // Predecessor block in source
-	Next       *BasicBlock   // Successor block in source
-}
-
-// Label is a label with an optional name.
-type Label struct {
-	ID   *big.Int
-	Name string
 }
 
 // ErrorRetUnderflow is an error given when ret is executed without a
@@ -112,27 +88,6 @@ outer:
 	return slice
 }
 
-// Disconnect removes incoming edges to a basic block. The block is not
-// removed from the program block slice and callers are not updated.
-func (block *BasicBlock) Disconnect() {
-	if block.Prev != nil {
-		block.Prev.Next = block.Next
-	}
-	if block.Next != nil {
-		block.Next.Prev = block.Prev
-	}
-	for _, exit := range block.Succs() {
-		i := 0
-		for _, entry := range exit.Entries {
-			if entry != block {
-				exit.Entries[i] = entry
-				i++
-			}
-		}
-		exit.Entries = exit.Entries[:i]
-	}
-}
-
 func (p *Program) trimUnreachable() {
 	i := 0
 	for _, block := range p.Blocks {
@@ -163,17 +118,6 @@ func (p *Program) Digraph() digraph.Digraph {
 		}
 	}
 	return g
-}
-
-// LookupConst creates a val for a constant with matching constants
-// having the same val.
-func (p *Program) LookupConst(c *big.Int, pos token.Pos) Value {
-	if val, ok := p.ConstValues.Get(c); ok {
-		return val.(Value)
-	}
-	val := NewIntConst(c, pos)
-	p.ConstValues.Put(c, val)
-	return val
 }
 
 // AppendInst appends an instruction to the block.

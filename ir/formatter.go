@@ -95,7 +95,7 @@ func (f *Formatter) FormatInst(inst Inst) string {
 func (f *Formatter) FormatValue(val Value) string {
 	switch v := val.(type) {
 	case *IntConst:
-		return v.Int.String()
+		return v.Int().String()
 	}
 	var id int
 	if vid, ok := f.ids[val]; ok {

@@ -291,7 +291,7 @@ func (m *moduleBuilder) lookupUse(use *ir.ValueUse) llvm.Value {
 func (m *moduleBuilder) lookupValue(val ir.Value) llvm.Value {
 	switch v := val.(type) {
 	case *ir.IntConst:
-		if i64, ok := bigint.ToInt64(v.Int); ok {
+		if i64, ok := bigint.ToInt64(v.Int()); ok {
 			return llvm.ConstInt(llvm.Int64Type(), uint64(i64), false)
 		}
 		panic(fmt.Sprintf("codegen: val overflows 64 bits: %v at %v", v, m.program.Position(v.Pos())))
