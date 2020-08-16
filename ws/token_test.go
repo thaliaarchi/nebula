@@ -64,6 +64,7 @@ func TestInstrTypeString(t *testing.T) {
 		Type   Type
 		String string
 	}{
+		{Illegal, "token(0)"},
 		{Push, "push"},
 		{Dup, "dup"},
 		{Copy, "copy"},
@@ -88,18 +89,7 @@ func TestInstrTypeString(t *testing.T) {
 		{Printi, "printi"},
 		{Readc, "readc"},
 		{Readi, "readi"},
-
-		{Illegal, "illegal"},
-		{stackBeg, "illegal"},
-		{stackEnd, "illegal"},
-		{arithBeg, "illegal"},
-		{arithEnd, "illegal"},
-		{heapBeg, "illegal"},
-		{heapEnd, "illegal"},
-		{flowBeg, "illegal"},
-		{flowEnd, "illegal"},
-		{ioBeg, "illegal"},
-		{ioEnd, "illegal"},
+		{100, "token(100)"},
 	}
 
 	for i, test := range tests {

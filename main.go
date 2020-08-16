@@ -159,11 +159,11 @@ func readFile(args []string) (string, []byte) {
 func lex(src []byte, filename string) *ws.Program {
 	fset := token.NewFileSet()
 	file := fset.AddFile(filename, -1, len(src))
-	lexer := ws.NewLexer(file, src)
-	program, err := lexer.LexProgram()
+	tokens, err := ws.LexTokens(file, src)
 	if err != nil {
 		exitError(err)
 	}
+	program := &ws.Program{File: file, Tokens: tokens}
 
 	mapFilename := filename + ".map"
 	if info, err := os.Stat(mapFilename); err == nil && !info.IsDir() {

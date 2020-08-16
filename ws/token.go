@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Token is a lexical token in the Whitespace language.
+// Token is a lexical token in Whitespace.
 type Token struct {
 	Type      Type
 	Arg       *big.Int
@@ -72,13 +72,13 @@ func (tok *Token) formatArgWS() string {
 	return b.String()
 }
 
-// Type is the instruction type of a token.
+// Type is the instruction type of a Whitespace token.
 type Type uint8
 
+// Instruction types.
 const (
 	Illegal Type = iota
 
-	stackBeg
 	// Stack manipulation instructions
 	Push
 	Dup
@@ -86,24 +86,18 @@ const (
 	Swap
 	Drop
 	Slide
-	stackEnd
 
-	arithBeg
 	// Arithmetic instructions
 	Add
 	Sub
 	Mul
 	Div
 	Mod
-	arithEnd
 
-	heapBeg
 	// Heap access instructions
 	Store
 	Retrieve
-	heapEnd
 
-	flowBeg
 	// Control flow instructions
 	Label
 	Call
@@ -112,31 +106,28 @@ const (
 	Jn
 	Ret
 	End
-	flowEnd
 
-	ioBeg
 	// I/O instructions
 	Printc
 	Printi
 	Readc
 	Readi
-	ioEnd
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
-func (typ Type) IsStack() bool { return stackBeg < typ && typ < stackEnd }
+func (typ Type) IsStack() bool { return Push <= typ && typ <= Slide }
 
 // IsArith returns true for tokens corresponding to arithmetic instructions.
-func (typ Type) IsArith() bool { return arithBeg < typ && typ < arithEnd }
+func (typ Type) IsArith() bool { return Add <= typ && typ <= Mod }
 
 // IsHeap returns true for tokens corresponding to heap access instructions.
-func (typ Type) IsHeap() bool { return heapBeg < typ && typ < heapEnd }
+func (typ Type) IsHeap() bool { return typ == Store || typ == Retrieve }
 
 // IsFlow returns true for tokens corresponding to control flow instructions.
-func (typ Type) IsFlow() bool { return flowBeg < typ && typ < flowEnd }
+func (typ Type) IsFlow() bool { return Label <= typ && typ <= End }
 
-// IsIO returns true for tokens corresponding to i/o instructions.
-func (typ Type) IsIO() bool { return ioBeg < typ && typ < ioEnd }
+// IsIO returns true for tokens corresponding to I/O instructions.
+func (typ Type) IsIO() bool { return Printc <= typ && typ <= Readi }
 
 // HasArg returns true for instructions that require an argument.
 func (typ Type) HasArg() bool {
@@ -198,11 +189,10 @@ func (typ Type) String() string {
 	case Readi:
 		return "readi"
 	}
-	return "illegal"
+	return fmt.Sprintf("token(%d)", int(typ))
 }
 
-// StringWS returns the string representation of the instruction in
-// Whitespace.
+// StringWS formats the instruction type as Whitespace syntax.
 func (typ Type) StringWS() string {
 	switch typ {
 	case Push:
@@ -254,5 +244,5 @@ func (typ Type) StringWS() string {
 	case Readi:
 		return "\t\n\t\t"
 	}
-	return "illegal"
+	return fmt.Sprintf("token(%d)", int(typ))
 }

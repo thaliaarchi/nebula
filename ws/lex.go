@@ -7,7 +7,7 @@ import (
 	"math/big"
 )
 
-// Lexer is a lexical analyzer for Whitespace source.
+// Lexer is a lexical analyzer that scans tokens in Whitespace source.
 type Lexer struct {
 	file        *token.File
 	src         []byte
@@ -38,8 +38,7 @@ const (
 	lf    = '\n'
 )
 
-// NewLexer constructs a Lexer scan a Whitespace source
-// file into tokens.
+// NewLexer constructs a Whitespace lexer.
 func NewLexer(file *token.File, src []byte) *Lexer {
 	return &Lexer{
 		file:        file,
@@ -50,18 +49,19 @@ func NewLexer(file *token.File, src []byte) *Lexer {
 	}
 }
 
-// Lex scans a single Whitespace token.
-func (l *Lexer) Lex() (*Token, error) {
+// NextToken scans a single Whitespace token.
+func (l *Lexer) NextToken() (*Token, error) {
 	return lexInst(l)
 }
 
-// LexProgram scans a Whitespace source file into a Program.
-func (l *Lexer) LexProgram() (*Program, error) {
+// LexTokens scans a Whitespace source file into tokens.
+func LexTokens(file *token.File, src []byte) ([]*Token, error) {
+	l := NewLexer(file, src)
 	var tokens []*Token
 	for {
-		tok, err := l.Lex()
+		tok, err := l.NextToken()
 		if err == io.EOF {
-			return &Program{l.file, tokens, nil}, nil
+			return tokens, nil
 		}
 		if err != nil {
 			return nil, err
