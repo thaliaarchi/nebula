@@ -65,22 +65,30 @@ func (m *Map) Put(key *big.Int, v interface{}) bool {
 	return false
 }
 
-// GetOrPut gets the value at the key, if it exists, and puts a value
-// at the key otherwise.
+// GetOrPut gets the value at the key, if it exists, or otherwise puts a
+// value at the key.
 func (m *Map) GetOrPut(key *big.Int, v interface{}) (interface{}, bool) {
+	pair, put := m.GetOrPutPair(key, v)
+	return pair.V, put
+}
+
+// GetOrPutPair gets the key-value pair at the key, if it exists, or
+// otherwise puts a value at the key.
+func (m *Map) GetOrPutPair(key *big.Int, v interface{}) (MapPair, bool) {
 	hash := key.Int64()
 	bucket := m.m[hash]
 	for _, pair := range bucket {
 		if pair.K.Cmp(key) == 0 {
-			return pair.V, true
+			return pair, true
 		}
 	}
-	m.m[hash] = append(bucket, MapPair{key, v}) // key not copied
+	pair := MapPair{key, v}
+	m.m[hash] = append(bucket, pair) // key not copied
 	m.len++
-	return v, false
+	return pair, false
 }
 
-// Pairs returns a sorted slice of key-value pairs in the map.
+// Pairs returns a sorted slice of the key-value pairs in the map.
 func (m *Map) Pairs() []MapPair {
 	pairs := make([]MapPair, m.len)
 	i := 0

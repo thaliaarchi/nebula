@@ -72,6 +72,15 @@ func (f *Formatter) FormatInst(inst Inst) string {
 	}
 	b.WriteString(inst.OpString())
 	writeStackPos(&b, inst)
+	if phi, ok := inst.(*PhiExpr); ok {
+		for _, val := range phi.Values() {
+			b.WriteString(" [")
+			b.WriteString(f.FormatValue(val.Value))
+			b.WriteByte(' ')
+			b.WriteString(val.Block.Name())
+			b.WriteByte(']')
+		}
+	}
 	if user, ok := inst.(User); ok {
 		for _, op := range user.Operands() {
 			b.WriteByte(' ')

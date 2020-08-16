@@ -70,7 +70,8 @@ func (use *ValueUse) SetUser(user User, operand uint) {
 	use.UserOperand = operand
 }
 
-// IntConst is a constant integer value.
+// IntConst is a constant integer value. The contained ints can be
+// compared for pointer equality.
 type IntConst struct {
 	val  *big.Int
 	uses []*ValueUse
@@ -81,8 +82,8 @@ var intLookup = bigint.NewMap()
 
 // NewIntConst constructs an IntConst.
 func NewIntConst(val *big.Int, pos token.Pos) *IntConst {
-	v, _ := intLookup.GetOrPut(val, val) // keep only one equivalent *big.Int
-	return &IntConst{val: v.(*big.Int), pos: pos}
+	pair, _ := intLookup.GetOrPutPair(val, nil) // keep only one equivalent *big.Int
+	return &IntConst{val: pair.K, pos: pos}
 }
 
 // Int returns the constant integer.
@@ -443,6 +444,39 @@ func (f *FlushStmt) Pos() token.Pos { return f.pos }
 
 // OpString pretty prints the op kind.
 func (f *FlushStmt) OpString() string { return "flush" }
+
+// PhiExpr is an SSA Φ function with pairs of values and predecessor
+// blocks.
+type PhiExpr struct {
+	values []PhiValue
+	uses   []*ValueUse
+	pos    token.Pos
+}
+
+// PhiValue is a value and predecessor block.
+type PhiValue struct {
+	Value Value
+	Block *BasicBlock
+}
+
+// AddIncoming adds a val for an incoming edge to the phi node.
+func (phi *PhiExpr) AddIncoming(val Value, block *BasicBlock) {
+	phi.values = append(phi.values, PhiValue{val, block})
+}
+
+// Values returns pairs of values and predecessor blocks.
+func (phi *PhiExpr) Values() []PhiValue {
+	return phi.values
+}
+
+// Uses returns the set of instructions referring this node.
+func (phi *PhiExpr) Uses() *[]*ValueUse { return &phi.uses }
+
+// Pos returns the source location of this node.
+func (phi *PhiExpr) Pos() token.Pos { return phi.pos }
+
+// OpString pretty prints the op kind.
+func (phi *PhiExpr) OpString() string { return "phi" }
 
 // CallTerm is terminator that pushes the current location to the call
 // stack, then jumps to the callee.
