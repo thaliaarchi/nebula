@@ -8,7 +8,7 @@ import (
 	"github.com/andrewarchi/nebula/ir"
 )
 
-// irBuilder converts a Whitespace AST to SSA form.
+// irBuilder lowers a Whitespace AST to SSA form.
 type irBuilder struct {
 	*ir.Program
 	tokens      []*Token
@@ -38,17 +38,13 @@ func (ib *irBuilder) err(err string, tok *Token) {
 
 // LowerIR lowers a Whitespace AST to Nebula IR in SSA form.
 func (p *Program) LowerIR() (*ir.Program, []error) {
-	tokens := p.Tokens
-	if needsImplicitEnd(tokens) {
-		tokens = append(tokens, &Token{Type: End})
-	}
 	ib := &irBuilder{
 		Program: &ir.Program{
 			Name:        p.File.Name(),
 			ConstValues: bigint.NewMap(),
 			File:        p.File,
 		},
-		tokens:      tokens,
+		tokens:      p.Tokens,
 		labels:      bigint.NewMap(),
 		labelUses:   bigint.NewMap(),
 		labelBlocks: bigint.NewMap(),
@@ -62,6 +58,9 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 		return nil, errs
 	}
 	ib.splitTokens()
+	if needsImplicitEnd(ib.tokens) {
+		ib.tokenBlocks = append(ib.tokenBlocks, []*Token{})
+	}
 	for i, tokens := range ib.tokenBlocks {
 		ib.block = ib.Blocks[i]
 		ib.convertBlock(tokens)
@@ -241,7 +240,11 @@ func (ib *irBuilder) convertBlock(tokens []*Token) {
 		ib.block.AppendInst(ir.NewStoreStackStmt(ib.stack.Len()-i, val, val.Pos()))
 	}
 	if ib.block.Terminator == nil {
-		ib.block.SetTerminator(ir.NewJmpTerm(ir.Fallthrough, ib.block.Next, token.NoPos)) // TODO source position
+		if ib.block.Next != nil {
+			ib.block.SetTerminator(ir.NewJmpTerm(ir.Fallthrough, ib.block.Next, token.NoPos)) // TODO source position
+		} else {
+			ib.block.SetTerminator(ir.NewExitTerm(token.NoPos)) // TODO source position
+		}
 	}
 }
 
