@@ -10,14 +10,12 @@ import (
 
 // irBuilder lowers a Whitespace AST to SSA form.
 type irBuilder struct {
-	*ir.Program
+	*ir.Builder
 	tokens      []*Token
 	tokenBlocks [][]*Token
-	block       *ir.BasicBlock
 	stack       *ir.Stack
-	labels      *bigint.Map // map[*big.Int]int
-	labelUses   *bigint.Map // map[*big.Int][]int
 	labelBlocks *bigint.Map // map[*big.Int]*ir.BasicBlock
+	file        *token.File
 	errs        []error
 }
 
@@ -36,70 +34,66 @@ func (ib *irBuilder) err(err string, tok *Token) {
 	ib.errs = append(ib.errs, &TokenError{tok, ib.position(tok.Start), err})
 }
 
+func (ib *irBuilder) Errs() []error {
+	return ib.errs
+}
+
 // LowerIR lowers a Whitespace AST to Nebula IR in SSA form.
 func (p *Program) LowerIR() (*ir.Program, []error) {
 	ib := &irBuilder{
-		Program: &ir.Program{
-			Name: p.File.Name(),
-			File: p.File,
-		},
 		tokens:      p.Tokens,
-		labels:      bigint.NewMap(),
-		labelUses:   bigint.NewMap(),
 		labelBlocks: bigint.NewMap(),
+		file:        p.File,
 	}
 	ib.stack = &ir.Stack{
 		HandleAccess: ib.handleAccess,
 		HandleLoad:   ib.handleLoad,
 	}
-	errs := ib.collectLabels()
-	if len(errs) != 0 {
-		return nil, errs
-	}
-	ib.splitTokens()
+	labelUses := ib.collectLabels()
+	ib.splitTokens(labelUses)
 	for i, tokens := range ib.tokenBlocks {
-		ib.block = ib.Blocks[i]
+		ib.SetCurrentBlock(i)
 		ib.convertBlock(tokens)
 	}
-	ib.nameBlocks()
-	err := ib.Program.ConnectEntries()
+	ssa, err := ib.Program()
 	if err != nil {
-		errs = append(errs, err)
+		ib.errs = append(ib.errs, err)
 	}
-	return ib.Program, errs
+	return ssa, ib.errs
 }
 
 // collectLabels collects all labels from the tokens into maps and
 // enforces that all labels are unique and callees exist.
-func (ib *irBuilder) collectLabels() []error {
-	var errs []error
+func (ib *irBuilder) collectLabels() *bigint.Map {
+	labels := bigint.NewMap()    // map[*big.Int]bool
+	labelUses := bigint.NewMap() // map[*big.Int][]int
 	for i, tok := range ib.tokens {
 		switch tok.Type {
 		case Label:
-			if ib.labels.Put(tok.Arg, i) {
+			if labels.Put(tok.Arg, nil) {
 				ib.err("Label is not unique", tok)
 			}
 		case Call, Jmp, Jz, Jn:
-			if l, ok := ib.labelUses.Get(tok.Arg); ok {
-				ib.labelUses.Put(tok.Arg, append(l.([]int), i))
+			if l, ok := labelUses.Get(tok.Arg); ok {
+				labelUses.Put(tok.Arg, append(l.([]int), i))
 			} else {
-				ib.labelUses.Put(tok.Arg, []int{i})
+				labelUses.Put(tok.Arg, []int{i})
 			}
 		}
 	}
 
-	for _, use := range ib.labelUses.Pairs() {
-		if _, ok := ib.labels.Get(use.K); !ok {
+	for _, use := range labelUses.Pairs() {
+		if !labels.Has(use.K) {
 			for _, branch := range use.V.([]int) {
 				ib.err("Label does not exist", ib.tokens[branch])
 			}
 		}
 	}
-	return errs
+	return labelUses
 }
 
 // splitTokens splits the tokens into sequences of non-branching tokens.
-func (ib *irBuilder) splitTokens() {
+func (ib *irBuilder) splitTokens(labelUses *bigint.Map) {
 	start := true
 	lo := 0
 	for i := 0; i < len(ib.tokens); i++ {
@@ -109,7 +103,7 @@ func (ib *irBuilder) splitTokens() {
 			continue
 		}
 		if tok.Type == Label {
-			if start || !ib.labelUses.Has(tok.Arg) {
+			if start || !labelUses.Has(tok.Arg) {
 				continue
 			}
 			i--
@@ -125,14 +119,8 @@ func (ib *irBuilder) splitTokens() {
 		ib.tokenBlocks = append(ib.tokenBlocks, []*Token{})
 	}
 
-	ib.Blocks = make([]*ir.BasicBlock, len(ib.tokenBlocks))
-	for i := range ib.Blocks {
-		block := &ir.BasicBlock{ID: i}
-		ib.Blocks[i] = block
-		if i > 0 {
-			block.Prev = ib.Blocks[i-1]
-			ib.Blocks[i-1].Next = block
-		}
+	ib.Builder = ir.NewBuilder(len(ib.tokenBlocks), ib.file)
+	for i, block := range ib.Blocks() {
 		for _, tok := range ib.tokenBlocks[i] {
 			if tok.Type == Label {
 				ib.labelBlocks.Put(tok.Arg, block)
@@ -141,8 +129,6 @@ func (ib *irBuilder) splitTokens() {
 			}
 		}
 	}
-	ib.Entry = ib.Blocks[0]
-	ib.NextBlockID = len(ib.Blocks)
 }
 
 func needsImplicitEnd(tokens []*Token) bool {
@@ -157,6 +143,7 @@ func needsImplicitEnd(tokens []*Token) bool {
 }
 
 func (ib *irBuilder) convertBlock(tokens []*Token) {
+	block := ib.CurrentBlock()
 	ib.stack.Clear()
 	start := true
 	for _, tok := range tokens {
@@ -192,29 +179,29 @@ func (ib *irBuilder) convertBlock(tokens []*Token) {
 
 		case Store:
 			addr, val := ib.stack.Pop2(pos)
-			ib.block.AppendInst(ir.NewStoreHeapStmt(addr, val, pos))
+			ib.AppendInst(ir.NewStoreHeapStmt(addr, val, pos))
 		case Retrieve:
 			addr := ib.stack.Pop(pos)
 			load := ir.NewLoadHeapExpr(addr, pos)
 			ib.stack.Push(load)
-			ib.block.AppendInst(load)
+			ib.AppendInst(load)
 
 		case Label:
 			if start {
-				ib.block.Labels = append(ib.block.Labels, ir.Label{ID: tok.Arg, Name: tok.ArgString})
+				block.Labels = append(block.Labels, ir.Label{ID: tok.Arg, Name: tok.ArgString})
 			}
 		case Call:
-			ib.block.SetTerminator(ir.NewCallTerm(ib.callee(tok), ib.block.Next, pos))
+			ib.SetTerminator(ir.NewCallTerm(ib.callee(tok), block.Next, pos))
 		case Jmp:
-			ib.block.SetTerminator(ir.NewJmpTerm(ir.Jmp, ib.callee(tok), pos))
+			ib.SetTerminator(ir.NewJmpTerm(ir.Jmp, ib.callee(tok), pos))
 		case Jz:
-			ib.block.SetTerminator(ir.NewJmpCondTerm(ir.Jz, ib.stack.Pop(pos), ib.callee(tok), ib.block.Next, pos))
+			ib.SetTerminator(ir.NewJmpCondTerm(ir.Jz, ib.stack.Pop(pos), ib.callee(tok), block.Next, pos))
 		case Jn:
-			ib.block.SetTerminator(ir.NewJmpCondTerm(ir.Jn, ib.stack.Pop(pos), ib.callee(tok), ib.block.Next, pos))
+			ib.SetTerminator(ir.NewJmpCondTerm(ir.Jn, ib.stack.Pop(pos), ib.callee(tok), block.Next, pos))
 		case Ret:
-			ib.block.SetTerminator(ir.NewRetTerm(pos))
+			ib.SetTerminator(ir.NewRetTerm(pos))
 		case End:
-			ib.block.SetTerminator(ir.NewExitTerm(pos))
+			ib.SetTerminator(ir.NewExitTerm(pos))
 
 		case Printc:
 			ib.appendPrint(ir.PrintByte, pos)
@@ -233,16 +220,16 @@ func (ib *irBuilder) convertBlock(tokens []*Token) {
 		}
 	}
 	if offset := ib.stack.Len() - ib.stack.Pops(); offset != 0 {
-		ib.block.AppendInst(ir.NewOffsetStackStmt(offset, token.NoPos)) // TODO source position
+		ib.AppendInst(ir.NewOffsetStackStmt(offset, token.NoPos)) // TODO source position
 	}
 	for i, val := range ib.stack.Values() {
-		ib.block.AppendInst(ir.NewStoreStackStmt(ib.stack.Len()-i, val, val.Pos()))
+		ib.AppendInst(ir.NewStoreStackStmt(ib.stack.Len()-i, val, val.Pos()))
 	}
-	if ib.block.Terminator == nil {
-		if ib.block.Next != nil {
-			ib.block.SetTerminator(ir.NewJmpTerm(ir.Fallthrough, ib.block.Next, token.NoPos)) // TODO source position
+	if block.Terminator == nil {
+		if block.Next != nil {
+			ib.SetTerminator(ir.NewJmpTerm(ir.Fallthrough, block.Next, token.NoPos)) // TODO source position
 		} else {
-			ib.block.SetTerminator(ir.NewExitTerm(token.NoPos)) // TODO source position
+			ib.SetTerminator(ir.NewExitTerm(token.NoPos)) // TODO source position
 		}
 	}
 }
@@ -259,8 +246,8 @@ func (ib *irBuilder) intArg(tok *Token) (int, bool) {
 
 func (ib *irBuilder) callee(tok *Token) *ir.BasicBlock {
 	callee, ok := ib.labelBlocks.Get(tok.Arg)
-	if !ok {
-		panic(fmt.Sprintf("ws: block %s jumps to non-existent label: label_%v", ib.block.Name(), tok.Arg))
+	if !ok || callee.(*ir.BasicBlock) == nil {
+		panic(fmt.Sprintf("ws: block %s jumps to non-existent label: label_%v", ib.CurrentBlock().Name(), tok.Arg))
 	}
 	return callee.(*ir.BasicBlock)
 }
@@ -269,55 +256,33 @@ func (ib *irBuilder) appendBinary(op ir.BinaryOp, pos token.Pos) {
 	lhs, rhs := ib.stack.Pop2(pos)
 	bin := ir.NewBinaryExpr(op, lhs, rhs, pos)
 	ib.stack.Push(bin)
-	ib.block.AppendInst(bin)
+	ib.AppendInst(bin)
 }
 
 func (ib *irBuilder) appendPrint(op ir.PrintOp, pos token.Pos) {
 	val := ib.stack.Pop(pos)
-	ib.block.AppendInst(ir.NewPrintStmt(op, val, pos))
-	ib.block.AppendInst(ir.NewFlushStmt(pos))
+	ib.AppendInst(ir.NewPrintStmt(op, val, pos))
+	ib.AppendInst(ir.NewFlushStmt(pos))
 }
 
 func (ib *irBuilder) appendRead(op ir.ReadOp, pos token.Pos) {
 	addr := ib.stack.Pop(pos)
 	read := ir.NewReadExpr(op, pos)
 	store := ir.NewStoreHeapStmt(addr, read, pos)
-	ib.block.AppendInst(read)
-	ib.block.AppendInst(store)
+	ib.AppendInst(read)
+	ib.AppendInst(store)
 }
 
 func (ib *irBuilder) handleAccess(n int, pos token.Pos) {
-	ib.block.AppendInst(ir.NewAccessStackStmt(n, pos))
+	ib.AppendInst(ir.NewAccessStackStmt(n, pos))
 }
 
 func (ib *irBuilder) handleLoad(n int, pos token.Pos) ir.Value {
 	load := ir.NewLoadStackExpr(n, pos)
-	ib.block.AppendInst(load)
+	ib.AppendInst(load)
 	return load
 }
 
-func (ib *irBuilder) nameBlocks() {
-	prevLabel := ""
-	labelIndex := 0
-	for _, block := range ib.Blocks {
-		if len(block.Labels) > 0 {
-			prevLabel = ""
-			labelIndex = 0
-			for _, label := range block.Labels {
-				if label.Name != "" && block.LabelName == "" {
-					block.LabelName = label.Name
-					prevLabel = label.Name
-					labelIndex = 1
-				}
-			}
-		}
-		if block.LabelName == "" && prevLabel != "" {
-			block.LabelName = fmt.Sprintf("%s%d", prevLabel, labelIndex)
-			labelIndex++
-		}
-	}
-}
-
 func (ib *irBuilder) position(pos token.Pos) token.Position {
-	return ib.File.PositionFor(pos, false)
+	return ib.file.PositionFor(pos, false)
 }

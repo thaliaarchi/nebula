@@ -197,7 +197,7 @@ func convertSSA(args []string) *ir.Program {
 	if len(errs) != 0 {
 		fatal := false
 		for _, err := range errs {
-			if _, ok := err.(*ir.ErrorRetUnderflow); !ok {
+			if _, ok := err.(*ir.RetUnderflowError); !ok {
 				fatal = true
 			}
 			fmt.Fprintln(os.Stderr, err)
@@ -206,6 +206,7 @@ func convertSSA(args []string) *ir.Program {
 			os.Exit(1)
 		}
 	}
+	ssa.TrimUnreachable()
 	if !noFold {
 		optimize.FoldConstArith(ssa)
 	}
