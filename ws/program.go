@@ -5,15 +5,12 @@ import (
 	"go/token"
 	"regexp"
 	"strings"
-
-	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
-// Program is a sequence of tokens with source map information.
+// Program is a sequence of tokens with file information.
 type Program struct {
-	File       *token.File
-	Tokens     []*Token
-	LabelNames *bigint.Map // map[*big.Int]string
+	Tokens []*Token
+	File   *token.File
 }
 
 // Position returns the full position information for a given pos.

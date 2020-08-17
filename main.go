@@ -163,19 +163,20 @@ func lex(src []byte, filename string) *ws.Program {
 	if err != nil {
 		exitError(err)
 	}
-	program := &ws.Program{File: file, Tokens: tokens}
+	program := &ws.Program{Tokens: tokens, File: file}
 
 	mapFilename := filename + ".map"
 	if info, err := os.Stat(mapFilename); err == nil && !info.IsDir() {
-		sourceMap, err := os.Open(mapFilename)
+		labelMap, err := os.Open(mapFilename)
 		if err != nil {
 			exitError(err)
 		}
-		defer sourceMap.Close()
-		program.LabelNames, err = ws.ParseSourceMap(sourceMap)
+		defer labelMap.Close()
+		labelNames, err := ws.ParseLabelMap(labelMap)
 		if err != nil {
 			exitError(err)
 		}
+		ws.ApplyLabelMap(tokens, labelNames)
 	}
 	return program
 }

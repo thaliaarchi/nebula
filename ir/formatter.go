@@ -34,12 +34,14 @@ func (f *Formatter) FormatProgram(p *Program) string {
 // FormatBlock pretty prints a BasicBlock.
 func (f *Formatter) FormatBlock(block *BasicBlock) string {
 	var b strings.Builder
-	if len(block.Labels) == 0 {
-		fmt.Fprintf(&b, "block_%d:\n", block.ID)
-	}
+	name := block.Name()
+	b.WriteString(name)
+	b.WriteString(":\n")
 	for _, label := range block.Labels {
-		b.WriteString(label.String())
-		b.WriteString(":\n")
+		if l := label.String(); l != name {
+			b.WriteString(l)
+			b.WriteString(":\n")
+		}
 	}
 
 	b.WriteString("    ; entries: ")

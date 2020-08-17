@@ -9,9 +9,9 @@ import (
 	"github.com/andrewarchi/nebula/internal/bigint"
 )
 
-// ParseSourceMap reads a source map and parses it into mappings from
-// label to source name.
-func ParseSourceMap(r io.Reader) (*bigint.Map, error) {
+// ParseLabelMap reads a label source map and parses it into mappings
+// from label name to integer value.
+func ParseLabelMap(r io.Reader) (*bigint.Map, error) {
 	br := bufio.NewReader(r)
 	labels := bigint.NewMap() // map[*big.Int]string
 	for {
@@ -32,6 +32,17 @@ func ParseSourceMap(r io.Reader) (*bigint.Map, error) {
 		}
 		if labels.Put(label, name[:len(name)-1]) {
 			return nil, fmt.Errorf("duplicate source map label: %v", labelText)
+		}
+	}
+}
+
+// ApplyLabelMap adds label names from mapping to tokens.
+func ApplyLabelMap(tokens []*Token, labelNames *bigint.Map /* map[*big.Int]string */) {
+	for _, tok := range tokens {
+		if tok.Type == Label && tok.ArgString == "" {
+			if name, ok := labelNames.Get(tok.Arg); ok {
+				tok.ArgString = name.(string)
+			}
 		}
 	}
 }
