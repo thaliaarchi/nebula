@@ -69,7 +69,7 @@ func (b *Builder) InitBlocks(n int) {
 // CreateBlock creates a block.
 func (b *Builder) CreateBlock() *BasicBlock {
 	block := &BasicBlock{ID: b.nextID}
-	if len(b.blocks) > 0 {
+	if len(b.blocks) != 0 {
 		prev := b.blocks[len(b.blocks)-1]
 		block.Prev = prev
 		prev.Next = block
@@ -79,21 +79,11 @@ func (b *Builder) CreateBlock() *BasicBlock {
 	return block
 }
 
-// AppendInst appends an instruction to the current block.
-func (b *Builder) AppendInst(inst Inst) {
-	b.curr.AppendInst(inst)
-}
-
-// SetTerminator sets the terminator instruction of the current block.
-func (b *Builder) SetTerminator(term TermInst) {
-	b.curr.SetTerminator(term)
-}
-
 // CreateBinaryExpr constructs a BinaryExpr and appends it to the
 // current block.
 func (b *Builder) CreateBinaryExpr(op BinaryOp, lhs, rhs Value, pos token.Pos) *BinaryExpr {
 	bin := NewBinaryExpr(op, lhs, rhs, pos)
-	b.AppendInst(bin)
+	b.curr.AppendInst(bin)
 	return bin
 }
 
@@ -101,7 +91,7 @@ func (b *Builder) CreateBinaryExpr(op BinaryOp, lhs, rhs Value, pos token.Pos) *
 // block.
 func (b *Builder) CreateUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryExpr {
 	un := NewUnaryExpr(op, val, pos)
-	b.AppendInst(un)
+	b.curr.AppendInst(un)
 	return un
 }
 
@@ -109,7 +99,7 @@ func (b *Builder) CreateUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryEx
 // current block.
 func (b *Builder) CreateLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExpr {
 	load := NewLoadStackExpr(stackPos, pos)
-	b.AppendInst(load)
+	b.curr.AppendInst(load)
 	return load
 }
 
@@ -117,7 +107,7 @@ func (b *Builder) CreateLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExp
 // the current block.
 func (b *Builder) CreateStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
 	store := NewStoreStackStmt(stackPos, val, pos)
-	b.AppendInst(store)
+	b.curr.AppendInst(store)
 	return store
 }
 
@@ -125,7 +115,7 @@ func (b *Builder) CreateStoreStackStmt(stackPos int, val Value, pos token.Pos) *
 // the current block.
 func (b *Builder) CreateAccessStackStmt(stackSize int, pos token.Pos) *AccessStackStmt {
 	access := NewAccessStackStmt(stackSize, pos)
-	b.AppendInst(access)
+	b.curr.AppendInst(access)
 	return access
 }
 
@@ -133,7 +123,7 @@ func (b *Builder) CreateAccessStackStmt(stackSize int, pos token.Pos) *AccessSta
 // the current block.
 func (b *Builder) CreateOffsetStackStmt(offset int, pos token.Pos) *OffsetStackStmt {
 	off := NewOffsetStackStmt(offset, pos)
-	b.AppendInst(off)
+	b.curr.AppendInst(off)
 	return off
 }
 
@@ -141,7 +131,7 @@ func (b *Builder) CreateOffsetStackStmt(offset int, pos token.Pos) *OffsetStackS
 // current block.
 func (b *Builder) CreateLoadHeapExpr(addr Value, pos token.Pos) *LoadHeapExpr {
 	load := NewLoadHeapExpr(addr, pos)
-	b.AppendInst(load)
+	b.curr.AppendInst(load)
 	return load
 }
 
@@ -149,7 +139,7 @@ func (b *Builder) CreateLoadHeapExpr(addr Value, pos token.Pos) *LoadHeapExpr {
 // current block.
 func (b *Builder) CreateStoreHeapStmt(addr, val Value, pos token.Pos) *StoreHeapStmt {
 	store := NewStoreHeapStmt(addr, val, pos)
-	b.AppendInst(store)
+	b.curr.AppendInst(store)
 	return store
 }
 
@@ -157,7 +147,7 @@ func (b *Builder) CreateStoreHeapStmt(addr, val Value, pos token.Pos) *StoreHeap
 // block.
 func (b *Builder) CreatePrintStmt(op PrintOp, val Value, pos token.Pos) *PrintStmt {
 	print := NewPrintStmt(op, val, pos)
-	b.AppendInst(print)
+	b.curr.AppendInst(print)
 	return print
 }
 
@@ -165,7 +155,7 @@ func (b *Builder) CreatePrintStmt(op PrintOp, val Value, pos token.Pos) *PrintSt
 // block.
 func (b *Builder) CreateReadExpr(op ReadOp, pos token.Pos) *ReadExpr {
 	read := NewReadExpr(op, pos)
-	b.AppendInst(read)
+	b.curr.AppendInst(read)
 	return read
 }
 
@@ -173,7 +163,7 @@ func (b *Builder) CreateReadExpr(op ReadOp, pos token.Pos) *ReadExpr {
 // block.
 func (b *Builder) CreateFlushStmt(pos token.Pos) *FlushStmt {
 	flush := NewFlushStmt(pos)
-	b.AppendInst(flush)
+	b.curr.AppendInst(flush)
 	return flush
 }
 
@@ -181,7 +171,7 @@ func (b *Builder) CreateFlushStmt(pos token.Pos) *FlushStmt {
 // block.
 func (b *Builder) CreateCallTerm(callee, next *BasicBlock, pos token.Pos) *CallTerm {
 	call := NewCallTerm(callee, next, pos)
-	b.SetTerminator(call)
+	b.curr.SetTerminator(call)
 	return call
 }
 
@@ -189,7 +179,7 @@ func (b *Builder) CreateCallTerm(callee, next *BasicBlock, pos token.Pos) *CallT
 // block.
 func (b *Builder) CreateJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *JmpTerm {
 	jmp := NewJmpTerm(op, jumpee, pos)
-	b.SetTerminator(jmp)
+	b.curr.SetTerminator(jmp)
 	return jmp
 }
 
@@ -197,7 +187,7 @@ func (b *Builder) CreateJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *Jm
 // current block.
 func (b *Builder) CreateJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, pos token.Pos) *JmpCondTerm {
 	jc := NewJmpCondTerm(op, val, trueBlock, falseBlock, pos)
-	b.SetTerminator(jc)
+	b.curr.SetTerminator(jc)
 	return jc
 }
 
@@ -205,7 +195,7 @@ func (b *Builder) CreateJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlo
 // block.
 func (b *Builder) CreateRetTerm(pos token.Pos) *RetTerm {
 	ret := NewRetTerm(pos)
-	b.SetTerminator(ret)
+	b.curr.SetTerminator(ret)
 	return ret
 }
 
@@ -213,7 +203,7 @@ func (b *Builder) CreateRetTerm(pos token.Pos) *RetTerm {
 // block.
 func (b *Builder) CreateExitTerm(pos token.Pos) *ExitTerm {
 	exit := NewExitTerm(pos)
-	b.SetTerminator(exit)
+	b.curr.SetTerminator(exit)
 	return exit
 }
 
@@ -235,7 +225,7 @@ func (b *Builder) nameBlocks() {
 	prevLabel := ""
 	labelIndex := 0
 	for _, block := range b.blocks {
-		if len(block.Labels) > 0 {
+		if len(block.Labels) != 0 {
 			prevLabel = ""
 			labelIndex = 0
 			for _, label := range block.Labels {

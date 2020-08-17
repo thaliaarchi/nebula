@@ -167,50 +167,54 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 			}
 
 		case Add:
-			ib.appendBinary(ir.Add, pos)
+			lhs, rhs := ib.stack.Pop2(pos)
+			ib.stack.Push(ib.CreateBinaryExpr(ir.Add, lhs, rhs, pos))
 		case Sub:
-			ib.appendBinary(ir.Sub, pos)
+			lhs, rhs := ib.stack.Pop2(pos)
+			ib.stack.Push(ib.CreateBinaryExpr(ir.Sub, lhs, rhs, pos))
 		case Mul:
-			ib.appendBinary(ir.Mul, pos)
+			lhs, rhs := ib.stack.Pop2(pos)
+			ib.stack.Push(ib.CreateBinaryExpr(ir.Mul, lhs, rhs, pos))
 		case Div:
-			ib.appendBinary(ir.Div, pos)
+			lhs, rhs := ib.stack.Pop2(pos)
+			ib.stack.Push(ib.CreateBinaryExpr(ir.Div, lhs, rhs, pos))
 		case Mod:
-			ib.appendBinary(ir.Mod, pos)
+			lhs, rhs := ib.stack.Pop2(pos)
+			ib.stack.Push(ib.CreateBinaryExpr(ir.Mod, lhs, rhs, pos))
 
 		case Store:
 			addr, val := ib.stack.Pop2(pos)
-			ib.AppendInst(ir.NewStoreHeapStmt(addr, val, pos))
+			ib.CreateStoreHeapStmt(addr, val, pos)
 		case Retrieve:
-			addr := ib.stack.Pop(pos)
-			load := ir.NewLoadHeapExpr(addr, pos)
-			ib.stack.Push(load)
-			ib.AppendInst(load)
+			ib.stack.Push(ib.CreateLoadHeapExpr(ib.stack.Pop(pos), pos))
 
 		case Label:
 			if start {
 				block.Labels = append(block.Labels, ir.Label{ID: tok.Arg, Name: tok.ArgString})
 			}
 		case Call:
-			ib.SetTerminator(ir.NewCallTerm(ib.callee(tok), block.Next, pos))
+			ib.CreateCallTerm(ib.callee(tok), block.Next, pos)
 		case Jmp:
-			ib.SetTerminator(ir.NewJmpTerm(ir.Jmp, ib.callee(tok), pos))
+			ib.CreateJmpTerm(ir.Jmp, ib.callee(tok), pos)
 		case Jz:
-			ib.SetTerminator(ir.NewJmpCondTerm(ir.Jz, ib.stack.Pop(pos), ib.callee(tok), block.Next, pos))
+			ib.CreateJmpCondTerm(ir.Jz, ib.stack.Pop(pos), ib.callee(tok), block.Next, pos)
 		case Jn:
-			ib.SetTerminator(ir.NewJmpCondTerm(ir.Jn, ib.stack.Pop(pos), ib.callee(tok), block.Next, pos))
+			ib.CreateJmpCondTerm(ir.Jn, ib.stack.Pop(pos), ib.callee(tok), block.Next, pos)
 		case Ret:
-			ib.SetTerminator(ir.NewRetTerm(pos))
+			ib.CreateRetTerm(pos)
 		case End:
-			ib.SetTerminator(ir.NewExitTerm(pos))
+			ib.CreateExitTerm(pos)
 
 		case Printc:
-			ib.appendPrint(ir.PrintByte, pos)
+			ib.CreatePrintStmt(ir.PrintByte, ib.stack.Pop(pos), pos)
+			ib.CreateFlushStmt(pos)
 		case Printi:
-			ib.appendPrint(ir.PrintInt, pos)
+			ib.CreatePrintStmt(ir.PrintInt, ib.stack.Pop(pos), pos)
+			ib.CreateFlushStmt(pos)
 		case Readc:
-			ib.appendRead(ir.ReadByte, pos)
+			ib.CreateStoreHeapStmt(ib.stack.Pop(pos), ib.CreateReadExpr(ir.ReadByte, pos), pos)
 		case Readi:
-			ib.appendRead(ir.ReadInt, pos)
+			ib.CreateStoreHeapStmt(ib.stack.Pop(pos), ib.CreateReadExpr(ir.ReadInt, pos), pos)
 
 		default:
 			panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
@@ -220,16 +224,16 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 		}
 	}
 	if offset := ib.stack.Len() - ib.stack.Pops(); offset != 0 {
-		ib.AppendInst(ir.NewOffsetStackStmt(offset, token.NoPos)) // TODO source position
+		ib.CreateOffsetStackStmt(offset, token.NoPos) // TODO source position
 	}
 	for i, val := range ib.stack.Values() {
-		ib.AppendInst(ir.NewStoreStackStmt(ib.stack.Len()-i, val, val.Pos()))
+		ib.CreateStoreStackStmt(ib.stack.Len()-i, val, val.Pos())
 	}
 	if block.Terminator == nil {
 		if block.Next != nil {
-			ib.SetTerminator(ir.NewJmpTerm(ir.Fallthrough, block.Next, token.NoPos)) // TODO source position
+			ib.CreateJmpTerm(ir.Fallthrough, block.Next, token.NoPos) // TODO source position
 		} else {
-			ib.SetTerminator(ir.NewExitTerm(token.NoPos)) // TODO source position
+			ib.CreateExitTerm(token.NoPos) // TODO source position
 		}
 	}
 }
@@ -252,35 +256,12 @@ func (ib *irBuilder) callee(tok *Token) *ir.BasicBlock {
 	return callee.(*ir.BasicBlock)
 }
 
-func (ib *irBuilder) appendBinary(op ir.BinaryOp, pos token.Pos) {
-	lhs, rhs := ib.stack.Pop2(pos)
-	bin := ir.NewBinaryExpr(op, lhs, rhs, pos)
-	ib.stack.Push(bin)
-	ib.AppendInst(bin)
-}
-
-func (ib *irBuilder) appendPrint(op ir.PrintOp, pos token.Pos) {
-	val := ib.stack.Pop(pos)
-	ib.AppendInst(ir.NewPrintStmt(op, val, pos))
-	ib.AppendInst(ir.NewFlushStmt(pos))
-}
-
-func (ib *irBuilder) appendRead(op ir.ReadOp, pos token.Pos) {
-	addr := ib.stack.Pop(pos)
-	read := ir.NewReadExpr(op, pos)
-	store := ir.NewStoreHeapStmt(addr, read, pos)
-	ib.AppendInst(read)
-	ib.AppendInst(store)
-}
-
 func (ib *irBuilder) handleAccess(n int, pos token.Pos) {
-	ib.AppendInst(ir.NewAccessStackStmt(n, pos))
+	ib.CreateAccessStackStmt(n, pos)
 }
 
 func (ib *irBuilder) handleLoad(n int, pos token.Pos) ir.Value {
-	load := ir.NewLoadStackExpr(n, pos)
-	ib.AppendInst(load)
-	return load
+	return ib.CreateLoadStackExpr(n, pos)
 }
 
 func (ib *irBuilder) position(pos token.Pos) token.Position {
