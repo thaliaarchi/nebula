@@ -151,23 +151,23 @@ type BinaryExpr struct {
 
 // NewBinaryExpr constructs a BinaryExpr.
 func NewBinaryExpr(op BinaryOp, lhs, rhs Value, pos token.Pos) *BinaryExpr {
-	b := &BinaryExpr{Op: op, pos: pos}
-	b.operands[0] = NewValueUse(lhs, b, 0)
-	b.operands[1] = NewValueUse(rhs, b, 1)
-	return b
+	bin := &BinaryExpr{Op: op, pos: pos}
+	bin.operands[0] = NewValueUse(lhs, bin, 0)
+	bin.operands[1] = NewValueUse(rhs, bin, 1)
+	return bin
 }
 
 // Operands returns the binary LHS and RHS values.
-func (b *BinaryExpr) Operands() []*ValueUse { return b.operands[:] }
+func (bin *BinaryExpr) Operands() []*ValueUse { return bin.operands[:] }
 
 // Uses returns the set of instructions referring this node.
-func (b *BinaryExpr) Uses() *[]*ValueUse { return &b.uses }
+func (bin *BinaryExpr) Uses() *[]*ValueUse { return &bin.uses }
 
 // Pos returns the source location of this node.
-func (b *BinaryExpr) Pos() token.Pos { return b.pos }
+func (bin *BinaryExpr) Pos() token.Pos { return bin.pos }
 
 // OpString pretty prints the op kind.
-func (b *BinaryExpr) OpString() string { return b.Op.String() }
+func (bin *BinaryExpr) OpString() string { return bin.Op.String() }
 
 // UnaryOp is the operator kind of a unary expression.
 type UnaryOp uint8
@@ -195,22 +195,22 @@ type UnaryExpr struct {
 
 // NewUnaryExpr constructs a UnaryExpr.
 func NewUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryExpr {
-	u := &UnaryExpr{Op: op, pos: pos}
-	u.operands[0] = NewValueUse(val, u, 0)
-	return u
+	un := &UnaryExpr{Op: op, pos: pos}
+	un.operands[0] = NewValueUse(val, un, 0)
+	return un
 }
 
 // Operands returns the unary value.
-func (u *UnaryExpr) Operands() []*ValueUse { return u.operands[:] }
+func (un *UnaryExpr) Operands() []*ValueUse { return un.operands[:] }
 
 // Uses returns the set of instructions referring this node.
-func (u *UnaryExpr) Uses() *[]*ValueUse { return &u.uses }
+func (un *UnaryExpr) Uses() *[]*ValueUse { return &un.uses }
 
 // Pos returns the source location of this node.
-func (u *UnaryExpr) Pos() token.Pos { return u.pos }
+func (un *UnaryExpr) Pos() token.Pos { return un.pos }
 
 // OpString pretty prints the op kind.
-func (u *UnaryExpr) OpString() string { return u.Op.String() }
+func (un *UnaryExpr) OpString() string { return un.Op.String() }
 
 // LoadStackExpr is an expression that loads a value from under the
 // current stack frame. A position of 1 is the top of the stack.
@@ -222,17 +222,20 @@ type LoadStackExpr struct {
 
 // NewLoadStackExpr constructs a LoadStackExpr.
 func NewLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExpr {
+	if stackPos < 0 {
+		panic("NewLoadStackExpr: negative stack position")
+	}
 	return &LoadStackExpr{StackPos: stackPos, pos: pos}
 }
 
 // Uses returns the set of instructions referring this node.
-func (l *LoadStackExpr) Uses() *[]*ValueUse { return &l.uses }
+func (load *LoadStackExpr) Uses() *[]*ValueUse { return &load.uses }
 
 // Pos returns the source location of this node.
-func (l *LoadStackExpr) Pos() token.Pos { return l.pos }
+func (load *LoadStackExpr) Pos() token.Pos { return load.pos }
 
 // OpString pretty prints the op kind.
-func (l *LoadStackExpr) OpString() string { return "loadstack" }
+func (load *LoadStackExpr) OpString() string { return "loadstack" }
 
 // StoreStackStmt is a statement that stores a value at a position in
 // the stack.
@@ -244,6 +247,9 @@ type StoreStackStmt struct {
 
 // NewStoreStackStmt constructs a StoreStackStmt.
 func NewStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
+	if stackPos < 0 {
+		panic("NewLoadStackExpr: negative stack position")
+	}
 	s := &StoreStackStmt{StackPos: stackPos, pos: pos}
 	s.operands[0] = NewValueUse(val, s, 0)
 	return s
@@ -266,6 +272,9 @@ type AccessStackStmt struct {
 
 // NewAccessStackStmt constructs a AccessStackStmt.
 func NewAccessStackStmt(stackSize int, pos token.Pos) *AccessStackStmt {
+	if stackSize < 0 {
+		panic("NewLoadStackExpr: negative stack position")
+	}
 	return &AccessStackStmt{StackSize: stackSize, pos: pos}
 }
 
@@ -303,22 +312,22 @@ type LoadHeapExpr struct {
 
 // NewLoadHeapExpr constructs a LoadHeapExpr.
 func NewLoadHeapExpr(addr Value, pos token.Pos) *LoadHeapExpr {
-	l := &LoadHeapExpr{pos: pos}
-	l.operands[0] = NewValueUse(addr, l, 0)
-	return l
+	load := &LoadHeapExpr{pos: pos}
+	load.operands[0] = NewValueUse(addr, load, 0)
+	return load
 }
 
 // Operands returns the heap address to load.
-func (l *LoadHeapExpr) Operands() []*ValueUse { return l.operands[:] }
+func (load *LoadHeapExpr) Operands() []*ValueUse { return load.operands[:] }
 
 // Uses returns the set of instructions referring this node.
-func (l *LoadHeapExpr) Uses() *[]*ValueUse { return &l.uses }
+func (load *LoadHeapExpr) Uses() *[]*ValueUse { return &load.uses }
 
 // Pos returns the source location of this node.
-func (l *LoadHeapExpr) Pos() token.Pos { return l.pos }
+func (load *LoadHeapExpr) Pos() token.Pos { return load.pos }
 
 // OpString pretty prints the op kind.
-func (l *LoadHeapExpr) OpString() string { return "loadheap" }
+func (load *LoadHeapExpr) OpString() string { return "loadheap" }
 
 // StoreHeapStmt is a statement that stores a value at an address
 // in the heap.
@@ -329,20 +338,20 @@ type StoreHeapStmt struct {
 
 // NewStoreHeapStmt constructs a StoreHeapStmt.
 func NewStoreHeapStmt(addr, val Value, pos token.Pos) *StoreHeapStmt {
-	s := &StoreHeapStmt{pos: pos}
-	s.operands[0] = NewValueUse(addr, s, 0)
-	s.operands[1] = NewValueUse(val, s, 1)
-	return s
+	store := &StoreHeapStmt{pos: pos}
+	store.operands[0] = NewValueUse(addr, store, 0)
+	store.operands[1] = NewValueUse(val, store, 1)
+	return store
 }
 
 // Operands returns the heap address and the value to store there.
-func (s *StoreHeapStmt) Operands() []*ValueUse { return s.operands[:] }
+func (store *StoreHeapStmt) Operands() []*ValueUse { return store.operands[:] }
 
 // Pos returns the source location of this node.
-func (s *StoreHeapStmt) Pos() token.Pos { return s.pos }
+func (store *StoreHeapStmt) Pos() token.Pos { return store.pos }
 
 // OpString pretty prints the op kind.
-func (s *StoreHeapStmt) OpString() string { return "storeheap" }
+func (store *StoreHeapStmt) OpString() string { return "storeheap" }
 
 // PrintOp is operator kind of a print statement.
 type PrintOp uint8
@@ -372,19 +381,19 @@ type PrintStmt struct {
 
 // NewPrintStmt constructs a PrintStmt.
 func NewPrintStmt(op PrintOp, val Value, pos token.Pos) *PrintStmt {
-	p := &PrintStmt{Op: op, pos: pos}
-	p.operands[0] = NewValueUse(val, p, 0)
-	return p
+	print := &PrintStmt{Op: op, pos: pos}
+	print.operands[0] = NewValueUse(val, print, 0)
+	return print
 }
 
 // Operands returns the value to print.
-func (p *PrintStmt) Operands() []*ValueUse { return p.operands[:] }
+func (print *PrintStmt) Operands() []*ValueUse { return print.operands[:] }
 
 // Pos returns the source location of this node.
-func (p *PrintStmt) Pos() token.Pos { return p.pos }
+func (print *PrintStmt) Pos() token.Pos { return print.pos }
 
 // OpString pretty prints the op kind.
-func (p *PrintStmt) OpString() string { return p.Op.String() }
+func (print *PrintStmt) OpString() string { return print.Op.String() }
 
 // ReadOp is the operator kind of a read expression.
 type ReadOp uint8
@@ -418,13 +427,13 @@ func NewReadExpr(op ReadOp, pos token.Pos) *ReadExpr {
 }
 
 // Uses returns the set of instructions referring this node.
-func (r *ReadExpr) Uses() *[]*ValueUse { return &r.uses }
+func (read *ReadExpr) Uses() *[]*ValueUse { return &read.uses }
 
 // Pos returns the source location of this node.
-func (r *ReadExpr) Pos() token.Pos { return r.pos }
+func (read *ReadExpr) Pos() token.Pos { return read.pos }
 
 // OpString pretty prints the op kind.
-func (r *ReadExpr) OpString() string { return r.Op.String() }
+func (read *ReadExpr) OpString() string { return read.Op.String() }
 
 // FlushStmt is a statement that flushes stdout.
 type FlushStmt struct {
@@ -437,10 +446,10 @@ func NewFlushStmt(pos token.Pos) *FlushStmt {
 }
 
 // Pos returns the source location of this node.
-func (f *FlushStmt) Pos() token.Pos { return f.pos }
+func (flush *FlushStmt) Pos() token.Pos { return flush.pos }
 
 // OpString pretty prints the op kind.
-func (f *FlushStmt) OpString() string { return "flush" }
+func (flush *FlushStmt) OpString() string { return "flush" }
 
 // PhiExpr is an SSA Φ function with pairs of values and predecessor
 // blocks.
@@ -489,13 +498,13 @@ func NewCallTerm(callee, next *BasicBlock, pos token.Pos) *CallTerm {
 
 // Succs returns the call destination block and the block to which ret
 // transfers control.
-func (c *CallTerm) Succs() []*BasicBlock { return c.succs[:] }
+func (call *CallTerm) Succs() []*BasicBlock { return call.succs[:] }
 
 // Pos returns the source location of this node.
-func (c *CallTerm) Pos() token.Pos { return c.pos }
+func (call *CallTerm) Pos() token.Pos { return call.pos }
 
 // OpString pretty prints the op kind.
-func (c *CallTerm) OpString() string { return "call" }
+func (call *CallTerm) OpString() string { return "call" }
 
 // JmpOp is the operator kind of a jump terminator.
 type JmpOp uint8
@@ -529,13 +538,13 @@ func NewJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *JmpTerm {
 }
 
 // Succs returns the jump destination.
-func (j *JmpTerm) Succs() []*BasicBlock { return j.succs[:] }
+func (jmp *JmpTerm) Succs() []*BasicBlock { return jmp.succs[:] }
 
 // Pos returns the source location of this node.
-func (j *JmpTerm) Pos() token.Pos { return j.pos }
+func (jmp *JmpTerm) Pos() token.Pos { return jmp.pos }
 
 // OpString pretty prints the op kind.
-func (j *JmpTerm) OpString() string { return j.Op.String() }
+func (jmp *JmpTerm) OpString() string { return jmp.Op.String() }
 
 // JmpCondOp is the kind of operator for a conditional jump terminator.
 type JmpCondOp uint8
@@ -543,6 +552,7 @@ type JmpCondOp uint8
 // Conditional jump operations.
 const (
 	Jz JmpCondOp = iota
+	Jnz
 	Jn
 )
 
@@ -550,6 +560,8 @@ func (op JmpCondOp) String() string {
 	switch op {
 	case Jz:
 		return "jz"
+	case Jnz:
+		return "jnz"
 	case Jn:
 		return "jn"
 	}
@@ -567,23 +579,23 @@ type JmpCondTerm struct {
 
 // NewJmpCondTerm constructs a JmpCondTerm.
 func NewJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, pos token.Pos) *JmpCondTerm {
-	j := &JmpCondTerm{Op: op, succs: [2]*BasicBlock{trueBlock, falseBlock}, pos: pos}
-	j.operands[0] = NewValueUse(val, j, 0)
-	return j
+	jc := &JmpCondTerm{Op: op, succs: [2]*BasicBlock{trueBlock, falseBlock}, pos: pos}
+	jc.operands[0] = NewValueUse(val, jc, 0)
+	return jc
 }
 
 // Operands returns the value used by the condition.
-func (j *JmpCondTerm) Operands() []*ValueUse { return j.operands[:] }
+func (jc *JmpCondTerm) Operands() []*ValueUse { return jc.operands[:] }
 
 // Succs returns the jump destination on true condition and the
 // destination on false.
-func (j *JmpCondTerm) Succs() []*BasicBlock { return j.succs[:] }
+func (jc *JmpCondTerm) Succs() []*BasicBlock { return jc.succs[:] }
 
 // Pos returns the source location of this node.
-func (j *JmpCondTerm) Pos() token.Pos { return j.pos }
+func (jc *JmpCondTerm) Pos() token.Pos { return jc.pos }
 
 // OpString pretty prints the op kind.
-func (j *JmpCondTerm) OpString() string { return j.Op.String() }
+func (jc *JmpCondTerm) OpString() string { return jc.Op.String() }
 
 // RetTerm is a terminator that returns to the caller.
 type RetTerm struct {
@@ -596,13 +608,13 @@ func NewRetTerm(pos token.Pos) *RetTerm {
 }
 
 // Succs returns no successors.
-func (r *RetTerm) Succs() []*BasicBlock { return nil }
+func (ret *RetTerm) Succs() []*BasicBlock { return nil }
 
 // Pos returns the source location of this node.
-func (r *RetTerm) Pos() token.Pos { return r.pos }
+func (ret *RetTerm) Pos() token.Pos { return ret.pos }
 
 // OpString pretty prints the op kind.
-func (r *RetTerm) OpString() string { return "ret" }
+func (ret *RetTerm) OpString() string { return "ret" }
 
 // ExitTerm is a terminator that exits the program.
 type ExitTerm struct {
@@ -615,13 +627,13 @@ func NewExitTerm(pos token.Pos) *ExitTerm {
 }
 
 // Succs returns no successors.
-func (e *ExitTerm) Succs() []*BasicBlock { return nil }
+func (exit *ExitTerm) Succs() []*BasicBlock { return nil }
 
 // Pos returns the source location of this node.
-func (e *ExitTerm) Pos() token.Pos { return e.pos }
+func (exit *ExitTerm) Pos() token.Pos { return exit.pos }
 
 // OpString pretty prints the op kind.
-func (e *ExitTerm) OpString() string { return "exit" }
+func (exit *ExitTerm) OpString() string { return "exit" }
 
 // Operand returns the specified operand.
 func Operand(user User, operand uint) *ValueUse {

@@ -38,9 +38,10 @@ func (ib *irBuilder) Errs() []error {
 	return ib.errs
 }
 
-// LowerIR lowers a Whitespace AST to Nebula IR in SSA form.
+// LowerIR lowers a Whitespace program to Nebula IR in SSA form.
 func (p *Program) LowerIR() (*ir.Program, []error) {
 	ib := &irBuilder{
+		Builder:     ir.NewBuilder(p.File),
 		tokens:      p.Tokens,
 		labelBlocks: bigint.NewMap(),
 		file:        p.File,
@@ -52,8 +53,7 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 	labelUses := ib.collectLabels()
 	ib.splitTokens(labelUses)
 	for i, tokens := range ib.tokenBlocks {
-		ib.SetCurrentBlock(i)
-		ib.convertBlock(tokens)
+		ib.convertBlock(ib.Block(i), tokens)
 	}
 	ssa, err := ib.Program()
 	if err != nil {
@@ -119,7 +119,7 @@ func (ib *irBuilder) splitTokens(labelUses *bigint.Map) {
 		ib.tokenBlocks = append(ib.tokenBlocks, []*Token{})
 	}
 
-	ib.Builder = ir.NewBuilder(len(ib.tokenBlocks), ib.file)
+	ib.InitBlocks(len(ib.tokenBlocks))
 	for i, block := range ib.Blocks() {
 		for _, tok := range ib.tokenBlocks[i] {
 			if tok.Type == Label {
@@ -142,8 +142,8 @@ func needsImplicitEnd(tokens []*Token) bool {
 	return true
 }
 
-func (ib *irBuilder) convertBlock(tokens []*Token) {
-	block := ib.CurrentBlock()
+func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
+	ib.SetCurrentBlock(block)
 	ib.stack.Clear()
 	start := true
 	for _, tok := range tokens {

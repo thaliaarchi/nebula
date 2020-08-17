@@ -175,6 +175,5 @@ func writeStackPos(b *strings.Builder, inst Inst) {
 	default:
 		return
 	}
-	b.WriteByte(' ')
-	fmt.Fprintf(b, "%d", pos)
+	fmt.Fprintf(b, " %d", pos)
 }

@@ -73,3 +73,9 @@ func (typ Type) StringBF() string {
 	}
 	return fmt.Sprintf("token(%d)", int(typ))
 }
+
+// Program is a sequence of Brainfuck tokens with file information.
+type Program struct {
+	Tokens []*Token
+	File   *token.File
+}

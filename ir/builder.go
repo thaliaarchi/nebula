@@ -9,6 +9,7 @@ import (
 type Builder struct {
 	blocks []*BasicBlock
 	curr   *BasicBlock
+	nextID int
 	file   *token.File
 }
 
@@ -19,19 +20,8 @@ type RetUnderflowError struct {
 }
 
 // NewBuilder constructs a builder with a given number of basic blocks.
-func NewBuilder(n int, file *token.File) *Builder {
-	if n < 0 {
-		panic(fmt.Sprintf("NewBuilder: negative block count: %d", n))
-	}
-	blocks := make([]*BasicBlock, n)
-	for i := range blocks {
-		blocks[i] = &BasicBlock{ID: i}
-		if i > 0 {
-			blocks[i].Prev = blocks[i-1]
-			blocks[i-1].Next = blocks[i]
-		}
-	}
-	return &Builder{blocks: blocks, file: file}
+func NewBuilder(file *token.File) *Builder {
+	return &Builder{file: file}
 }
 
 // Blocks returns all blocks.
@@ -44,9 +34,43 @@ func (b *Builder) Block(n int) *BasicBlock { return b.blocks[n] }
 func (b *Builder) CurrentBlock() *BasicBlock { return b.curr }
 
 // SetCurrentBlock sets the currently selected block.
-func (b *Builder) SetCurrentBlock(n int) *BasicBlock {
-	b.curr = b.blocks[n]
-	return b.curr
+func (b *Builder) SetCurrentBlock(block *BasicBlock) {
+	b.curr = block
+}
+
+// InitBlocks creates n empty blocks and sets the first to be the
+// current block.
+func (b *Builder) InitBlocks(n int) {
+	if n < 0 {
+		panic(fmt.Sprintf("NewBuilder: negative block count: %d", n))
+	}
+	if n == 0 {
+		return
+	}
+	blocks := make([]*BasicBlock, n)
+	for i := range blocks {
+		blocks[i] = &BasicBlock{ID: b.nextID}
+		if i > 0 {
+			blocks[i].Prev = blocks[i-1]
+			blocks[i-1].Next = blocks[i]
+		}
+		b.nextID++
+	}
+	b.blocks = blocks
+	b.curr = blocks[0]
+}
+
+// CreateBlock creates a block.
+func (b *Builder) CreateBlock() *BasicBlock {
+	block := &BasicBlock{ID: b.nextID}
+	if len(b.blocks) > 0 {
+		prev := b.blocks[len(b.blocks)-1]
+		block.Prev = prev
+		prev.Next = block
+	}
+	b.blocks = append(b.blocks, block)
+	b.nextID++
+	return block
 }
 
 // AppendInst appends an instruction to the current block.
@@ -57,6 +81,134 @@ func (b *Builder) AppendInst(inst Inst) {
 // SetTerminator sets the terminator instruction of the current block.
 func (b *Builder) SetTerminator(term TermInst) {
 	b.curr.SetTerminator(term)
+}
+
+// CreateBinaryExpr constructs a BinaryExpr and appends it to the
+// current block.
+func (b *Builder) CreateBinaryExpr(op BinaryOp, lhs, rhs Value, pos token.Pos) *BinaryExpr {
+	bin := NewBinaryExpr(op, lhs, rhs, pos)
+	b.AppendInst(bin)
+	return bin
+}
+
+// CreateUnaryExpr constructs a UnaryExpr and appends it to the current
+// block.
+func (b *Builder) CreateUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryExpr {
+	un := NewUnaryExpr(op, val, pos)
+	b.AppendInst(un)
+	return un
+}
+
+// CreateLoadStackExpr constructs a LoadStackExpr and appends it to the
+// current block.
+func (b *Builder) CreateLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExpr {
+	load := NewLoadStackExpr(stackPos, pos)
+	b.AppendInst(load)
+	return load
+}
+
+// CreateStoreStackStmt constructs a StoreStackStmt and appends it to
+// the current block.
+func (b *Builder) CreateStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
+	store := NewStoreStackStmt(stackPos, val, pos)
+	b.AppendInst(store)
+	return store
+}
+
+// CreateAccessStackStmt constructs a AccessStackStmt and appends it to
+// the current block.
+func (b *Builder) CreateAccessStackStmt(stackSize int, pos token.Pos) *AccessStackStmt {
+	access := NewAccessStackStmt(stackSize, pos)
+	b.AppendInst(access)
+	return access
+}
+
+// CreateOffsetStackStmt constructs a OffsetStackStmt and appends it to
+// the current block.
+func (b *Builder) CreateOffsetStackStmt(offset int, pos token.Pos) *OffsetStackStmt {
+	off := NewOffsetStackStmt(offset, pos)
+	b.AppendInst(off)
+	return off
+}
+
+// CreateLoadHeapExpr constructs a LoadHeapExpr and appends it to the
+// current block.
+func (b *Builder) CreateLoadHeapExpr(addr Value, pos token.Pos) *LoadHeapExpr {
+	load := NewLoadHeapExpr(addr, pos)
+	b.AppendInst(load)
+	return load
+}
+
+// CreateStoreHeapStmt constructs a StoreHeapStmt and appends it to the
+// current block.
+func (b *Builder) CreateStoreHeapStmt(addr, val Value, pos token.Pos) *StoreHeapStmt {
+	store := NewStoreHeapStmt(addr, val, pos)
+	b.AppendInst(store)
+	return store
+}
+
+// CreatePrintStmt constructs a PrintStmt and appends it to the current
+// block.
+func (b *Builder) CreatePrintStmt(op PrintOp, val Value, pos token.Pos) *PrintStmt {
+	print := NewPrintStmt(op, val, pos)
+	b.AppendInst(print)
+	return print
+}
+
+// CreateReadExpr constructs a ReadExpr and appends it to the current
+// block.
+func (b *Builder) CreateReadExpr(op ReadOp, pos token.Pos) *ReadExpr {
+	read := NewReadExpr(op, pos)
+	b.AppendInst(read)
+	return read
+}
+
+// CreateFlushStmt constructs a FlushStmt and appends it to the current
+// block.
+func (b *Builder) CreateFlushStmt(pos token.Pos) *FlushStmt {
+	flush := NewFlushStmt(pos)
+	b.AppendInst(flush)
+	return flush
+}
+
+// CreateCallTerm constructs a CallTerm and appends it to the current
+// block.
+func (b *Builder) CreateCallTerm(callee, next *BasicBlock, pos token.Pos) *CallTerm {
+	call := NewCallTerm(callee, next, pos)
+	b.AppendInst(call)
+	return call
+}
+
+// CreateJmpTerm constructs a JmpTerm and appends it to the current
+// block.
+func (b *Builder) CreateJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *JmpTerm {
+	jmp := NewJmpTerm(op, jumpee, pos)
+	b.AppendInst(jmp)
+	return jmp
+}
+
+// CreateJmpCondTerm constructs a JmpCondTerm and appends it to the
+// current block.
+func (b *Builder) CreateJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, pos token.Pos) *JmpCondTerm {
+	jc := NewJmpCondTerm(op, val, trueBlock, falseBlock, pos)
+	b.AppendInst(jc)
+	return jc
+}
+
+// CreateRetTerm constructs a RetTerm and appends it to the current
+// block.
+func (b *Builder) CreateRetTerm(pos token.Pos) *RetTerm {
+	ret := NewRetTerm(pos)
+	b.AppendInst(ret)
+	return ret
+}
+
+// CreateExitTerm constructs a ExitTerm and appends it to the current
+// block.
+func (b *Builder) CreateExitTerm(pos token.Pos) *ExitTerm {
+	exit := NewExitTerm(pos)
+	b.AppendInst(exit)
+	return exit
 }
 
 // Program completes IR construction and returns a program.

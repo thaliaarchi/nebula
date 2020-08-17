@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Program is a sequence of tokens with file information.
+// Program is a sequence of Whitespace tokens with file information.
 type Program struct {
 	Tokens []*Token
 	File   *token.File

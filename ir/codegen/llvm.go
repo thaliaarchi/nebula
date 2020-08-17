@@ -256,9 +256,11 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		var cond llvm.Value
 		switch term.Op {
 		case ir.Jz:
-			cond = m.b.CreateICmp(llvm.IntEQ, val, zero, "cmp")
+			cond = m.b.CreateICmp(llvm.IntEQ, val, zero, "jz")
+		case ir.Jnz:
+			cond = m.b.CreateICmp(llvm.IntNE, val, zero, "jnz")
 		case ir.Jn:
-			cond = m.b.CreateICmp(llvm.IntSLT, val, zero, "cmp")
+			cond = m.b.CreateICmp(llvm.IntSLT, val, zero, "jn")
 		default:
 			panic("codegen: unrecognized conditional jump op")
 		}
