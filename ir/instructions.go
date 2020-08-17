@@ -349,19 +349,16 @@ type PrintOp uint8
 
 // Print operations.
 const (
-	Printc PrintOp = iota
-	Printi
-	Prints
+	PrintByte PrintOp = iota
+	PrintInt
 )
 
 func (op PrintOp) String() string {
 	switch op {
-	case Printc:
-		return "printc"
-	case Printi:
-		return "printi"
-	case Prints:
-		return "prints"
+	case PrintByte:
+		return "printbyte"
+	case PrintInt:
+		return "printint"
 	}
 	return "printerr"
 }
@@ -394,16 +391,16 @@ type ReadOp uint8
 
 // Read operations.
 const (
-	Readc ReadOp = iota
-	Readi
+	ReadByte ReadOp = iota
+	ReadInt
 )
 
 func (op ReadOp) String() string {
 	switch op {
-	case Readc:
-		return "readc"
-	case Readi:
-		return "readi"
+	case ReadByte:
+		return "readbyte"
+	case ReadInt:
+		return "readint"
 	}
 	return "readerr"
 }

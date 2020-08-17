@@ -181,9 +181,7 @@ func TestSimplify(t *testing.T) {
 	}
 }
 
-func handleAccess(n int, pos token.Pos) {
-	panic("TODO")
-}
+func handleAccess(n int, pos token.Pos) {}
 
 func handleLoad(n int, pos token.Pos) Value {
 	if n < 1 || n > 4 {

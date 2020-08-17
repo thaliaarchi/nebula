@@ -29,10 +29,10 @@ type moduleBuilder struct {
 	heap         llvm.Value
 
 	main           llvm.Value
-	printc         llvm.Value
-	printi         llvm.Value
-	readc          llvm.Value
-	readi          llvm.Value
+	printByte      llvm.Value
+	printInt       llvm.Value
+	readByte       llvm.Value
+	readInt        llvm.Value
 	flush          llvm.Value
 	checkStack     llvm.Value
 	checkCallStack llvm.Value
@@ -89,18 +89,18 @@ func (m *moduleBuilder) declareFuncs() {
 	checkStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{llvm.Int64Type(), cStrTyp, cStrTyp}, false)
 	checkCallStackTyp := llvm.FunctionType(llvm.VoidType(), []llvm.Type{cStrTyp, cStrTyp}, false)
 
-	m.printc = llvm.AddFunction(m.module, "printc", printcTyp)
-	m.printi = llvm.AddFunction(m.module, "printi", printiTyp)
-	m.readc = llvm.AddFunction(m.module, "readc", readcTyp)
-	m.readi = llvm.AddFunction(m.module, "readi", readiTyp)
+	m.printByte = llvm.AddFunction(m.module, "print_byte", printcTyp)
+	m.printInt = llvm.AddFunction(m.module, "print_int", printiTyp)
+	m.readByte = llvm.AddFunction(m.module, "read_byte", readcTyp)
+	m.readInt = llvm.AddFunction(m.module, "read_int", readiTyp)
 	m.flush = llvm.AddFunction(m.module, "flush", flushTyp)
 	m.checkStack = llvm.AddFunction(m.module, "check_stack", checkStackTyp)
 	m.checkCallStack = llvm.AddFunction(m.module, "check_call_stack", checkCallStackTyp)
 
-	m.printc.SetLinkage(llvm.ExternalLinkage)
-	m.printi.SetLinkage(llvm.ExternalLinkage)
-	m.readc.SetLinkage(llvm.ExternalLinkage)
-	m.readi.SetLinkage(llvm.ExternalLinkage)
+	m.printByte.SetLinkage(llvm.ExternalLinkage)
+	m.printInt.SetLinkage(llvm.ExternalLinkage)
+	m.readByte.SetLinkage(llvm.ExternalLinkage)
+	m.readInt.SetLinkage(llvm.ExternalLinkage)
 	m.flush.SetLinkage(llvm.ExternalLinkage)
 	m.checkStack.SetLinkage(llvm.ExternalLinkage)
 	m.checkCallStack.SetLinkage(llvm.ExternalLinkage)
@@ -211,10 +211,10 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 	case *ir.PrintStmt:
 		var f llvm.Value
 		switch inst.Op {
-		case ir.Printc:
-			f = m.printc
-		case ir.Printi:
-			f = m.printi
+		case ir.PrintByte:
+			f = m.printByte
+		case ir.PrintInt:
+			f = m.printInt
 		default:
 			panic("codegen: unrecognized print op")
 		}
@@ -223,10 +223,10 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 	case *ir.ReadExpr:
 		var f llvm.Value
 		switch inst.Op {
-		case ir.Readc:
-			f = m.readc
-		case ir.Readi:
-			f = m.readi
+		case ir.ReadByte:
+			f = m.readByte
+		case ir.ReadInt:
+			f = m.readInt
 		default:
 			panic("codegen: unrecognized read op")
 		}

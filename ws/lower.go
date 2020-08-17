@@ -217,13 +217,13 @@ func (ib *irBuilder) convertBlock(tokens []*Token) {
 			ib.block.SetTerminator(ir.NewExitTerm(pos))
 
 		case Printc:
-			ib.appendPrint(ir.Printc, pos)
+			ib.appendPrint(ir.PrintByte, pos)
 		case Printi:
-			ib.appendPrint(ir.Printi, pos)
+			ib.appendPrint(ir.PrintInt, pos)
 		case Readc:
-			ib.appendRead(ir.Readc, pos)
+			ib.appendRead(ir.ReadByte, pos)
 		case Readi:
-			ib.appendRead(ir.Readi, pos)
+			ib.appendRead(ir.ReadInt, pos)
 
 		default:
 			panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))

@@ -5,19 +5,19 @@
 extern uint64_t stack_len;
 extern uint64_t call_stack_len;
 
-void printc(int64_t c) {
-  fputc(c, stdout);
+void print_byte(int64_t b) {
+  fputc(b, stdout);
 }
 
-void printi(int64_t i) {
+void print_int(int64_t i) {
   printf("%d", (int) i);
 }
 
-int64_t readc() {
+int64_t read_byte() {
   return fgetc(stdin);
 }
 
-int64_t readi() {
+int64_t read_int() {
   int i;
   fscanf(stdin, "%d", &i);
   return i;
