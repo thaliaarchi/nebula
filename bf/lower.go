@@ -51,6 +51,11 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 			data := b.CreateLoadHeapExpr(dataPtr, tok.Pos)
 			b.CreateStoreHeapStmt(data, val, tok.Pos)
 		case Bracket:
+			if len(b.CurrentBlock().Nodes) != 0 {
+				head := b.CreateBlock()
+				b.CreateJmpTerm(ir.Fallthrough, head, tok.Pos)
+				b.SetCurrentBlock(head)
+			}
 			data := b.CreateLoadHeapExpr(dataPtr, tok.Pos)
 			val := b.CreateLoadHeapExpr(data, tok.Pos)
 			next := b.CreateBlock()
@@ -64,17 +69,14 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 			}
 			head := bracketStack[len(bracketStack)-1].Block
 			bracketStack = bracketStack[:len(bracketStack)-1]
-			head.Terminator.(*ir.JmpCondTerm).Succs()[0] = b.CurrentBlock()
-
-			data := b.CreateLoadHeapExpr(dataPtr, tok.Pos)
-			val := b.CreateLoadHeapExpr(data, tok.Pos)
 			next := b.CreateBlock()
-			b.CreateJmpCondTerm(ir.Jz, val, head, next, tok.Pos)
+			head.Terminator.(*ir.JmpCondTerm).Succs()[0] = next
+			b.CreateJmpTerm(ir.Jmp, head, tok.Pos)
 			b.SetCurrentBlock(next)
 		}
 	}
 	exitPos := token.NoPos
-	if len(p.Tokens) > 0 {
+	if len(p.Tokens) != 0 {
 		exitPos = p.Tokens[len(p.Tokens)-1].Pos
 	}
 	b.CreateExitTerm(exitPos)
