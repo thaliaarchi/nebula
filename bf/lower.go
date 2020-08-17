@@ -16,7 +16,7 @@ type bracketBlock struct {
 // LowerIR lowers a Brainfuck program to Nebula IR in SSA form.
 func (p *Program) LowerIR() (*ir.Program, []error) {
 	b := ir.NewBuilder(p.File)
-	b.CreateBlock()
+	b.SetCurrentBlock(b.CreateBlock())
 	dataPtr := ir.NewIntConst(big.NewInt(0), token.NoPos)
 	one := ir.NewIntConst(big.NewInt(1), token.NoPos)
 	b.CreateStoreHeapStmt(dataPtr, one, token.NoPos)
@@ -73,6 +73,11 @@ func (p *Program) LowerIR() (*ir.Program, []error) {
 			b.SetCurrentBlock(next)
 		}
 	}
+	exitPos := token.NoPos
+	if len(p.Tokens) > 0 {
+		exitPos = p.Tokens[len(p.Tokens)-1].Pos
+	}
+	b.CreateExitTerm(exitPos)
 	for _, bracket := range bracketStack {
 		errs = append(errs, fmt.Errorf("Bracket not matched at %v", bracket.Pos))
 	}

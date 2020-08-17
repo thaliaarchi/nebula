@@ -5,6 +5,7 @@ package bf // import "github.com/andrewarchi/nebula/bf"
 import (
 	"fmt"
 	"go/token"
+	"strings"
 )
 
 // Token is a lexical token in Brainfuck.
@@ -78,4 +79,26 @@ func (typ Type) StringBF() string {
 type Program struct {
 	Tokens []*Token
 	File   *token.File
+}
+
+func (p *Program) String() string {
+	var b strings.Builder
+	indent := "  "
+	indentLevel := 0
+	var prev Type
+	for i, tok := range p.Tokens {
+		if tok.Type == EndBracket && indentLevel > 0 {
+			indentLevel--
+		}
+		if (prev != tok.Type && i != 0) || tok.Type == Bracket || tok.Type == EndBracket {
+			b.WriteByte('\n')
+			b.WriteString(strings.Repeat(indent, indentLevel))
+		}
+		if tok.Type == Bracket {
+			indentLevel++
+		}
+		b.WriteString(tok.Type.StringBF())
+		prev = tok.Type
+	}
+	return b.String()
 }

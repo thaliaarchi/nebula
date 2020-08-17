@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"github.com/andrewarchi/graph"
+	"github.com/andrewarchi/nebula/bf"
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/ir/codegen"
 	"github.com/andrewarchi/nebula/ir/optimize"
 	"github.com/andrewarchi/nebula/ws"
-	"llvm.org/llvm/bindings/go/llvm"
 )
 
 var (
@@ -156,7 +156,7 @@ func readFile(args []string) (string, []byte) {
 	return filename, src
 }
 
-func lex(src []byte, filename string) *ws.Program {
+func lexWS(src []byte, filename string) *ws.Program {
 	fset := token.NewFileSet()
 	file := fset.AddFile(filename, -1, len(src))
 	tokens, err := ws.LexTokens(file, src)
@@ -181,19 +181,39 @@ func lex(src []byte, filename string) *ws.Program {
 	return program
 }
 
-func lexFile(args []string) (*ws.Program, []byte) {
-	filename, src := readFile(args)
+func lexBF(src []byte, filename string) *bf.Program {
+	fset := token.NewFileSet()
+	file := fset.AddFile(filename, -1, len(src))
+	tokens, err := bf.LexTokens(file, src)
+	if err != nil {
+		exitError(err)
+	}
+	return &bf.Program{Tokens: tokens, File: file}
+}
+
+func lexFileWS(src []byte, filename string) (*ws.Program, []byte) {
 	switch {
+	case strings.HasSuffix(filename, ".ws"):
+		return lexWS(src, filename), src
 	case strings.HasSuffix(filename, ".wsa"):
 		exitError("WSA lexing not implemented.")
 	case strings.HasSuffix(filename, ".wsx"):
 		src = ws.Unpack(src)
+		return lexWS(src, filename), src
+	default:
+		exitError("Unrecognized file type: " + filename)
 	}
-	return lex(src, filename), src
+	panic("unreachable")
 }
 
 func convertSSA(args []string) *ir.Program {
-	program, _ := lexFile(args)
+	filename, src := readFile(args)
+	var program interface{ LowerIR() (*ir.Program, []error) }
+	if strings.HasSuffix(filename, ".bf") {
+		program = lexBF(src, filename)
+	} else {
+		program, _ = lexFileWS(src, filename)
+	}
 	ssa, errs := program.LowerIR()
 	if len(errs) != 0 {
 		fatal := false
@@ -244,7 +264,11 @@ func runGraph(args []string) {
 }
 
 func runAST(args []string) {
-	program, src := lexFile(args)
+	filename, src := readFile(args)
+	if strings.HasSuffix(filename, ".bf") {
+		panic("BF printing not implemented")
+	}
+	program, src := lexFileWS(src, filename)
 	switch format {
 	case "ws":
 		fmt.Print(program.DumpWS())
@@ -268,12 +292,12 @@ func runIR(args []string) {
 
 func runLLVM(args []string) {
 	program := convertSSA(args)
-	mod := codegen.EmitLLVMModule(program, codegen.Config{
+	mod, err := codegen.EmitLLVMModule(program, codegen.Config{
 		MaxStackLen:     maxStackLen,
 		MaxCallStackLen: maxCallStackLen,
 		MaxHeapBound:    maxHeapBound,
 	})
-	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	fmt.Print(mod.String())

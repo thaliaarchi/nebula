@@ -36,6 +36,12 @@ func (b *Builder) CurrentBlock() *BasicBlock { return b.curr }
 // SetCurrentBlock sets the currently selected block.
 func (b *Builder) SetCurrentBlock(block *BasicBlock) {
 	b.curr = block
+	for _, b := range b.blocks { // TODO avoid this loop
+		if b == block {
+			return
+		}
+	}
+	b.blocks = append(b.blocks, block)
 }
 
 // InitBlocks creates n empty blocks and sets the first to be the
@@ -175,7 +181,7 @@ func (b *Builder) CreateFlushStmt(pos token.Pos) *FlushStmt {
 // block.
 func (b *Builder) CreateCallTerm(callee, next *BasicBlock, pos token.Pos) *CallTerm {
 	call := NewCallTerm(callee, next, pos)
-	b.AppendInst(call)
+	b.SetTerminator(call)
 	return call
 }
 
@@ -183,7 +189,7 @@ func (b *Builder) CreateCallTerm(callee, next *BasicBlock, pos token.Pos) *CallT
 // block.
 func (b *Builder) CreateJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *JmpTerm {
 	jmp := NewJmpTerm(op, jumpee, pos)
-	b.AppendInst(jmp)
+	b.SetTerminator(jmp)
 	return jmp
 }
 
@@ -191,7 +197,7 @@ func (b *Builder) CreateJmpTerm(op JmpOp, jumpee *BasicBlock, pos token.Pos) *Jm
 // current block.
 func (b *Builder) CreateJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, pos token.Pos) *JmpCondTerm {
 	jc := NewJmpCondTerm(op, val, trueBlock, falseBlock, pos)
-	b.AppendInst(jc)
+	b.SetTerminator(jc)
 	return jc
 }
 
@@ -199,7 +205,7 @@ func (b *Builder) CreateJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlo
 // block.
 func (b *Builder) CreateRetTerm(pos token.Pos) *RetTerm {
 	ret := NewRetTerm(pos)
-	b.AppendInst(ret)
+	b.SetTerminator(ret)
 	return ret
 }
 
@@ -207,7 +213,7 @@ func (b *Builder) CreateRetTerm(pos token.Pos) *RetTerm {
 // block.
 func (b *Builder) CreateExitTerm(pos token.Pos) *ExitTerm {
 	exit := NewExitTerm(pos)
-	b.AppendInst(exit)
+	b.SetTerminator(exit)
 	return exit
 }
 

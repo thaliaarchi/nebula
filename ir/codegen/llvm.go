@@ -58,7 +58,7 @@ var (
 )
 
 // EmitLLVMModule generates a LLVM IR module for the given program.
-func EmitLLVMModule(program *ir.Program, config Config) llvm.Module {
+func EmitLLVMModule(program *ir.Program, config Config) (llvm.Module, error) {
 	ctx := llvm.GlobalContext()
 	m := moduleBuilder{
 		ctx:     ctx,
@@ -73,7 +73,8 @@ func EmitLLVMModule(program *ir.Program, config Config) llvm.Module {
 	m.declareFuncs()
 	m.declareGlobals()
 	m.emitBlocks()
-	return m.module
+	err := llvm.VerifyModule(m.module, llvm.PrintMessageAction)
+	return m.module, err
 }
 
 func (m *moduleBuilder) declareFuncs() {

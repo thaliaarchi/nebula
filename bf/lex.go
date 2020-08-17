@@ -46,7 +46,9 @@ func (l *Lexer) NextToken() (*Token, error) {
 			l.offset++
 			continue
 		}
-		return &Token{typ, l.file.Pos(l.offset)}, nil
+		tok := &Token{typ, l.file.Pos(l.offset)}
+		l.offset++
+		return tok, nil
 	}
 	return nil, io.EOF
 }
