@@ -91,12 +91,19 @@ func UsedBy(val Value, user User) bool {
 
 // UserBase implements the User interface.
 type UserBase struct {
-	operands [2]*ValueUse
+	operands  []*ValueUse
+	operands2 [2]*ValueUse // storage for operands
 	PosBase
 }
 
 // Operands returns the user's operands.
-func (user *UserBase) Operands() []*ValueUse { return user.operands[:] }
+func (user *UserBase) Operands() []*ValueUse {
+	var operands2 = user.operands2 // Copy array to prevent indexed writes
+	return operands2[:len(user.operands)]
+}
+
+// NOperands returns the number of operands.
+func (user *UserBase) NOperands() int { return len(user.operands) }
 
 // Operand returns the specified operand.
 func (user *UserBase) Operand(n int) *ValueUse {
@@ -121,6 +128,7 @@ func (user *UserBase) SetOperand(n int, val Value) {
 // initOperands initializes user operands. User is passed as a parameter
 // because ValueUse needs the full User, not the embedded UserBase.
 func (user *UserBase) initOperands(u User, vals ...Value) {
+	user.operands = user.operands2[:len(vals)]
 	for i, val := range vals {
 		user.operands[i] = &ValueUse{val, u, i}
 		if val != nil {
@@ -417,7 +425,7 @@ type PrintOp uint8
 
 // Print operations.
 const (
-	PrintByte PrintOp = iota
+	PrintByte PrintOp = iota + 1
 	PrintInt
 )
 
@@ -453,7 +461,7 @@ type ReadOp uint8
 
 // Read operations.
 const (
-	ReadByte ReadOp = iota
+	ReadByte ReadOp = iota + 1
 	ReadInt
 )
 
@@ -543,7 +551,7 @@ type JmpOp uint8
 
 // Jump operations.
 const (
-	Jmp JmpOp = iota
+	Jmp JmpOp = iota + 1
 	Fallthrough
 )
 
@@ -580,7 +588,7 @@ type JmpCondOp uint8
 
 // Conditional jump operations.
 const (
-	Jz JmpCondOp = iota
+	Jz JmpCondOp = iota + 1
 	Jnz
 	Jn
 )
