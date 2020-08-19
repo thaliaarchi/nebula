@@ -69,13 +69,9 @@ func canThrow(node ir.Inst) bool {
 // references returns whether node B references the assignment of
 // node A.
 func references(a, b ir.Inst) bool {
-	if expr, ok := a.(ir.Value); ok {
+	if val, ok := a.(ir.Value); ok {
 		if user, ok := b.(ir.User); ok {
-			for _, operand := range user.Operands() {
-				if operand.Def == expr {
-					return true
-				}
-			}
+			return ir.UsedBy(val, user)
 		}
 	}
 	return false

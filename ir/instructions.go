@@ -79,6 +79,16 @@ func (val *ValueBase) ReplaceUsesWith(other Value) {
 	val.uses = val.uses[:0]
 }
 
+// UsedBy returns the user uses the value.
+func UsedBy(val Value, user User) bool {
+	for _, operand := range user.Operands() {
+		if operand.Def == val {
+			return true
+		}
+	}
+	return false
+}
+
 // UserBase implements the User interface.
 type UserBase struct {
 	operands []*ValueUse
