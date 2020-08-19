@@ -89,7 +89,7 @@ func (f *Formatter) FormatInst(inst Inst) string {
 			if op == nil {
 				b.WriteString("<nil>")
 			} else {
-				b.WriteString(f.FormatValue(op.Def))
+				b.WriteString(f.FormatValue(op.Def()))
 			}
 		}
 	}

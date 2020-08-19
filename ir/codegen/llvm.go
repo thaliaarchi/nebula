@@ -137,18 +137,18 @@ func (m *moduleBuilder) emitBlocks() {
 		llvmBlock := m.blocks[block]
 		m.b.SetInsertPoint(llvmBlock, llvmBlock.FirstInstruction())
 		stackLen := m.b.CreateLoad(m.stackLen, "stack_len")
-		for _, node := range block.Nodes {
-			stackLen = m.emitNode(node, block, stackLen)
+		for _, inst := range block.Nodes {
+			stackLen = m.emitInst(inst, block, stackLen)
 		}
 		m.emitTerminator(block)
 	}
 }
 
-func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen llvm.Value) llvm.Value {
-	switch inst := node.(type) {
+func (m *moduleBuilder) emitInst(inst ir.Inst, block *ir.BasicBlock, stackLen llvm.Value) llvm.Value {
+	switch inst := inst.(type) {
 	case *ir.BinaryExpr:
-		lhs := m.lookupUse(inst.Operand(0))
-		rhs := m.lookupUse(inst.Operand(1))
+		lhs := m.lookupValue(inst.Operand(0).Def())
+		rhs := m.lookupValue(inst.Operand(1).Def())
 		var val llvm.Value
 		switch inst.Op {
 		case ir.Add:
@@ -180,7 +180,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 	case *ir.UnaryExpr:
 		switch inst.Op {
 		case ir.Neg:
-			val := m.lookupUse(inst.Operand(0))
+			val := m.lookupValue(inst.Operand(0).Def())
 			m.defs[inst] = m.b.CreateSub(zero, val, "neg")
 		default:
 			panic("codegen: unrecognized unary op")
@@ -190,7 +190,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		m.defs[inst] = m.b.CreateLoad(addr, "loadstack")
 	case *ir.StoreStackStmt:
 		addr := m.stackAddr(inst.StackPos, stackLen)
-		val := m.lookupUse(inst.Operand(0))
+		val := m.lookupValue(inst.Operand(0).Def())
 		m.b.CreateStore(val, addr)
 	case *ir.AccessStackStmt:
 		if inst.StackSize <= 0 {
@@ -203,11 +203,11 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		stackLen = m.b.CreateAdd(stackLen, n, "offsetstack")
 		m.b.CreateStore(stackLen, m.stackLen)
 	case *ir.LoadHeapExpr:
-		addr := m.heapAddr(inst.Operand(0))
+		addr := m.heapAddr(inst.Operand(0).Def())
 		m.defs[inst] = m.b.CreateLoad(addr, "loadheap")
 	case *ir.StoreHeapStmt:
-		addr := m.heapAddr(inst.Operand(0))
-		val := m.lookupUse(inst.Operand(1))
+		addr := m.heapAddr(inst.Operand(0).Def())
+		val := m.lookupValue(inst.Operand(1).Def())
 		m.b.CreateStore(val, addr)
 	case *ir.PrintStmt:
 		var f llvm.Value
@@ -219,7 +219,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		default:
 			panic("codegen: unrecognized print op")
 		}
-		val := m.lookupUse(inst.Operand(0))
+		val := m.lookupValue(inst.Operand(0).Def())
 		m.b.CreateCall(f, []llvm.Value{val}, "")
 	case *ir.ReadExpr:
 		var f llvm.Value
@@ -235,7 +235,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 	case *ir.FlushStmt:
 		m.b.CreateCall(m.flush, []llvm.Value{}, "")
 	default:
-		panic("codegen: unrecognized node type")
+		panic("codegen: unrecognized instruction type")
 	}
 	return stackLen
 }
@@ -253,7 +253,7 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 	case *ir.JmpTerm:
 		m.b.CreateBr(m.blocks[term.Succ(0)])
 	case *ir.JmpCondTerm:
-		val := m.lookupUse(term.Operand(0))
+		val := m.lookupValue(term.Operand(0).Def())
 		var cond llvm.Value
 		switch term.Op {
 		case ir.Jz:
@@ -287,10 +287,6 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 	}
 }
 
-func (m *moduleBuilder) lookupUse(use *ir.ValueUse) llvm.Value {
-	return m.lookupValue(use.Def)
-}
-
 func (m *moduleBuilder) lookupValue(val ir.Value) llvm.Value {
 	switch v := val.(type) {
 	case *ir.IntConst:
@@ -313,9 +309,8 @@ func (m *moduleBuilder) stackAddr(pos int, stackLen llvm.Value) llvm.Value {
 	return m.b.CreateInBoundsGEP(m.stack, []llvm.Value{zero, idx}, name+".gep")
 }
 
-func (m *moduleBuilder) heapAddr(val *ir.ValueUse) llvm.Value {
-	addr := m.lookupUse(val)
-	return m.b.CreateInBoundsGEP(m.heap, []llvm.Value{zero, addr}, "gep")
+func (m *moduleBuilder) heapAddr(addr ir.Value) llvm.Value {
+	return m.b.CreateInBoundsGEP(m.heap, []llvm.Value{zero, m.lookupValue(addr)}, "gep")
 }
 
 func (m *moduleBuilder) constString(str string) llvm.Value {

@@ -48,7 +48,7 @@ type ValueBase struct {
 	uses []*ValueUse
 }
 
-// Uses returns the set of instructions referring this node.
+// Uses returns the set of instructions referring this value.
 func (val *ValueBase) Uses() []*ValueUse { return val.uses }
 
 // AddUse adds a use edge to the value and user.
@@ -73,7 +73,7 @@ func (val *ValueBase) RemoveUse(use *ValueUse) bool {
 // ReplaceUsesWith replaces all uses of def with newDef.
 func (val *ValueBase) ReplaceUsesWith(other Value) {
 	for _, use := range val.uses {
-		use.Def = other
+		use.def = other
 		other.AddUse(use)
 	}
 	val.uses = val.uses[:0]
@@ -82,7 +82,7 @@ func (val *ValueBase) ReplaceUsesWith(other Value) {
 // UsedBy returns the user uses the value.
 func UsedBy(val Value, user User) bool {
 	for _, operand := range user.Operands() {
-		if operand.Def == val {
+		if operand.def == val {
 			return true
 		}
 	}
@@ -107,34 +107,34 @@ func (user *UserBase) Operand(n int) *ValueUse {
 // lists.
 func (user *UserBase) SetOperand(n int, val Value) {
 	operand := user.operands[n]
-	if operand.Def != val {
-		if operand.Def != nil {
-			operand.Def.RemoveUse(operand)
+	if operand.def != val {
+		if operand.def != nil {
+			operand.def.RemoveUse(operand)
 		}
 		if val != nil {
 			val.AddUse(operand)
 		}
-		operand.Def = val
+		operand.def = val
 	}
 }
 
 // ClearOperands clears all operands and removes the uses.
 func (user *UserBase) ClearOperands() {
 	for i, operand := range user.operands {
-		operand.Def.RemoveUse(operand)
+		operand.def.RemoveUse(operand)
 		user.operands[i] = nil
 	}
 }
 
 // ValueUse is an edge between a value definition and referrer.
 type ValueUse struct {
-	Def         Value
-	User        User
-	UserOperand uint
+	def     Value
+	user    User
+	operand int
 }
 
 // NewValueUse constructs a ValueUse.
-func NewValueUse(def Value, user User, operand uint) *ValueUse {
+func NewValueUse(def Value, user User, operand int) *ValueUse {
 	use := &ValueUse{def, user, operand}
 	if def != nil {
 		def.AddUse(use)
@@ -142,23 +142,29 @@ func NewValueUse(def Value, user User, operand uint) *ValueUse {
 	return use
 }
 
+// Def returns the value definition.
+func (use *ValueUse) Def() Value { return use.def }
+
 // SetDef replaces the value definition and updates uses.
 func (use *ValueUse) SetDef(def Value) {
-	if use.Def != def {
-		if use.Def != nil {
-			use.Def.RemoveUse(use)
+	if use.def != def {
+		if use.def != nil {
+			use.def.RemoveUse(use)
 		}
 		if def != nil {
 			def.AddUse(use)
 		}
-		use.Def = def
+		use.def = def
 	}
 }
 
-// SetUser replaces the user.
-func (use *ValueUse) SetUser(user User, operand uint) {
-	use.User = user
-	use.UserOperand = operand
+// User returns the user and user's operand.
+func (use *ValueUse) User() (User, int) { return use.user, use.operand }
+
+// SetUser replaces the user and user's operand.
+func (use *ValueUse) SetUser(user User, operand int) {
+	use.user = user
+	use.operand = operand
 }
 
 // TermBase implements the TermInst interface.
@@ -521,7 +527,7 @@ type PhiValue struct {
 	Block *BasicBlock
 }
 
-// AddIncoming adds a val for an incoming edge to the phi node.
+// AddIncoming adds a val for an incoming edge to the phi expression.
 func (phi *PhiExpr) AddIncoming(val Value, block *BasicBlock) {
 	phi.values = append(phi.values, PhiValue{val, block})
 }

@@ -47,8 +47,8 @@ func Dependent(a, b ir.Inst) bool {
 		references(a, b) || references(b, a)
 }
 
-func isIO(node ir.Inst) bool {
-	switch node.(type) {
+func isIO(inst ir.Inst) bool {
+	switch inst.(type) {
 	case *ir.PrintStmt, *ir.ReadExpr:
 		return true
 	}
@@ -58,9 +58,9 @@ func isIO(node ir.Inst) bool {
 // canThrow returns whether the node is a division with a non-constant
 // RHS.
 // TODO: create div trap to replace this.
-func canThrow(node ir.Inst) bool {
-	if bin, ok := node.(*ir.BinaryExpr); ok && bin.Op == ir.Div {
-		_, ok := bin.Operand(1).Def.(*ir.IntConst)
+func canThrow(inst ir.Inst) bool {
+	if bin, ok := inst.(*ir.BinaryExpr); ok && bin.Op == ir.Div {
+		_, ok := bin.Operand(1).Def().(*ir.IntConst)
 		return !ok
 	}
 	return false

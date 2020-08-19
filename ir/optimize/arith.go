@@ -31,7 +31,7 @@ func FoldConstArith(p *ir.Program) {
 				}
 			case *ir.UnaryExpr:
 				if inst.Op == ir.Neg {
-					val := inst.Operand(0).Def
+					val := inst.Operand(0).Def()
 					if lhs, ok := val.(*ir.IntConst); ok {
 						constNeg := ir.NewIntConst(new(big.Int).Neg(lhs.Int()), inst.Pos())
 						inst.ClearOperands()
@@ -47,27 +47,26 @@ func FoldConstArith(p *ir.Program) {
 	}
 }
 
-func foldBinaryExpr(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
-	ops := expr.Operands()
-	_, lhsConst := ops[0].Def.(*ir.IntConst)
-	_, rhsConst := ops[1].Def.(*ir.IntConst)
+func foldBinaryExpr(p *ir.Program, bin *ir.BinaryExpr) (ir.Value, bool) {
+	_, lhsConst := bin.Operand(0).Def().(*ir.IntConst)
+	_, rhsConst := bin.Operand(1).Def().(*ir.IntConst)
 	switch {
 	case lhsConst && rhsConst:
-		return foldBinaryLR(p, expr)
+		return foldBinaryLR(p, bin)
 	case lhsConst:
-		return foldBinaryL(p, expr)
+		return foldBinaryL(p, bin)
 	case rhsConst:
-		return foldBinaryR(p, expr)
+		return foldBinaryR(p, bin)
 	default:
-		return foldBinary(p, expr)
+		return foldBinary(p, bin)
 	}
 }
 
-func foldBinaryLR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
-	ops := expr.Operands()
-	lhs, rhs := ops[0].Def.(*ir.IntConst), ops[1].Def.(*ir.IntConst)
+func foldBinaryLR(p *ir.Program, bin *ir.BinaryExpr) (ir.Value, bool) {
+	lhs := bin.Operand(0).Def().(*ir.IntConst)
+	rhs := bin.Operand(1).Def().(*ir.IntConst)
 	result := new(big.Int)
-	switch expr.Op {
+	switch bin.Op {
 	case ir.Add:
 		result.Add(lhs.Int(), rhs.Int())
 	case ir.Sub:
@@ -101,7 +100,7 @@ func foldBinaryLR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 	default:
 		return nil, false
 	}
-	return ir.NewIntConst(result, expr.Pos()), false
+	return ir.NewIntConst(result, bin.Pos()), false
 }
 
 var (
@@ -110,12 +109,12 @@ var (
 	bigNegOne = big.NewInt(-1)
 )
 
-func foldBinaryL(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
-	ops := expr.Operands()
-	lhs, rhs := ops[0].Def.(*ir.IntConst), ops[1].Def
+func foldBinaryL(p *ir.Program, bin *ir.BinaryExpr) (ir.Value, bool) {
+	lhs := bin.Operand(0).Def().(*ir.IntConst)
+	rhs := bin.Operand(1).Def()
 	switch lhs.Int().Sign() {
 	case 0:
-		switch expr.Op {
+		switch bin.Op {
 		case ir.Add:
 			return rhs, false
 		case ir.Sub:
@@ -127,23 +126,23 @@ func foldBinaryL(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 			return lhs, false
 		}
 	case 1:
-		if expr.Op == ir.Mul && lhs.Int().Cmp(bigOne) == 0 {
+		if bin.Op == ir.Mul && lhs.Int().Cmp(bigOne) == 0 {
 			return rhs, false
 		}
 	case -1:
-		if expr.Op == ir.Mul && lhs.Int().Cmp(bigNegOne) == 0 {
+		if bin.Op == ir.Mul && lhs.Int().Cmp(bigNegOne) == 0 {
 			return rhs, true
 		}
 	}
 	return nil, false
 }
 
-func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
-	ops := expr.Operands()
-	lhs, rhs := ops[0].Def, ops[1].Def.(*ir.IntConst)
+func foldBinaryR(p *ir.Program, bin *ir.BinaryExpr) (ir.Value, bool) {
+	lhs := bin.Operand(0).Def()
+	rhs := bin.Operand(1).Def().(*ir.IntConst)
 	switch rhs.Int().Sign() {
 	case 0:
-		switch expr.Op {
+		switch bin.Op {
 		case ir.Add, ir.Sub:
 			return lhs, false
 		case ir.Mul:
@@ -153,52 +152,54 @@ func foldBinaryR(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
 		}
 	case 1:
 		if rhs.Int().Cmp(bigOne) == 0 {
-			switch expr.Op {
+			switch bin.Op {
 			case ir.Mul, ir.Div:
 				return lhs, false
 			case ir.Mod:
-				return ir.NewIntConst(bigZero, expr.Pos()), false
+				return ir.NewIntConst(bigZero, bin.Pos()), false
 			}
 		} else if ntz := rhs.Int().TrailingZeroBits(); uint(rhs.Int().BitLen()) == ntz+1 {
-			switch expr.Op {
+			var r *big.Int
+			switch bin.Op {
 			case ir.Mul:
-				expr.Op = ir.Shl
-				ops[1].SetDef(ir.NewIntConst(new(big.Int).SetUint64(uint64(ntz)), expr.Pos()))
+				bin.Op = ir.Shl
+				r = new(big.Int).SetUint64(uint64(ntz))
 			case ir.Div:
-				expr.Op = ir.AShr
-				ops[1].SetDef(ir.NewIntConst(new(big.Int).SetUint64(uint64(ntz)), expr.Pos()))
+				bin.Op = ir.AShr
+				r = new(big.Int).SetUint64(uint64(ntz))
 			case ir.Mod:
-				expr.Op = ir.And
-				ops[1].SetDef(ir.NewIntConst(new(big.Int).Sub(rhs.Int(), bigOne), expr.Pos()))
+				bin.Op = ir.And
+				r = new(big.Int).Sub(rhs.Int(), bigOne)
+			default:
+				return nil, false
 			}
-			return nil, false // overwrite op
+			bin.Operand(1).SetDef(ir.NewIntConst(r, bin.Pos()))
+			// overwrite op
 		}
 	case -1:
 		if rhs.Int().Cmp(bigNegOne) == 0 {
-			switch expr.Op {
+			switch bin.Op {
 			case ir.Mul, ir.Div:
 				return lhs, true
 			case ir.Mod:
-				return ir.NewIntConst(bigZero, expr.Pos()), false
+				return ir.NewIntConst(bigZero, bin.Pos()), false
 			}
 		}
 	}
 	return nil, false
 }
 
-func foldBinary(p *ir.Program, expr *ir.BinaryExpr) (ir.Value, bool) {
-	ops := expr.Operands()
-	lhs, rhs := ops[0], ops[1]
-	if lhs.Def == rhs.Def {
-		switch expr.Op {
+func foldBinary(p *ir.Program, bin *ir.BinaryExpr) (ir.Value, bool) {
+	if bin.Operand(0).Def() == bin.Operand(1).Def() {
+		switch bin.Op {
 		case ir.Sub:
-			return ir.NewIntConst(bigZero, expr.Pos()), false
+			return ir.NewIntConst(bigZero, bin.Pos()), false
 		case ir.Div:
 			// TODO trap if RHS zero
-			return ir.NewIntConst(bigOne, expr.Pos()), false
+			return ir.NewIntConst(bigOne, bin.Pos()), false
 		case ir.Mod:
 			// TODO trap if RHS zero
-			return ir.NewIntConst(bigZero, expr.Pos()), false
+			return ir.NewIntConst(bigZero, bin.Pos()), false
 		}
 	}
 	return nil, false
