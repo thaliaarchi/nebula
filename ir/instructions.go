@@ -91,12 +91,12 @@ func UsedBy(val Value, user User) bool {
 
 // UserBase implements the User interface.
 type UserBase struct {
-	operands []*ValueUse
+	operands [2]*ValueUse
 	PosBase
 }
 
 // Operands returns the user's operands.
-func (user *UserBase) Operands() []*ValueUse { return user.operands }
+func (user *UserBase) Operands() []*ValueUse { return user.operands[:] }
 
 // Operand returns the specified operand.
 func (user *UserBase) Operand(n int) *ValueUse {
@@ -118,6 +118,17 @@ func (user *UserBase) SetOperand(n int, val Value) {
 	}
 }
 
+// initOperands initializes user operands. User is passed as a parameter
+// because ValueUse needs the full User, not the embedded UserBase.
+func (user *UserBase) initOperands(u User, vals ...Value) {
+	for i, val := range vals {
+		user.operands[i] = &ValueUse{val, u, i}
+		if val != nil {
+			val.AddUse(user.operands[i])
+		}
+	}
+}
+
 // ClearOperands clears all operands and removes the uses.
 func (user *UserBase) ClearOperands() {
 	for i, operand := range user.operands {
@@ -131,15 +142,6 @@ type ValueUse struct {
 	def     Value
 	user    User
 	operand int
-}
-
-// NewValueUse constructs a ValueUse.
-func NewValueUse(def Value, user User, operand int) *ValueUse {
-	use := &ValueUse{def, user, operand}
-	if def != nil {
-		def.AddUse(use)
-	}
-	return use
 }
 
 // Def returns the value definition.
@@ -160,12 +162,6 @@ func (use *ValueUse) SetDef(def Value) {
 
 // User returns the user and user's operand.
 func (use *ValueUse) User() (User, int) { return use.user, use.operand }
-
-// SetUser replaces the user and user's operand.
-func (use *ValueUse) SetUser(user User, operand int) {
-	use.user = user
-	use.operand = operand
-}
 
 // TermBase implements the TermInst interface.
 type TermBase struct {
@@ -257,10 +253,9 @@ func (op BinaryOp) String() string {
 	return "binaryerr"
 }
 
-// BinaryExpr is an expression with two operands.
+// BinaryExpr is an arithmetic expression with two operands.
 type BinaryExpr struct {
-	Op       BinaryOp
-	operands [2]*ValueUse // LHS, RHS
+	Op BinaryOp
 	ValueBase
 	UserBase
 	PosBase
@@ -269,9 +264,7 @@ type BinaryExpr struct {
 // NewBinaryExpr constructs a BinaryExpr.
 func NewBinaryExpr(op BinaryOp, lhs, rhs Value, pos token.Pos) *BinaryExpr {
 	bin := &BinaryExpr{Op: op, PosBase: PosBase{pos: pos}}
-	bin.operands[0] = NewValueUse(lhs, bin, 0)
-	bin.operands[1] = NewValueUse(rhs, bin, 1)
-	bin.UserBase.operands = bin.operands[:]
+	bin.initOperands(bin, lhs, rhs)
 	return bin
 }
 
@@ -294,10 +287,9 @@ func (op UnaryOp) String() string {
 	return "unaryerr"
 }
 
-// UnaryExpr is an expression with one operand.
+// UnaryExpr is an arithmetic expression with one operand.
 type UnaryExpr struct {
-	Op       UnaryOp
-	operands [1]*ValueUse // unary value
+	Op UnaryOp
 	ValueBase
 	UserBase
 	PosBase
@@ -306,8 +298,7 @@ type UnaryExpr struct {
 // NewUnaryExpr constructs a UnaryExpr.
 func NewUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryExpr {
 	un := &UnaryExpr{Op: op, PosBase: PosBase{pos: pos}}
-	un.operands[0] = NewValueUse(val, un, 0)
-	un.UserBase.operands = un.operands[:]
+	un.initOperands(un, val)
 	return un
 }
 
@@ -337,7 +328,6 @@ func (*LoadStackExpr) OpString() string { return "loadstack" }
 // the stack.
 type StoreStackStmt struct {
 	StackPos int
-	operands [1]*ValueUse // value to store
 	UserBase
 	PosBase
 }
@@ -348,8 +338,7 @@ func NewStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
 		panic("NewLoadStackExpr: negative stack position")
 	}
 	store := &StoreStackStmt{StackPos: stackPos, PosBase: PosBase{pos: pos}}
-	store.operands[0] = NewValueUse(val, store, 0)
-	store.UserBase.operands = store.operands[:]
+	store.initOperands(store, val)
 	return store
 }
 
@@ -391,7 +380,6 @@ func (*OffsetStackStmt) OpString() string { return "offsetstack" }
 // LoadHeapExpr is an expression that loads a value at an address
 // from the heap.
 type LoadHeapExpr struct {
-	operands [1]*ValueUse // heap address
 	ValueBase
 	UserBase
 	PosBase
@@ -400,8 +388,7 @@ type LoadHeapExpr struct {
 // NewLoadHeapExpr constructs a LoadHeapExpr.
 func NewLoadHeapExpr(addr Value, pos token.Pos) *LoadHeapExpr {
 	load := &LoadHeapExpr{PosBase: PosBase{pos: pos}}
-	load.operands[0] = NewValueUse(addr, load, 0)
-	load.UserBase.operands = load.operands[:]
+	load.initOperands(load, addr)
 	return load
 }
 
@@ -411,7 +398,6 @@ func (*LoadHeapExpr) OpString() string { return "loadheap" }
 // StoreHeapStmt is a statement that stores a value at an address
 // in the heap.
 type StoreHeapStmt struct {
-	operands [2]*ValueUse // heap address, value
 	UserBase
 	PosBase
 }
@@ -419,9 +405,7 @@ type StoreHeapStmt struct {
 // NewStoreHeapStmt constructs a StoreHeapStmt.
 func NewStoreHeapStmt(addr, val Value, pos token.Pos) *StoreHeapStmt {
 	store := &StoreHeapStmt{PosBase: PosBase{pos: pos}}
-	store.operands[0] = NewValueUse(addr, store, 0)
-	store.operands[1] = NewValueUse(val, store, 1)
-	store.UserBase.operands = store.operands[:]
+	store.initOperands(store, addr, val)
 	return store
 }
 
@@ -449,8 +433,7 @@ func (op PrintOp) String() string {
 
 // PrintStmt is an expression that prints a value to stdout.
 type PrintStmt struct {
-	Op       PrintOp
-	operands [1]*ValueUse // value to print
+	Op PrintOp
 	UserBase
 	PosBase
 }
@@ -458,8 +441,7 @@ type PrintStmt struct {
 // NewPrintStmt constructs a PrintStmt.
 func NewPrintStmt(op PrintOp, val Value, pos token.Pos) *PrintStmt {
 	print := &PrintStmt{Op: op, PosBase: PosBase{pos: pos}}
-	print.operands[0] = NewValueUse(val, print, 0)
-	print.UserBase.operands = print.operands[:]
+	print.initOperands(print, val)
 	return print
 }
 
@@ -618,9 +600,8 @@ func (op JmpCondOp) String() string {
 // JmpCondTerm is a terminator that conditionally jumps to one of
 // two blocks.
 type JmpCondTerm struct {
-	Op       JmpCondOp
-	operands [1]*ValueUse   // condition value
-	succs    [2]*BasicBlock // true block, false block
+	Op    JmpCondOp
+	succs [2]*BasicBlock // true block, false block
 	UserBase
 	TermBase
 	PosBase
@@ -629,8 +610,7 @@ type JmpCondTerm struct {
 // NewJmpCondTerm constructs a JmpCondTerm.
 func NewJmpCondTerm(op JmpCondOp, val Value, trueBlock, falseBlock *BasicBlock, pos token.Pos) *JmpCondTerm {
 	jc := &JmpCondTerm{Op: op, succs: [2]*BasicBlock{trueBlock, falseBlock}, PosBase: PosBase{pos: pos}}
-	jc.operands[0] = NewValueUse(val, jc, 0)
-	jc.UserBase.operands = jc.operands[:]
+	jc.initOperands(jc, val)
 	jc.TermBase.succs = jc.succs[:]
 	return jc
 }
