@@ -147,8 +147,8 @@ func (m *moduleBuilder) emitBlocks() {
 func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen llvm.Value) llvm.Value {
 	switch inst := node.(type) {
 	case *ir.BinaryExpr:
-		lhs := m.lookupUse(ir.Operand(inst, 0))
-		rhs := m.lookupUse(ir.Operand(inst, 1))
+		lhs := m.lookupUse(inst.Operand(0))
+		rhs := m.lookupUse(inst.Operand(1))
 		var val llvm.Value
 		switch inst.Op {
 		case ir.Add:
@@ -180,7 +180,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 	case *ir.UnaryExpr:
 		switch inst.Op {
 		case ir.Neg:
-			val := m.lookupUse(ir.Operand(inst, 0))
+			val := m.lookupUse(inst.Operand(0))
 			m.defs[inst] = m.b.CreateSub(zero, val, "neg")
 		default:
 			panic("codegen: unrecognized unary op")
@@ -190,7 +190,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		m.defs[inst] = m.b.CreateLoad(addr, "loadstack")
 	case *ir.StoreStackStmt:
 		addr := m.stackAddr(inst.StackPos, stackLen)
-		val := m.lookupUse(ir.Operand(inst, 0))
+		val := m.lookupUse(inst.Operand(0))
 		m.b.CreateStore(val, addr)
 	case *ir.AccessStackStmt:
 		if inst.StackSize <= 0 {
@@ -203,11 +203,11 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		stackLen = m.b.CreateAdd(stackLen, n, "offsetstack")
 		m.b.CreateStore(stackLen, m.stackLen)
 	case *ir.LoadHeapExpr:
-		addr := m.heapAddr(ir.Operand(inst, 0))
+		addr := m.heapAddr(inst.Operand(0))
 		m.defs[inst] = m.b.CreateLoad(addr, "loadheap")
 	case *ir.StoreHeapStmt:
-		addr := m.heapAddr(ir.Operand(inst, 0))
-		val := m.lookupUse(ir.Operand(inst, 1))
+		addr := m.heapAddr(inst.Operand(0))
+		val := m.lookupUse(inst.Operand(1))
 		m.b.CreateStore(val, addr)
 	case *ir.PrintStmt:
 		var f llvm.Value
@@ -219,7 +219,7 @@ func (m *moduleBuilder) emitNode(node ir.Inst, block *ir.BasicBlock, stackLen ll
 		default:
 			panic("codegen: unrecognized print op")
 		}
-		val := m.lookupUse(ir.Operand(inst, 0))
+		val := m.lookupUse(inst.Operand(0))
 		m.b.CreateCall(f, []llvm.Value{val}, "")
 	case *ir.ReadExpr:
 		var f llvm.Value
@@ -247,13 +247,13 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		gep := m.b.CreateInBoundsGEP(m.callStack, []llvm.Value{zero, callStackLen}, "ret_addr.gep")
 		callStackLen = m.b.CreateAdd(callStackLen, one, "call_stack_len")
 		m.b.CreateStore(callStackLen, m.callStackLen)
-		addr := llvm.BlockAddress(m.main, m.blocks[ir.Succ(term, 1)])
+		addr := llvm.BlockAddress(m.main, m.blocks[term.Succ(1)])
 		m.b.CreateStore(addr, gep)
-		m.b.CreateBr(m.blocks[ir.Succ(term, 0)])
+		m.b.CreateBr(m.blocks[term.Succ(0)])
 	case *ir.JmpTerm:
-		m.b.CreateBr(m.blocks[ir.Succ(term, 0)])
+		m.b.CreateBr(m.blocks[term.Succ(0)])
 	case *ir.JmpCondTerm:
-		val := m.lookupUse(ir.Operand(term, 0))
+		val := m.lookupUse(term.Operand(0))
 		var cond llvm.Value
 		switch term.Op {
 		case ir.Jz:
@@ -265,7 +265,7 @@ func (m *moduleBuilder) emitTerminator(block *ir.BasicBlock) {
 		default:
 			panic("codegen: unrecognized conditional jump op")
 		}
-		m.b.CreateCondBr(cond, m.blocks[ir.Succ(term, 0)], m.blocks[ir.Succ(term, 1)])
+		m.b.CreateCondBr(cond, m.blocks[term.Succ(0)], m.blocks[term.Succ(1)])
 	case *ir.RetTerm:
 		m.b.CreateCall(m.checkCallStack, []llvm.Value{m.blockName(block), m.instPos(term)}, "")
 		callStackLen := m.b.CreateLoad(m.callStackLen, "call_stack_len")

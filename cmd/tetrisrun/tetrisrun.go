@@ -1,5 +1,5 @@
-// tetrisrun is a driver for Peter De Wachter's Whitespace Tetris game.
-// It introduces gravity and provides several key mappings.
+// Command tetrisrun is a driver for Peter De Wachter's Whitespace
+// Tetris game. It introduces gravity and provides several key mappings.
 //
 // Download tetris.ws from the Whitespace mailing list archives:
 // https://web.archive.org/web/20141011193149/http://compsoc.dur.ac.uk/archives/whitespace/2008-January/000067.html

@@ -21,21 +21,21 @@ func FoldConstArith(p *ir.Program) {
 				val, isNeg := foldBinaryExpr(p, inst)
 				if isNeg {
 					neg := ir.NewUnaryExpr(ir.Neg, val, inst.Pos())
-					ir.ClearOperands(inst)
-					ir.ReplaceUses(inst, neg)
+					inst.ClearOperands()
+					inst.ReplaceUsesWith(neg)
 					node = neg
 				} else if val != nil {
-					ir.ClearOperands(inst)
-					ir.ReplaceUses(inst, val)
+					inst.ClearOperands()
+					inst.ReplaceUsesWith(val)
 					continue
 				}
 			case *ir.UnaryExpr:
 				if inst.Op == ir.Neg {
-					val := ir.Operand(inst, 0).Def
+					val := inst.Operand(0).Def
 					if lhs, ok := val.(*ir.IntConst); ok {
 						constNeg := ir.NewIntConst(new(big.Int).Neg(lhs.Int()), inst.Pos())
-						ir.ClearOperands(inst)
-						ir.ReplaceUses(inst, constNeg)
+						inst.ClearOperands()
+						inst.ReplaceUsesWith(constNeg)
 						continue
 					}
 				}

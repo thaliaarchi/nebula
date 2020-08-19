@@ -59,8 +59,8 @@ func isIO(node ir.Inst) bool {
 // RHS.
 // TODO: create div trap to replace this.
 func canThrow(node ir.Inst) bool {
-	if n, ok := node.(*ir.BinaryExpr); ok && n.Op == ir.Div {
-		_, ok := ir.Operand(n, 0).Def.(*ir.IntConst)
+	if bin, ok := node.(*ir.BinaryExpr); ok && bin.Op == ir.Div {
+		_, ok := bin.Operand(1).Def.(*ir.IntConst)
 		return !ok
 	}
 	return false
