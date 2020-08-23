@@ -100,11 +100,6 @@ func (p *Program) String() string {
 	return NewFormatter().FormatProgram(p)
 }
 
-// Position returns the full position information for a given pos.
-func (p *Program) Position(pos token.Pos) token.Position {
-	return p.File.PositionFor(pos, false)
-}
-
 func (err *RetUnderflowError) addTrace(err2 *RetUnderflowError, trace *BasicBlock) *RetUnderflowError {
 	if err2 == nil {
 		return err

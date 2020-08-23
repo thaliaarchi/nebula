@@ -13,11 +13,6 @@ type Program struct {
 	File   *token.File
 }
 
-// Position returns the full position information for a given pos.
-func (p *Program) Position(pos token.Pos) token.Position {
-	return p.File.PositionFor(pos, false)
-}
-
 // Dump formats a program as Whitespace assembly.
 func (p *Program) Dump(indent string) string {
 	var b strings.Builder
@@ -58,7 +53,7 @@ func (p *Program) DumpPos() string {
 			b.WriteString(padding[:padWidth-l])
 		}
 		b.WriteString(" ; ")
-		pos := p.Position(tok.Start)
+		pos := p.File.Position(tok.Pos)
 		pos.Filename = ""
 		b.WriteString(pos.String())
 		b.WriteByte('\n')
@@ -68,6 +63,8 @@ func (p *Program) DumpPos() string {
 
 var spacePattern = regexp.MustCompile("[ \t\n]+")
 
+// DumpCommented formats a program as Whitesapce assembly with comments
+// interspersed.
 func (p *Program) DumpCommented(src []byte, indent string) string {
 	var b strings.Builder
 	start := 0

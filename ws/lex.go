@@ -7,29 +7,20 @@ import (
 	"math/big"
 )
 
-// Lexer is a lexical analyzer that scans tokens in Whitespace source.
-type Lexer struct {
+// lexer is a lexical analyzer that scans tokens in Whitespace source.
+type lexer struct {
 	file        *token.File
 	src         []byte
+	tokens      []*Token
 	offset      int
 	startOffset int
-	endOffset   int
 }
 
 // SyntaxError identifies the location of a syntactic error.
 type SyntaxError struct { // TODO report instruction string
-	Msg   string
-	Start token.Position
-	End   token.Position
-}
-
-type stateFn func(*Lexer) (*Token, error)
-
-type states struct {
-	Space stateFn
-	Tab   stateFn
-	LF    stateFn
-	Root  bool
+	Err string
+	Pos token.Position
+	End token.Position
 }
 
 const (
@@ -38,48 +29,26 @@ const (
 	lf    = '\n'
 )
 
-// NewLexer constructs a Whitespace lexer.
-func NewLexer(file *token.File, src []byte) *Lexer {
-	return &Lexer{
-		file:        file,
-		src:         src,
-		offset:      0,
-		startOffset: 0,
-		endOffset:   0,
-	}
-}
-
-// NextToken scans a single Whitespace token.
-func (l *Lexer) NextToken() (*Token, error) {
-	return lexInst(l)
-}
-
 // LexTokens scans a Whitespace source file into tokens.
 func LexTokens(file *token.File, src []byte) ([]*Token, error) {
-	l := NewLexer(file, src)
-	var tokens []*Token
+	l := &lexer{file: file, src: src}
+	var s state = lexInst
+	var err error
 	for {
-		tok, err := l.NextToken()
+		s, err = s.nextState(l)
 		if err == io.EOF {
-			return tokens, nil
+			return l.tokens, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		tokens = append(tokens, tok)
 	}
 }
 
-// Position returns the full position information for a given pos.
-func (l *Lexer) Position(pos token.Pos) token.Position {
-	return l.file.PositionFor(pos, false)
-}
-
-func (l *Lexer) next() (byte, bool) {
+func (l *lexer) next() (byte, bool) {
 	if l.offset < len(l.src) {
-		l.endOffset = l.offset
+		c := l.src[l.offset]
 		l.offset++
-		c := l.src[l.endOffset]
 		if c == '\n' {
 			l.file.AddLine(l.offset)
 		}
@@ -88,63 +57,91 @@ func (l *Lexer) next() (byte, bool) {
 	return 0, true
 }
 
-func (l *Lexer) peek() (byte, bool) {
-	if l.offset < len(l.src) {
-		return l.src[l.offset], false
-	}
-	return 0, true
-}
-
-func (l *Lexer) emitToken(typ Type, arg *big.Int) (*Token, error) {
-	return &Token{
-		Type:  typ,
-		Arg:   arg,
-		Start: l.file.Pos(l.startOffset),
-		End:   l.file.Pos(l.endOffset),
-	}, nil
-}
-
-func (l *Lexer) error(msg string) (*Token, error) {
-	return nil, &SyntaxError{
-		Msg:   msg,
-		Start: l.Position(l.file.Pos(l.startOffset)),
-		End:   l.Position(l.file.Pos(l.endOffset)),
+func (l *lexer) error(err string) error {
+	return &SyntaxError{
+		Err: err,
+		Pos: l.file.Position(l.file.Pos(l.startOffset)),
+		End: l.file.Position(l.file.Pos(l.offset - 1)),
 	}
 }
 
-func (l *Lexer) errorf(format string, args ...interface{}) (*Token, error) {
+func (l *lexer) errorf(format string, args ...interface{}) error {
 	return l.error(fmt.Sprintf(format, args...))
 }
 
-func transition(s states) stateFn {
-	return func(l *Lexer) (*Token, error) {
-	next:
+func (err *SyntaxError) Error() string {
+	end := err.End
+	if err.Pos.Filename == end.Filename {
+		end.Filename = ""
+	}
+	return fmt.Sprintf("syntax error: %s at %v-%v", err.Err, err.Pos, end)
+}
+
+type state interface {
+	nextState(*lexer) (state, error)
+}
+
+type transition struct {
+	Space state
+	Tab   state
+	LF    state
+	Root  bool
+}
+
+func (t *transition) nextState(l *lexer) (state, error) {
+	for {
 		c, eof := l.next()
 		if eof {
-			if s.Root {
+			if t.Root {
 				return nil, io.EOF
 			}
-			return l.error("incomplete instruction")
+			return nil, l.error("Incomplete instruction")
 		}
-		if s.Root {
-			l.startOffset = l.endOffset
-		}
-		var state stateFn
+		var next state
 		switch c {
 		case space:
-			state = s.Space
+			next = t.Space
 		case tab:
-			state = s.Tab
+			next = t.Tab
 		case lf:
-			state = s.LF
+			next = t.LF
 		default:
-			goto next
+			continue
 		}
-		if state == nil {
-			return l.error("invalid instruction")
+		if next == nil {
+			return nil, l.error("Invalid instruction")
 		}
-		return state(l)
+		return next, nil
 	}
+}
+
+type argType uint8
+
+const (
+	noArg argType = iota
+	signedArg
+	labelArg
+)
+
+type accept struct {
+	Type Type
+	Arg  argType
+}
+
+func (acc *accept) nextState(l *lexer) (state, error) {
+	tok := &Token{Type: acc.Type}
+	if acc.Arg != noArg {
+		num, err := l.lexNumber(acc.Type, acc.Arg == signedArg)
+		if err != nil {
+			return nil, err
+		}
+		tok.Arg = num
+	}
+	tok.Pos = l.file.Pos(l.startOffset)
+	tok.End = l.file.Pos(l.offset)
+	l.startOffset = l.offset
+	l.tokens = append(l.tokens, tok)
+	return lexInst, nil
 }
 
 var (
@@ -152,124 +149,111 @@ var (
 	bigOne  = big.NewInt(1)
 )
 
-func lexNumber(typ Type, signed bool) stateFn {
-	return func(l *Lexer) (*Token, error) {
-		var negative bool
-		if signed {
-		next:
+func (l *lexer) lexNumber(typ Type, signed bool) (*big.Int, error) {
+	var negative bool
+	if signed {
+		for {
 			tok, eof := l.next()
 			if eof {
-				return l.error("unterminated number")
+				return nil, l.errorf("Unterminated number: %v", typ)
 			}
 			switch tok {
 			case space:
 			case tab:
 				negative = true
 			case lf:
-				return l.emitToken(typ, bigZero)
+				return bigZero, nil
 			default:
-				goto next
+				continue
 			}
-		}
-		num := new(big.Int)
-		for {
-			tok, eof := l.next()
-			if eof {
-				return l.errorf("unterminated number: %d", num)
-			}
-			switch tok {
-			case space:
-				num.Lsh(num, 1)
-			case tab:
-				num.Lsh(num, 1).Or(num, bigOne)
-			case lf:
-				if negative {
-					num.Neg(num)
-				}
-				return l.emitToken(typ, num)
-			}
+			break
 		}
 	}
-}
 
-func emitInst(typ Type) stateFn {
-	return func(l *Lexer) (*Token, error) {
-		return l.emitToken(typ, nil)
+	num := new(big.Int)
+	for {
+		tok, eof := l.next()
+		if eof {
+			return nil, l.errorf("Unterminated number: %v %d", typ, num)
+		}
+		switch tok {
+		case space:
+			num.Lsh(num, 1)
+		case tab:
+			num.Lsh(num, 1).Or(num, bigOne)
+		case lf:
+			if negative {
+				num.Neg(num)
+			}
+			return num, nil
+		}
 	}
 }
 
-func (err *SyntaxError) Error() string {
-	end := err.End
-	if err.Start.Filename == end.Filename {
-		end.Filename = ""
-	}
-	return fmt.Sprintf("syntax error: %s at %v-%v", err.Msg, err.Start, end)
-}
-
-var lexInst = transition(states{
-	Space: lexStack,
-	Tab: transition(states{
-		Space: lexArith,
-		Tab:   lexHeap,
-		LF:    lexIO,
-	}),
-	LF:   lexFlow,
+var lexInst = &transition{
 	Root: true,
-})
 
-var lexStack = transition(states{
-	Space: lexNumber(Push, true),
-	Tab: transition(states{
-		Space: lexNumber(Copy, true),
-		LF:    lexNumber(Slide, true),
-	}),
-	LF: transition(states{
-		Space: emitInst(Dup),
-		Tab:   emitInst(Swap),
-		LF:    emitInst(Drop),
-	}),
-})
+	// Stack
+	Space: &transition{
+		Space: &accept{Push, signedArg},
+		Tab: &transition{
+			Space: &accept{Copy, signedArg},
+			LF:    &accept{Slide, signedArg},
+		},
+		LF: &transition{
+			Space: &accept{Dup, noArg},
+			Tab:   &accept{Swap, noArg},
+			LF:    &accept{Drop, noArg},
+		},
+	},
 
-var lexArith = transition(states{
-	Space: transition(states{
-		Space: emitInst(Add),
-		Tab:   emitInst(Sub),
-		LF:    emitInst(Mul),
-	}),
-	Tab: transition(states{
-		Space: emitInst(Div),
-		Tab:   emitInst(Mod),
-	}),
-})
+	Tab: &transition{
+		// Arithmetic
+		Space: &transition{
+			Space: &transition{
+				Space: &accept{Add, noArg},
+				Tab:   &accept{Sub, noArg},
+				LF:    &accept{Mul, noArg},
+			},
+			Tab: &transition{
+				Space: &accept{Div, noArg},
+				Tab:   &accept{Mod, noArg},
+			},
+		},
 
-var lexHeap = transition(states{
-	Space: emitInst(Store),
-	Tab:   emitInst(Retrieve),
-})
+		// Heap
+		Tab: &transition{
+			Space: &accept{Store, noArg},
+			Tab:   &accept{Retrieve, noArg},
+		},
 
-var lexIO = transition(states{
-	Space: transition(states{
-		Space: emitInst(Printc),
-		Tab:   emitInst(Printi),
-	}),
-	Tab: transition(states{
-		Space: emitInst(Readc),
-		Tab:   emitInst(Readi),
-	}),
-})
+		// I/O
+		LF: &transition{
+			Space: &transition{
+				Space: &accept{Printc, noArg},
+				Tab:   &accept{Printi, noArg},
+			},
+			Tab: &transition{
+				Space: &accept{Readc, noArg},
+				Tab:   &accept{Readi, noArg},
+			},
+		},
+	},
 
-var lexFlow = transition(states{
-	Space: transition(states{
-		Space: lexNumber(Label, false),
-		Tab:   lexNumber(Call, false),
-		LF:    lexNumber(Jmp, false),
-	}),
-	Tab: transition(states{
-		Space: lexNumber(Jz, false),
-		Tab:   lexNumber(Jn, false),
-		LF:    emitInst(Ret),
-	}),
-	LF: transition(states{
-		LF: emitInst(End),
-	}),
-})
+	// Control flow
+	LF: &transition{
+		Space: &transition{
+			Space: &accept{Label, labelArg},
+			Tab:   &accept{Call, labelArg},
+			LF:    &accept{Jmp, labelArg},
+		},
+		Tab: &transition{
+			Space: &accept{Jz, labelArg},
+			Tab:   &accept{Jn, labelArg},
+			LF:    &accept{Ret, noArg},
+		},
+		LF: &transition{
+			LF: &accept{End, noArg},
+		},
+	},
+}

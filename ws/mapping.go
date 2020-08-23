@@ -39,9 +39,12 @@ func ParseLabelMap(r io.Reader) (*bigint.Map, error) {
 // ApplyLabelMap adds label names from mapping to tokens.
 func ApplyLabelMap(tokens []*Token, labelNames *bigint.Map /* map[*big.Int]string */) {
 	for _, tok := range tokens {
-		if tok.Type == Label && tok.ArgString == "" {
-			if name, ok := labelNames.Get(tok.Arg); ok {
-				tok.ArgString = name.(string)
+		switch tok.Type {
+		case Label, Call, Jmp, Jz, Jn:
+			if tok.ArgString == "" {
+				if name, ok := labelNames.Get(tok.Arg); ok {
+					tok.ArgString = name.(string)
+				}
 			}
 		}
 	}

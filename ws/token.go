@@ -14,7 +14,7 @@ type Token struct {
 	Type      Type
 	Arg       *big.Int
 	ArgString string    // Label string, if exists
-	Start     token.Pos // Start position in source
+	Pos       token.Pos // Start position in source
 	End       token.Pos // End position in source (exclusive)
 }
 

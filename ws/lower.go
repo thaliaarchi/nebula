@@ -31,7 +31,7 @@ func (err *TokenError) Error() string {
 }
 
 func (ib *irBuilder) err(err string, tok *Token) {
-	ib.errs = append(ib.errs, &TokenError{tok, ib.position(tok.Start), err})
+	ib.errs = append(ib.errs, &TokenError{tok, ib.file.Position(tok.Pos), err})
 }
 
 func (ib *irBuilder) Errs() []error {
@@ -147,7 +147,7 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 	ib.stack.Clear()
 	start := true
 	for _, tok := range tokens {
-		pos := tok.Start
+		pos := tok.Pos
 		switch tok.Type {
 		case Push:
 			ib.stack.Push(ir.NewIntConst(tok.Arg, pos))
@@ -262,8 +262,4 @@ func (ib *irBuilder) handleAccess(n int, pos token.Pos) {
 
 func (ib *irBuilder) handleLoad(n int, pos token.Pos) ir.Value {
 	return ib.CreateLoadStackExpr(n, pos)
-}
-
-func (ib *irBuilder) position(pos token.Pos) token.Position {
-	return ib.file.PositionFor(pos, false)
 }
