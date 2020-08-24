@@ -32,7 +32,7 @@ const (
 // LexTokens scans a Whitespace source file into tokens.
 func LexTokens(file *token.File, src []byte) ([]*Token, error) {
 	l := &lexer{file: file, src: src}
-	var s state = lexInst
+	s := rootState
 	var err error
 	for {
 		s, err = s.nextState(l)
@@ -141,7 +141,7 @@ func (acc *accept) nextState(l *lexer) (state, error) {
 	tok.End = l.file.Pos(l.offset)
 	l.startOffset = l.offset
 	l.tokens = append(l.tokens, tok)
-	return lexInst, nil
+	return rootState, nil
 }
 
 var (
@@ -190,7 +190,7 @@ func (l *lexer) lexNumber(typ Type, signed bool) (*big.Int, error) {
 	}
 }
 
-var lexInst = &transition{
+var rootState state = &transition{
 	Root: true,
 
 	// Stack

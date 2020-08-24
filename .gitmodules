@@ -1,0 +1,4 @@
+[submodule "programs/collection"]
+	path = programs/collection
+	url = https://github.com/andrewarchi/wspace-collection
+	branch = master
