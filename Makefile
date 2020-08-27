@@ -6,11 +6,7 @@ all: build/99_bottles build/ascii build/ascii4 build/caesar \
 	build/rosetta/harshad build/rosetta/langstons_ant \
 	build/rosetta/octal build/rosetta/shell_sort \
 	build/rosetta/term_cursor build/rosetta/while \
-	build/test_ret_underflow build/collection/tetris
-
-build/collection/%: programs/collection/tetris/%.ws nebula compile ir/codegen/ext/ext.c
-	@mkdir -p build/collection
-	./compile $< $@
+	build/test_ret_underflow
 
 build/rosetta/%: programs/rosetta/%.ws nebula compile ir/codegen/ext/ext.c
 	@mkdir -p build/rosetta

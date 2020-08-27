@@ -1,4 +1,0 @@
-[submodule "programs/collection"]
-	path = programs/collection
-	url = https://github.com/andrewarchi/ws-collection
-	branch = master
