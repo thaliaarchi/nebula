@@ -82,17 +82,17 @@ type state interface {
 }
 
 type transition struct {
-	Space state
-	Tab   state
-	LF    state
-	Root  bool
+	Space  state
+	Tab    state
+	LF     state
+	CanEOF bool
 }
 
 func (t *transition) nextState(l *lexer) (state, error) {
 	for {
 		c, eof := l.next()
 		if eof {
-			if t.Root {
+			if t.CanEOF {
 				return nil, io.EOF
 			}
 			return nil, l.error("Incomplete instruction")
@@ -191,8 +191,6 @@ func (l *lexer) lexNumber(typ Type, signed bool) (*big.Int, error) {
 }
 
 var rootState state = &transition{
-	Root: true,
-
 	// Stack
 	Space: &transition{
 		Space: &accept{Push, signedArg},
@@ -255,5 +253,9 @@ var rootState state = &transition{
 		LF: &transition{
 			LF: &accept{End, noArg},
 		},
+
+		CanEOF: true, // allow trailing LF
 	},
+
+	CanEOF: true,
 }
