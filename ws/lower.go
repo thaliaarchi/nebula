@@ -208,10 +208,6 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 			ib.CreateRetTerm(pos)
 		case End:
 			ib.CreateExitTerm(pos)
-		case Trace:
-			// Aggressive optimizations may discard information needed to
-			// printing a full core dump.
-			ib.err("trace instruction not supported", tok)
 
 		case Printc:
 			ib.CreatePrintStmt(ir.PrintByte, ib.stack.Pop(pos), pos)
@@ -223,6 +219,15 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 			ib.CreateStoreHeapStmt(ib.stack.Pop(pos), ib.CreateReadExpr(ir.ReadByte, pos), pos)
 		case Readi:
 			ib.CreateStoreHeapStmt(ib.stack.Pop(pos), ib.CreateReadExpr(ir.ReadInt, pos), pos)
+
+		// Aggressive optimizations may discard information needed to dump
+		// the stack or heap.
+		case Trace:
+			ib.err("trace instruction not supported", tok)
+		case PrintStack:
+			ib.err("printstack instruction not supported", tok)
+		case PrintHeap:
+			ib.err("printheap instruction not supported", tok)
 
 		default:
 			panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))

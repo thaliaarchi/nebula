@@ -254,8 +254,16 @@ var rootState state = &transition{
 			LF:    &accept{Ret, noArg},
 		},
 		LF: &transition{
+			LF: &accept{End, noArg},
+
+			// Debug
+			Space: &transition{
+				Space: &transition{
+					Space: &accept{PrintStack, noArg},
+					Tab:   &accept{PrintHeap, noArg},
+				},
+			},
 			Tab: &accept{Trace, noArg},
-			LF:  &accept{End, noArg},
 		},
 
 		CanEOF: true, // allow trailing LF
