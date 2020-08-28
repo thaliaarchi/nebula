@@ -165,6 +165,10 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 			if n, ok := ib.intArg(tok); ok {
 				ib.stack.Slide(n, pos)
 			}
+		case Shuffle:
+			// Shuffle invalidates SSA value references and in most cases, the
+			// stack would need to be preserved.
+			ib.err("shuffle instruction not supported", tok)
 
 		case Add:
 			lhs, rhs := ib.stack.Pop2(pos)
@@ -204,6 +208,10 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 			ib.CreateRetTerm(pos)
 		case End:
 			ib.CreateExitTerm(pos)
+		case Trace:
+			// Aggressive optimizations may discard information needed to
+			// printing a full core dump.
+			ib.err("trace instruction not supported", tok)
 
 		case Printc:
 			ib.CreatePrintStmt(ir.PrintByte, ib.stack.Pop(pos), pos)

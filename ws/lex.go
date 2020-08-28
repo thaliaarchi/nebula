@@ -95,7 +95,7 @@ func (t *transition) nextState(l *lexer) (state, error) {
 			if t.CanEOF {
 				return nil, io.EOF
 			}
-			return nil, l.error("Incomplete instruction")
+			return nil, l.error("incomplete instruction")
 		}
 		var next state
 		switch c {
@@ -109,7 +109,7 @@ func (t *transition) nextState(l *lexer) (state, error) {
 			continue
 		}
 		if next == nil {
-			return nil, l.error("Invalid instruction")
+			return nil, l.error("invalid instruction")
 		}
 		return next, nil
 	}
@@ -155,7 +155,7 @@ func (l *lexer) lexNumber(typ Type, signed bool) (*big.Int, error) {
 		for {
 			tok, eof := l.next()
 			if eof {
-				return nil, l.errorf("Unterminated number: %v", typ)
+				return nil, l.errorf("unterminated number: %v", typ)
 			}
 			switch tok {
 			case space:
@@ -174,7 +174,7 @@ func (l *lexer) lexNumber(typ Type, signed bool) (*big.Int, error) {
 	for {
 		tok, eof := l.next()
 		if eof {
-			return nil, l.errorf("Unterminated number: %v %d", typ, num)
+			return nil, l.errorf("unterminated number: %v %d", typ, num)
 		}
 		switch tok {
 		case space:
@@ -196,7 +196,10 @@ var rootState state = &transition{
 		Space: &accept{Push, signedArg},
 		Tab: &transition{
 			Space: &accept{Copy, signedArg},
-			LF:    &accept{Slide, signedArg},
+			Tab: &transition{
+				Space: &accept{Shuffle, noArg},
+			},
+			LF: &accept{Slide, signedArg},
 		},
 		LF: &transition{
 			Space: &accept{Dup, noArg},
@@ -251,7 +254,8 @@ var rootState state = &transition{
 			LF:    &accept{Ret, noArg},
 		},
 		LF: &transition{
-			LF: &accept{End, noArg},
+			Tab: &accept{Trace, noArg},
+			LF:  &accept{End, noArg},
 		},
 
 		CanEOF: true, // allow trailing LF

@@ -86,6 +86,7 @@ const (
 	Swap
 	Drop
 	Slide
+	Shuffle // Non-standard extension used by Harold Lee's whitespace-0.4
 
 	// Arithmetic instructions
 	Add
@@ -106,6 +107,7 @@ const (
 	Jn
 	Ret
 	End
+	Trace // Non-standard extension used by Phillip Bradbury's pywhitespace
 
 	// I/O instructions
 	Printc
@@ -152,6 +154,8 @@ func (typ Type) String() string {
 		return "drop"
 	case Slide:
 		return "slide"
+	case Shuffle:
+		return "shuffle"
 	case Add:
 		return "add"
 	case Sub:
@@ -180,6 +184,8 @@ func (typ Type) String() string {
 		return "ret"
 	case End:
 		return "end"
+	case Trace:
+		return "trace"
 	case Printc:
 		return "printc"
 	case Printi:
