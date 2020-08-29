@@ -20,7 +20,7 @@ type lexer struct {
 type SyntaxError struct { // TODO report instruction string
 	Err string
 	Pos token.Position
-	End token.Position
+	End token.Position // inclusive
 }
 
 const (
@@ -259,8 +259,8 @@ var rootState state = &transition{
 			// Debug
 			Space: &transition{
 				Space: &transition{
-					Space: &accept{PrintStack, noArg},
-					Tab:   &accept{PrintHeap, noArg},
+					Space: &accept{DumpStack, noArg},
+					Tab:   &accept{DumpHeap, noArg},
 				},
 			},
 			Tab: &accept{Trace, noArg},

@@ -115,7 +115,7 @@ func (ib *irBuilder) splitTokens(labelUses *bigint.Map) {
 	if lo < len(ib.tokens) {
 		ib.tokenBlocks = append(ib.tokenBlocks, ib.tokens[lo:])
 	}
-	if needsImplicitEnd(ib.tokens) {
+	if needsFinalBlock(ib.tokens) {
 		ib.tokenBlocks = append(ib.tokenBlocks, []*Token{})
 	}
 
@@ -131,15 +131,15 @@ func (ib *irBuilder) splitTokens(labelUses *bigint.Map) {
 	}
 }
 
-func needsImplicitEnd(tokens []*Token) bool {
+func needsFinalBlock(tokens []*Token) bool {
 	if len(tokens) == 0 {
 		return true
 	}
 	switch tokens[len(tokens)-1].Type {
-	case Jmp, Ret, End:
-		return false
+	case Call, Jz, Jn:
+		return true
 	}
-	return true
+	return false
 }
 
 func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
@@ -224,10 +224,10 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 		// the stack or heap.
 		case Trace:
 			ib.err("trace instruction not supported", tok)
-		case PrintStack:
-			ib.err("printstack instruction not supported", tok)
-		case PrintHeap:
-			ib.err("printheap instruction not supported", tok)
+		case DumpStack:
+			ib.err("dumpstack instruction not supported", tok)
+		case DumpHeap:
+			ib.err("dumpheap instruction not supported", tok)
 
 		default:
 			panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))

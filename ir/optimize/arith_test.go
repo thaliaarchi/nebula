@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/andrewarchi/nebula/internal/bigint"
 	"github.com/andrewarchi/nebula/ir"
 	"github.com/andrewarchi/nebula/ws"
 )
@@ -33,48 +32,40 @@ func TestFoldConstArith(t *testing.T) {
 	// printi    ; 19
 
 	tokens := []*ws.Token{
-		{Type: ws.Push, Arg: big.NewInt(1), Start: 1, End: 1},     // 1
-		{Type: ws.Push, Arg: big.NewInt(3), Start: 2, End: 2},     // 2
-		{Type: ws.Push, Arg: big.NewInt(10), Start: 3, End: 3},    // 3
-		{Type: ws.Push, Arg: big.NewInt(2), Start: 4, End: 4},     // 4
-		{Type: ws.Mul, Start: 5, End: 5},                          // 5
-		{Type: ws.Add, Start: 6, End: 6},                          // 6
-		{Type: ws.Swap, Start: 7, End: 7},                         // 7
-		{Type: ws.Push, Arg: big.NewInt('C'), Start: 8, End: 8},   // 8
-		{Type: ws.Dup, Start: 9, End: 9},                          // 9
-		{Type: ws.Copy, Arg: big.NewInt(2), Start: 10, End: 10},   // 10
-		{Type: ws.Sub, Start: 11, End: 11},                        // 11
-		{Type: ws.Push, Arg: big.NewInt(-32), Start: 12, End: 12}, // 12
-		{Type: ws.Push, Arg: big.NewInt('a'), Start: 13, End: 13}, // 13
-		{Type: ws.Add, Start: 14, End: 14},                        // 14
-		{Type: ws.Printc, Start: 15, End: 15},                     // 15
-		{Type: ws.Printc, Start: 16, End: 16},                     // 16
-		{Type: ws.Printc, Start: 17, End: 17},                     // 17
-		{Type: ws.Printi, Start: 18, End: 18},                     // 18
-		{Type: ws.Printi, Start: 19, End: 19},                     // 19
+		{Type: ws.Push, Arg: big.NewInt(1), Pos: 1, End: 1},     // 1
+		{Type: ws.Push, Arg: big.NewInt(3), Pos: 2, End: 2},     // 2
+		{Type: ws.Push, Arg: big.NewInt(10), Pos: 3, End: 3},    // 3
+		{Type: ws.Push, Arg: big.NewInt(2), Pos: 4, End: 4},     // 4
+		{Type: ws.Mul, Pos: 5, End: 5},                          // 5
+		{Type: ws.Add, Pos: 6, End: 6},                          // 6
+		{Type: ws.Swap, Pos: 7, End: 7},                         // 7
+		{Type: ws.Push, Arg: big.NewInt('C'), Pos: 8, End: 8},   // 8
+		{Type: ws.Dup, Pos: 9, End: 9},                          // 9
+		{Type: ws.Copy, Arg: big.NewInt(2), Pos: 10, End: 10},   // 10
+		{Type: ws.Sub, Pos: 11, End: 11},                        // 11
+		{Type: ws.Push, Arg: big.NewInt(-32), Pos: 12, End: 12}, // 12
+		{Type: ws.Push, Arg: big.NewInt('a'), Pos: 13, End: 13}, // 13
+		{Type: ws.Add, Pos: 14, End: 14},                        // 14
+		{Type: ws.Printc, Pos: 15, End: 15},                     // 15
+		{Type: ws.Printc, Pos: 16, End: 16},                     // 16
+		{Type: ws.Printc, Pos: 17, End: 17},                     // 17
+		{Type: ws.Printi, Pos: 18, End: 18},                     // 18
+		{Type: ws.Printi, Pos: 19, End: 19},                     // 19
 	}
 	file := token.NewFileSet().AddFile("test", -1, 0)
-	p := &ws.Program{File: file, Tokens: tokens, LabelNames: nil}
+	p := &ws.Program{File: file, Tokens: tokens}
 
 	var (
-		big1   = big.NewInt(1)
-		big3   = big.NewInt(3)
-		big10  = big.NewInt(10)
-		big2   = big.NewInt(2)
-		bigC   = big.NewInt('C')
-		bign32 = big.NewInt(-32)
-		biga   = big.NewInt('a')
-
-		push1     = ir.NewIntConst(big1, 1)
-		push3     = ir.NewIntConst(big3, 2)
-		push10    = ir.NewIntConst(big10, 3)
-		push2     = ir.NewIntConst(big2, 4)
+		push1     = ir.NewIntConst(big.NewInt(1), 1)
+		push3     = ir.NewIntConst(big.NewInt(3), 2)
+		push10    = ir.NewIntConst(big.NewInt(10), 3)
+		push2     = ir.NewIntConst(big.NewInt(2), 4)
 		mul       = ir.NewBinaryExpr(ir.Mul, push10, push2, 5)
 		add1      = ir.NewBinaryExpr(ir.Add, push3, mul, 6)
-		pushC     = ir.NewIntConst(bigC, 8)
+		pushC     = ir.NewIntConst(big.NewInt('C'), 8)
 		sub       = ir.NewBinaryExpr(ir.Sub, pushC, push1, 11)
-		pushn32   = ir.NewIntConst(bign32, 12)
-		pusha     = ir.NewIntConst(biga, 13)
+		pushn32   = ir.NewIntConst(big.NewInt(-32), 12)
+		pusha     = ir.NewIntConst(big.NewInt('a'), 13)
 		add2      = ir.NewBinaryExpr(ir.Add, pushn32, pusha, 14)
 		printAdd2 = ir.NewPrintStmt(ir.PrintByte, add2, 15)
 		flushAdd2 = ir.NewFlushStmt(15)
@@ -87,15 +78,6 @@ func TestFoldConstArith(t *testing.T) {
 		printAdd1 = ir.NewPrintStmt(ir.PrintInt, add1, 19)
 		flushAdd1 = ir.NewFlushStmt(19)
 	)
-
-	constValues := bigint.NewMap()
-	constValues.Put(big1, push1)
-	constValues.Put(big3, push3)
-	constValues.Put(big10, push10)
-	constValues.Put(big2, push2)
-	constValues.Put(bigC, pushC)
-	constValues.Put(bign32, pushn32)
-	constValues.Put(biga, pusha)
 
 	var stack ir.Stack
 	stack.Push(push1)   // 0
@@ -155,7 +137,6 @@ func TestFoldConstArith(t *testing.T) {
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockStart},
 		Entry:       blockStart,
-		ConstValues: constValues,
 		NextBlockID: 1,
 		File:        file,
 	}
@@ -169,30 +150,20 @@ func TestFoldConstArith(t *testing.T) {
 	}
 
 	var (
-		big20 = big.NewInt(20)
-		big23 = big.NewInt(23)
-		bigA  = big.NewInt('A')
-		bigB  = big.NewInt('B')
-
-		fold20 = ir.NewIntConst(big20, 5)
-		fold23 = ir.NewIntConst(big23, 6)
-		foldB  = ir.NewIntConst(bigB, 11)
-		foldA  = ir.NewIntConst(bigA, 14)
+		fold20 = ir.NewIntConst(big.NewInt(20), 5)
+		fold23 = ir.NewIntConst(big.NewInt(23), 6)
+		foldB  = ir.NewIntConst(big.NewInt('B'), 11)
+		foldA  = ir.NewIntConst(big.NewInt('A'), 14)
 	)
 
-	constValues.Put(big.NewInt(20), fold20)
-	constValues.Put(big.NewInt(23), fold23)
-	constValues.Put(big.NewInt('A'), foldA)
-	constValues.Put(big.NewInt('B'), foldB)
-
-	ir.ReplaceUses(mul, fold20)
-	ir.ClearOperands(mul)
-	ir.ReplaceUses(add1, fold23)
-	ir.ClearOperands(add1)
-	ir.ReplaceUses(sub, foldB)
-	ir.ClearOperands(sub)
-	ir.ReplaceUses(add2, foldA)
-	ir.ClearOperands(add2)
+	mul.ReplaceUsesWith(fold20)
+	mul.ClearOperands()
+	add1.ReplaceUsesWith(fold23)
+	add1.ClearOperands()
+	sub.ReplaceUsesWith(foldB)
+	sub.ClearOperands()
+	add2.ReplaceUsesWith(foldA)
+	add2.ClearOperands()
 
 	blockConst := &ir.BasicBlock{
 		Nodes: []ir.Inst{
@@ -215,7 +186,6 @@ func TestFoldConstArith(t *testing.T) {
 		Name:        "test",
 		Blocks:      []*ir.BasicBlock{blockConst},
 		Entry:       blockConst,
-		ConstValues: constValues,
 		NextBlockID: 1,
 		File:        file,
 	}
@@ -224,32 +194,4 @@ func TestFoldConstArith(t *testing.T) {
 	if !reflect.DeepEqual(program, programConst) {
 		t.Errorf("constant arithmetic folding not equal\ngot:\n%v\nwant:\n%v", program, programConst)
 	}
-
-	/*var (
-		strABC123   = ir.NewStringConst("ABC123", 18)
-		printABC123 = ir.NewPrintStmt(ir.Prints, strABC123, 18)
-	)
-
-	blockStr := &ir.BasicBlock{
-		Nodes: []ir.Inst{
-			printABC123,
-			flushAdd1,
-		},
-		Terminator: &ir.ExitTerm{},
-		Stack:      stack,
-		Entries:    []*ir.BasicBlock{nil},
-		Callers:    []*ir.BasicBlock{nil},
-	}
-	programStr := &ir.Program{
-		Name:        "test",
-		Blocks:      []*ir.BasicBlock{blockStr},
-		Entry:       blockStr,
-		ConstVals:   constValues,
-		NextBlockID: 1,
-	}
-
-	ConcatStrings(program)
-	if !reflect.DeepEqual(program, programStr) {
-		t.Errorf("string concat not equal\ngot:\n%v\nwant:\n%v", program, programStr)
-	}*/
 }

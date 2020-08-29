@@ -86,7 +86,7 @@ const (
 	Swap
 	Drop
 	Slide
-	Shuffle // Non-standard instruction from Harold Lee's whitespace-0.4
+	Shuffle // non-standard; from Harold Lee's whitespace-0.4
 
 	// Arithmetic instructions
 	Add
@@ -114,10 +114,10 @@ const (
 	Readc
 	Readi
 
-	// Debug
-	Trace      // Non-standard instruction from Phillip Bradbury's pywhitespace
-	PrintStack // Non-standard instruction from Oliver Burghard's Whitespace Assembler
-	PrintHeap  // Non-standard instruction from Oliver Burghard's Whitespace Assembler
+	// Debug instructions (non-standard)
+	Trace     // from Phillip Bradbury's pywhitespace
+	DumpStack // from Oliver Burghard's interpreter
+	DumpHeap  // from Oliver Burghard's interpreter
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
@@ -198,10 +198,10 @@ func (typ Type) String() string {
 		return "readi"
 	case Trace:
 		return "trace"
-	case PrintStack:
-		return "printstack"
-	case PrintHeap:
-		return "printheap"
+	case DumpStack:
+		return "dumpstack"
+	case DumpHeap:
+		return "dumpheap"
 	}
 	return fmt.Sprintf("token(%d)", int(typ))
 }
