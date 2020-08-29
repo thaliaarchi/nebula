@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"io"
 	"math/big"
+	"unicode/utf8"
 )
 
 // lexer is a lexical analyzer that scans tokens in Whitespace source.
@@ -45,14 +46,14 @@ func LexTokens(file *token.File, src []byte) ([]*Token, error) {
 	}
 }
 
-func (l *lexer) next() (byte, bool) {
+func (l *lexer) next() (rune, bool) {
 	if l.offset < len(l.src) {
-		c := l.src[l.offset]
-		l.offset++
-		if c == '\n' {
+		ch, size := utf8.DecodeRune(l.src[l.offset:])
+		l.offset += size
+		if ch == '\n' {
 			l.file.AddLine(l.offset)
 		}
-		return c, false
+		return ch, false
 	}
 	return 0, true
 }
