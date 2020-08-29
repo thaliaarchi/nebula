@@ -26,34 +26,30 @@ func TestTokenString(t *testing.T) {
 	}
 }
 
-func TestTypeGroups(t *testing.T) {
-	tests := []struct {
-		IsStack, IsArith, IsHeap, IsFlow, IsIO bool
-		Types                                  []Type
+func TestTypePredicates(t *testing.T) {
+	types := []struct {
+		Name      string
+		Predicate func(Type) bool
+		Types     []Type
 	}{
-		{true, false, false, false, false, []Type{Push, Dup, Copy, Swap, Drop, Slide}},
-		{false, true, false, false, false, []Type{Add, Sub, Mul, Div, Mod}},
-		{false, false, true, false, false, []Type{Store, Retrieve}},
-		{false, false, false, true, false, []Type{Label, Call, Jmp, Jz, Jn, Ret, End}},
-		{false, false, false, false, true, []Type{Printc, Printi, Readc, Readi}},
+		{"stack", Type.IsStack, []Type{Push, Dup, Copy, Swap, Drop, Slide, Shuffle}},
+		{"arith", Type.IsArith, []Type{Add, Sub, Mul, Div, Mod}},
+		{"heap", Type.IsHeap, []Type{Store, Retrieve}},
+		{"control", Type.IsControl, []Type{Label, Call, Jmp, Jz, Jn, Ret, End}},
+		{"io", Type.IsIO, []Type{Printc, Printi, Readc, Readi}},
+		{"debug", Type.IsDebug, []Type{Trace, DumpStack, DumpHeap}},
 	}
 
-	for _, test := range tests {
-		for _, typ := range test.Types {
-			if typ.IsStack() != test.IsStack {
-				t.Errorf("(%s).IsStack() = %t, want %t", typ, typ.IsStack(), test.IsStack)
+	for i, group := range types {
+		for _, typ := range group.Types {
+			if !group.Predicate(typ) {
+				t.Errorf("%v is not a %s instruction, but should be", typ, group.Name)
 			}
-			if typ.IsArith() != test.IsArith {
-				t.Errorf("(%s).IsArith() = %t, want %t", typ, typ.IsArith(), test.IsArith)
-			}
-			if typ.IsHeap() != test.IsHeap {
-				t.Errorf("(%s).IsHeap() = %t, want %t", typ, typ.IsHeap(), test.IsHeap)
-			}
-			if typ.IsFlow() != test.IsFlow {
-				t.Errorf("(%s).IsFlow() = %t, want %t", typ, typ.IsFlow(), test.IsFlow)
-			}
-			if typ.IsIO() != test.IsIO {
-				t.Errorf("(%s).IsIO() = %t, want %t", typ, typ.IsIO(), test.IsIO)
+
+			for j, other := range types {
+				if i != j && other.Predicate(typ) {
+					t.Errorf("%v is a %s instruction, but should not be", typ, other.Name)
+				}
 			}
 		}
 	}
@@ -71,6 +67,7 @@ func TestInstrTypeString(t *testing.T) {
 		{Swap, "swap"},
 		{Drop, "drop"},
 		{Slide, "slide"},
+		{Shuffle, "shuffle"},
 		{Add, "add"},
 		{Sub, "sub"},
 		{Mul, "mul"},
@@ -89,6 +86,9 @@ func TestInstrTypeString(t *testing.T) {
 		{Printi, "printi"},
 		{Readc, "readc"},
 		{Readi, "readi"},
+		{Trace, "trace"},
+		{DumpStack, "dumpstack"},
+		{DumpHeap, "dumpheap"},
 		{100, "token(100)"},
 	}
 

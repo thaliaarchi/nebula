@@ -30,7 +30,7 @@ func (tok *Token) String() string {
 }
 
 func (tok *Token) formatArg() string {
-	if !tok.Type.IsFlow() {
+	if !tok.Type.IsControl() {
 		return tok.Arg.String()
 	}
 	if tok.ArgString != "" {
@@ -51,7 +51,7 @@ func (tok *Token) StringWS() string {
 func (tok *Token) formatArgWS() string {
 	var b strings.Builder
 	num := tok.Arg
-	if !tok.Type.IsFlow() {
+	if !tok.Type.IsControl() {
 		if num.Sign() != -1 {
 			b.WriteByte(' ')
 		} else {
@@ -121,7 +121,7 @@ const (
 )
 
 // IsStack returns true for tokens corresponding to stack manipulation instructions.
-func (typ Type) IsStack() bool { return Push <= typ && typ <= Slide }
+func (typ Type) IsStack() bool { return Push <= typ && typ <= Shuffle }
 
 // IsArith returns true for tokens corresponding to arithmetic instructions.
 func (typ Type) IsArith() bool { return Add <= typ && typ <= Mod }
@@ -129,11 +129,14 @@ func (typ Type) IsArith() bool { return Add <= typ && typ <= Mod }
 // IsHeap returns true for tokens corresponding to heap access instructions.
 func (typ Type) IsHeap() bool { return typ == Store || typ == Retrieve }
 
-// IsFlow returns true for tokens corresponding to control flow instructions.
-func (typ Type) IsFlow() bool { return Label <= typ && typ <= End }
+// IsControl returns true for tokens corresponding to control flow instructions.
+func (typ Type) IsControl() bool { return Label <= typ && typ <= End }
 
 // IsIO returns true for tokens corresponding to I/O instructions.
 func (typ Type) IsIO() bool { return Printc <= typ && typ <= Readi }
+
+// IsDebug returns true for tokens corresponding to debug instructions.
+func (typ Type) IsDebug() bool { return Trace <= typ && typ <= DumpHeap }
 
 // HasArg returns true for instructions that require an argument.
 func (typ Type) HasArg() bool {

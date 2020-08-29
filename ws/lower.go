@@ -98,7 +98,7 @@ func (ib *irBuilder) splitTokens(labelUses *bigint.Map) {
 	lo := 0
 	for i := 0; i < len(ib.tokens); i++ {
 		tok := ib.tokens[i]
-		if !tok.Type.IsFlow() {
+		if !tok.Type.IsControl() {
 			start = false
 			continue
 		}
