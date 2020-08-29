@@ -302,7 +302,7 @@ func (m *moduleBuilder) lookupValue(val ir.Value) llvm.Value {
 	}
 }
 
-func (m *moduleBuilder) stackAddr(pos int, stackLen llvm.Value) llvm.Value {
+func (m *moduleBuilder) stackAddr(pos uint, stackLen llvm.Value) llvm.Value {
 	name := fmt.Sprintf("s%d", pos)
 	n := llvm.ConstInt(llvm.Int64Type(), uint64(pos), false)
 	idx := m.b.CreateSub(stackLen, n, name+".idx")

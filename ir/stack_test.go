@@ -33,7 +33,7 @@ type stackTest struct {
 	Stack *Stack
 	Want  *Stack
 	Value Value
-	N     int
+	N     uint
 }
 
 func TestPush(t *testing.T) {
@@ -108,10 +108,6 @@ func TestDropN(t *testing.T) {
 		test.Stack.DropN(test.N, token.NoPos)
 		checkStack(t, i, test.Stack, test.Want)
 	}
-
-	checkPanic(t, "stack: drop count must be positive: -1", func() {
-		new(Stack).DropN(-1, token.NoPos)
-	})
 }
 
 func TestSwap(t *testing.T) {
@@ -181,9 +177,9 @@ func TestSimplify(t *testing.T) {
 	}
 }
 
-func handleAccess(n int, pos token.Pos) {}
+func handleAccess(n uint, pos token.Pos) {}
 
-func handleLoad(n int, pos token.Pos) Value {
+func handleLoad(n uint, pos token.Pos) Value {
 	if n < 1 || n > 4 {
 		panic(fmt.Sprintf("handleLoad: n out of range: %d", n))
 	}

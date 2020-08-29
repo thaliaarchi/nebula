@@ -162,18 +162,14 @@ func writeBlockSlice(b *strings.Builder, blocks []*BasicBlock) {
 }
 
 func writeStackPos(b *strings.Builder, inst Inst) {
-	var pos int
 	switch s := inst.(type) {
 	case *LoadStackExpr:
-		pos = s.StackPos
+		fmt.Fprintf(b, " %d", s.StackPos)
 	case *StoreStackStmt:
-		pos = s.StackPos
+		fmt.Fprintf(b, " %d", s.StackPos)
 	case *AccessStackStmt:
-		pos = s.StackSize
+		fmt.Fprintf(b, " %d", s.StackSize)
 	case *OffsetStackStmt:
-		pos = s.Offset
-	default:
-		return
+		fmt.Fprintf(b, " %d", s.Offset)
 	}
-	fmt.Fprintf(b, " %d", pos)
 }

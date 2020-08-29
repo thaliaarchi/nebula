@@ -316,16 +316,13 @@ func (un *UnaryExpr) OpString() string { return un.Op.String() }
 // LoadStackExpr is an expression that loads a value from under the
 // current stack frame. A position of 1 is the top of the stack.
 type LoadStackExpr struct {
-	StackPos int
+	StackPos uint
 	ValueBase
 	PosBase
 }
 
 // NewLoadStackExpr constructs a LoadStackExpr.
-func NewLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExpr {
-	if stackPos < 0 {
-		panic("NewLoadStackExpr: negative stack position")
-	}
+func NewLoadStackExpr(stackPos uint, pos token.Pos) *LoadStackExpr {
 	return &LoadStackExpr{StackPos: stackPos, PosBase: PosBase{pos: pos}}
 }
 
@@ -335,16 +332,13 @@ func (*LoadStackExpr) OpString() string { return "loadstack" }
 // StoreStackStmt is a statement that stores a value at a position in
 // the stack.
 type StoreStackStmt struct {
-	StackPos int
+	StackPos uint
 	UserBase
 	PosBase
 }
 
 // NewStoreStackStmt constructs a StoreStackStmt.
-func NewStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
-	if stackPos < 0 {
-		panic("NewLoadStackExpr: negative stack position")
-	}
+func NewStoreStackStmt(stackPos uint, val Value, pos token.Pos) *StoreStackStmt {
 	store := &StoreStackStmt{StackPos: stackPos, PosBase: PosBase{pos: pos}}
 	store.initOperands(store, val)
 	return store
@@ -355,15 +349,12 @@ func (*StoreStackStmt) OpString() string { return "storestack" }
 
 // AccessStackStmt is a statement that asserts the stack length.
 type AccessStackStmt struct {
-	StackSize int
+	StackSize uint
 	PosBase
 }
 
 // NewAccessStackStmt constructs a AccessStackStmt.
-func NewAccessStackStmt(stackSize int, pos token.Pos) *AccessStackStmt {
-	if stackSize < 0 {
-		panic("NewLoadStackExpr: negative stack position")
-	}
+func NewAccessStackStmt(stackSize uint, pos token.Pos) *AccessStackStmt {
 	return &AccessStackStmt{StackSize: stackSize, PosBase: PosBase{pos: pos}}
 }
 

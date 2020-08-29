@@ -154,7 +154,7 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 		case Dup:
 			ib.stack.Dup(pos)
 		case Copy:
-			if n, ok := ib.intArg(tok); ok {
+			if n, ok := ib.uintArg(tok); ok {
 				ib.stack.Copy(n, pos)
 			}
 		case Swap:
@@ -162,7 +162,7 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 		case Drop:
 			ib.stack.Drop(pos)
 		case Slide:
-			if n, ok := ib.intArg(tok); ok {
+			if n, ok := ib.uintArg(tok); ok {
 				ib.stack.Slide(n, pos)
 			}
 		case Shuffle:
@@ -230,17 +230,17 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 			ib.err("dumpheap instruction not supported", tok)
 
 		default:
-			panic(fmt.Sprintf("ws: unrecognized token type: %v", tok.Type))
+			panic(fmt.Sprintf("unrecognized token type: %v", tok.Type))
 		}
 		if tok.Type != Label {
 			start = false
 		}
 	}
-	if offset := ib.stack.Len() - ib.stack.Pops(); offset != 0 {
+	if offset := int(ib.stack.Len()) - int(ib.stack.Pops()); offset != 0 {
 		ib.CreateOffsetStackStmt(offset, token.NoPos) // TODO source position
 	}
 	for i, val := range ib.stack.Values() {
-		ib.CreateStoreStackStmt(ib.stack.Len()-i, val, val.Pos())
+		ib.CreateStoreStackStmt(ib.stack.Len()-uint(i), val, val.Pos())
 	}
 	if block.Terminator == nil {
 		if block.Next != nil {
@@ -251,12 +251,12 @@ func (ib *irBuilder) convertBlock(block *ir.BasicBlock, tokens []*Token) {
 	}
 }
 
-func (ib *irBuilder) intArg(tok *Token) (int, bool) {
-	n, ok := bigint.ToInt(tok.Arg)
-	if !ok {
-		ib.err("Argument overflows int", tok)
-	} else if n < 0 {
-		ib.err("Argument is negative", tok)
+func (ib *irBuilder) uintArg(tok *Token) (uint, bool) {
+	n, ok := bigint.ToUint(tok.Arg)
+	if tok.Arg.Sign() == -1 {
+		ib.err("argument is negative", tok)
+	} else if !ok {
+		ib.err("argument overflows uint", tok)
 	}
 	return n, ok
 }
@@ -264,15 +264,15 @@ func (ib *irBuilder) intArg(tok *Token) (int, bool) {
 func (ib *irBuilder) callee(tok *Token) *ir.BasicBlock {
 	callee, ok := ib.labelBlocks.Get(tok.Arg)
 	if !ok || callee.(*ir.BasicBlock) == nil {
-		panic(fmt.Sprintf("ws: block %s jumps to non-existent label: label_%v", ib.CurrentBlock().Name(), tok.Arg))
+		panic(fmt.Sprintf("block %s jumps to non-existent label: label_%v", ib.CurrentBlock().Name(), tok.Arg))
 	}
 	return callee.(*ir.BasicBlock)
 }
 
-func (ib *irBuilder) handleAccess(n int, pos token.Pos) {
+func (ib *irBuilder) handleAccess(n uint, pos token.Pos) {
 	ib.CreateAccessStackStmt(n, pos)
 }
 
-func (ib *irBuilder) handleLoad(n int, pos token.Pos) ir.Value {
+func (ib *irBuilder) handleLoad(n uint, pos token.Pos) ir.Value {
 	return ib.CreateLoadStackExpr(n, pos)
 }

@@ -97,7 +97,7 @@ func (b *Builder) CreateUnaryExpr(op UnaryOp, val Value, pos token.Pos) *UnaryEx
 
 // CreateLoadStackExpr constructs a LoadStackExpr and appends it to the
 // current block.
-func (b *Builder) CreateLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExpr {
+func (b *Builder) CreateLoadStackExpr(stackPos uint, pos token.Pos) *LoadStackExpr {
 	load := NewLoadStackExpr(stackPos, pos)
 	b.curr.AppendInst(load)
 	return load
@@ -105,7 +105,7 @@ func (b *Builder) CreateLoadStackExpr(stackPos int, pos token.Pos) *LoadStackExp
 
 // CreateStoreStackStmt constructs a StoreStackStmt and appends it to
 // the current block.
-func (b *Builder) CreateStoreStackStmt(stackPos int, val Value, pos token.Pos) *StoreStackStmt {
+func (b *Builder) CreateStoreStackStmt(stackPos uint, val Value, pos token.Pos) *StoreStackStmt {
 	store := NewStoreStackStmt(stackPos, val, pos)
 	b.curr.AppendInst(store)
 	return store
@@ -113,7 +113,7 @@ func (b *Builder) CreateStoreStackStmt(stackPos int, val Value, pos token.Pos) *
 
 // CreateAccessStackStmt constructs a AccessStackStmt and appends it to
 // the current block.
-func (b *Builder) CreateAccessStackStmt(stackSize int, pos token.Pos) *AccessStackStmt {
+func (b *Builder) CreateAccessStackStmt(stackSize uint, pos token.Pos) *AccessStackStmt {
 	access := NewAccessStackStmt(stackSize, pos)
 	b.curr.AppendInst(access)
 	return access
