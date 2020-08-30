@@ -24,7 +24,7 @@ import (
 // by calling the error handler. If no flag is set, comments
 // are ignored.
 const (
-	comments uint = 1 << iota // emit all comments
+	emitComments uint = 1 << iota // emit all comments
 	semiComment
 )
 
@@ -59,7 +59,6 @@ func (s *scanner) errorAtf(offset int, format string, args ...interface{}) {
 
 // setLiteral sets the scanner state for a recognized literal token.
 func (s *scanner) setLiteral(kind token, ok bool) {
-	s.nlsemi = true
 	s.tok = kind
 	s.literal = string(s.segment())
 	s.bad = !ok
@@ -88,11 +87,6 @@ redo:
 	s.line, s.col = s.pos()
 	s.blank = s.line > startLine || startCol == colbase
 	s.start()
-	if s.atIdentChar(true, false) {
-		s.nextch()
-		s.ident(false)
-		return
-	}
 
 	switch s.ch {
 	case -1:
@@ -141,11 +135,13 @@ redo:
 			s.number(true)
 			break
 		}
-		if s.atIdentChar(true, true) {
+		if s.atIdentChar(true) {
 			s.nextch()
 			s.ident(true)
 			break
 		}
+		s.error("bare dot")
+		s.nextch()
 
 	case '#':
 		s.nextch()
@@ -177,6 +173,12 @@ redo:
 		}
 
 	default:
+		if s.atIdentChar(true) {
+			s.nextch()
+			s.ident(false)
+			break
+		}
+
 		s.errorf("invalid character %#U", s.ch)
 		s.nextch()
 		goto redo
@@ -186,27 +188,26 @@ redo:
 }
 
 func (s *scanner) ident(prevDot bool) {
-	// general case
-	if s.ch >= utf8.RuneSelf {
-		for s.atIdentChar(false, prevDot) {
-			prevDot = s.ch == '.'
-			s.nextch()
+	ok := true
+	for s.atIdentChar(false) {
+		if s.ch == '.' && prevDot && ok {
+			s.error("identifier has multiple consecutive dots")
+			ok = false
 		}
+		prevDot = s.ch == '.'
+		s.nextch()
 	}
-
-	s.nlsemi = true
-	s.literal = string(s.segment())
-	s.tok = Ident
+	if prevDot && ok {
+		s.error("identifier cannot end with dot")
+		ok = false
+	}
+	s.setLiteral(Ident, ok)
 }
 
-func (s *scanner) atIdentChar(first, prevDot bool) bool {
+func (s *scanner) atIdentChar(first bool) bool {
 	switch {
-	case unicode.IsLetter(s.ch) || s.ch == '_':
+	case unicode.IsLetter(s.ch) || s.ch == '_' || s.ch == '.':
 		// ok
-	case s.ch == '.':
-		if prevDot {
-			s.errorf("identifier has multiple consecutive dots")
-		}
 	case unicode.IsDigit(s.ch):
 		if first {
 			s.errorf("identifier cannot begin with digit %#U", s.ch)
@@ -515,7 +516,7 @@ func (s *scanner) skipLine() {
 func (s *scanner) lineComment() (keep bool) {
 	// opening has already been consumed
 
-	if s.mode&comments != 0 {
+	if s.mode&emitComments != 0 {
 		s.skipLine()
 		s.setLiteral(Comment, true)
 		return true
@@ -544,7 +545,7 @@ func (s *scanner) skipBlockComment() (ok bool) {
 func (s *scanner) blockComment() (keep bool) {
 	// opening has already been consumed
 
-	if s.mode&comments != 0 {
+	if s.mode&emitComments != 0 {
 		ok := s.skipBlockComment()
 		s.setLiteral(Comment, ok)
 		return true
