@@ -20,6 +20,7 @@ type Inst interface {
 // Value is an expression or constant with a set of uses.
 type Value interface {
 	Uses() []*ValueUse
+	NUses() int
 	AddUse(use *ValueUse)
 	RemoveUse(use *ValueUse) bool
 	ReplaceUsesWith(other Value)
@@ -29,15 +30,18 @@ type Value interface {
 // User is an instruction that uses values.
 type User interface {
 	Operands() []*ValueUse
+	NOperands() int
 	Operand(n int) *ValueUse
 	SetOperand(n int, val Value)
 	ClearOperands()
+	UsesValue(val Value) bool
 	Inst
 }
 
 // TermInst is a branching instruction that terminates a basic block.
 type TermInst interface {
 	Succs() []*BasicBlock
+	NSuccs() int
 	Succ(n int) *BasicBlock
 	SetSucc(n int, block *BasicBlock)
 	Inst
@@ -50,6 +54,9 @@ type ValueBase struct {
 
 // Uses returns the set of instructions referring this value.
 func (val *ValueBase) Uses() []*ValueUse { return val.uses }
+
+// NUses returns the number of uses.
+func (val *ValueBase) NUses() int { return len(val.uses) }
 
 // AddUse adds a use edge to the value and user.
 func (val *ValueBase) AddUse(use *ValueUse) {
@@ -79,16 +86,6 @@ func (val *ValueBase) ReplaceUsesWith(other Value) {
 	val.uses = val.uses[:0]
 }
 
-// UsedBy returns the user uses the value.
-func UsedBy(val Value, user User) bool {
-	for _, operand := range user.Operands() {
-		if operand.def == val {
-			return true
-		}
-	}
-	return false
-}
-
 // UserBase implements the User interface.
 type UserBase struct {
 	operands  []*ValueUse
@@ -106,9 +103,7 @@ func (user *UserBase) Operands() []*ValueUse {
 func (user *UserBase) NOperands() int { return len(user.operands) }
 
 // Operand returns the specified operand.
-func (user *UserBase) Operand(n int) *ValueUse {
-	return user.operands[n]
-}
+func (user *UserBase) Operand(n int) *ValueUse { return user.operands[n] }
 
 // SetOperand sets the specified operand to a value and updates the use
 // lists.
@@ -145,6 +140,16 @@ func (user *UserBase) ClearOperands() {
 	}
 }
 
+// UsesValue returns whether an operand uses the value.
+func (user *UserBase) UsesValue(val Value) bool {
+	for _, operand := range user.Operands() {
+		if operand.def == val {
+			return true
+		}
+	}
+	return false
+}
+
 // ValueUse is an edge between a value definition and referrer.
 type ValueUse struct {
 	def     Value
@@ -179,6 +184,9 @@ type TermBase struct {
 
 // Succs returns the terminator's successor blocks.
 func (term *TermBase) Succs() []*BasicBlock { return term.succs }
+
+// NSuccs returns the number of successor blocks.
+func (term *TermBase) NSuccs() int { return len(term.succs) }
 
 // Succ returns the specified successor block.
 func (term *TermBase) Succ(n int) *BasicBlock { return term.succs[n] }

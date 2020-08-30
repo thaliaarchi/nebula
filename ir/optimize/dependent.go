@@ -71,7 +71,7 @@ func canThrow(inst ir.Inst) bool {
 func references(a, b ir.Inst) bool {
 	if val, ok := a.(ir.Value); ok {
 		if user, ok := b.(ir.User); ok {
-			return ir.UsedBy(val, user)
+			return user.UsesValue(val)
 		}
 	}
 	return false
