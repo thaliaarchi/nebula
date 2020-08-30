@@ -137,11 +137,10 @@ redo:
 		}
 		if s.atIdentChar(true) {
 			s.nextch()
-			s.ident(true)
+			s.ident()
 			break
 		}
-		s.error("bare dot")
-		s.nextch()
+		s.setLiteral(Ident, true)
 
 	case '#':
 		s.nextch()
@@ -175,7 +174,7 @@ redo:
 	default:
 		if s.atIdentChar(true) {
 			s.nextch()
-			s.ident(false)
+			s.ident()
 			break
 		}
 
@@ -187,26 +186,16 @@ redo:
 	return
 }
 
-func (s *scanner) ident(prevDot bool) {
-	ok := true
+func (s *scanner) ident() {
 	for s.atIdentChar(false) {
-		if s.ch == '.' && prevDot && ok {
-			s.error("identifier has multiple consecutive dots")
-			ok = false
-		}
-		prevDot = s.ch == '.'
 		s.nextch()
 	}
-	if prevDot && ok {
-		s.error("identifier cannot end with dot")
-		ok = false
-	}
-	s.setLiteral(Ident, ok)
+	s.setLiteral(Ident, true)
 }
 
 func (s *scanner) atIdentChar(first bool) bool {
 	switch {
-	case unicode.IsLetter(s.ch) || s.ch == '_' || s.ch == '.':
+	case unicode.IsLetter(s.ch) || s.ch == '_' || s.ch == '.' || s.ch == '~':
 		// ok
 	case unicode.IsDigit(s.ch):
 		if first {
